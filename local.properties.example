@@ -1,0 +1,23 @@
+## Melova Android → backend URL
+
+Copy this file to `local.properties` in the project root (same folder as `settings.gradle.kts`).
+
+```properties
+# Android Studio already has sdk.dir here — keep that line and add:
+sdk.dir=/path/from/your/studio
+
+# Pick ONE base URL for your setup:
+#
+# Android Emulator (default if omitted):
+# melova.api.baseUrl=http://10.0.2.2:8000/
+#
+# Physical phone on same Wi‑Fi / iPhone hotspot (Mac is usually x.x.x.1):
+melova.api.baseUrl=http://172.20.10.1:8000/
+#
+# USB debugging with port reverse (run: adb reverse tcp:8000 tcp:8000):
+# melova.api.baseUrl=http://127.0.0.1:8000/
+```
+
+Find your Mac IP: System Settings → Network, or terminal: `ipconfig getifaddr en0`
+
+After editing, **Rebuild** the app (Build → Rebuild Project).
