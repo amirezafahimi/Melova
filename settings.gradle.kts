@@ -1,5 +1,15 @@
 pluginManagement {
     repositories {
+        // Google Maven (dl.google.com) is blocked on some networks; Myket mirrors it.
+        maven {
+            name = "MyketGoogleMirror"
+            url = uri("https://maven.myket.ir")
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -7,7 +17,6 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
-        //maven(url = "https://maven.myket.ir")
         maven {
             name = "TarsosDSP"
             url = uri("https://mvn.0110.be/releases")
@@ -22,7 +31,11 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        //maven(url = "https://maven.myket.ir")
+        // Google Maven (dl.google.com) is blocked on some networks; Myket mirrors it.
+        maven {
+            name = "MyketGoogleMirror"
+            url = uri("https://maven.myket.ir")
+        }
         google()
         mavenCentral()
         maven {

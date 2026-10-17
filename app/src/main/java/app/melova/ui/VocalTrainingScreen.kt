@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.melova.audio.scoring.VocalAnalysisFeedback
 import app.melova.presentation.PlaybackTarget
+import app.melova.data.model.TahrirComparison
 import app.melova.data.model.VocalScoreResult
 import app.melova.presentation.VocalTrainingMode
 import app.melova.presentation.VocalTrainingUiState
@@ -72,6 +73,7 @@ import app.melova.ui.components.MelovaProgressBar
 import app.melova.ui.components.ScoreMetricsList
 import app.melova.ui.components.StudentRecordingWaveform
 import app.melova.ui.components.VocalTrainingCorrectionRow
+import app.melova.ui.components.VocalTrainingTahrirRow
 import app.melova.ui.layout.LtrContent
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
@@ -205,6 +207,8 @@ fun VocalTrainingScreen(
                                 isPlayingTeacherSample = uiState.isPlayingTeacherSample,
                                 onPlayCorrectionStudentSnippet = viewModel::playCorrectionSnippet,
                                 onPlayCorrectionTeacherSnippet = viewModel::playCorrectionTeacherSnippet,
+                                onPlayTahrirStudentSnippet = viewModel::playTahrirStudentSnippet,
+                                onPlayTahrirTeacherSnippet = viewModel::playTahrirTeacherSnippet,
                                 onRetryRecording = viewModel::retryRecording,
                                 onDismiss = viewModel::dismissResults
                             )
@@ -715,6 +719,8 @@ private fun HolisticScoreResultCard(
     isPlayingTeacherSample: Boolean,
     onPlayCorrectionStudentSnippet: (app.melova.audio.scoring.VocalScorer.PitchCorrection) -> Unit,
     onPlayCorrectionTeacherSnippet: (app.melova.audio.scoring.VocalScorer.PitchCorrection) -> Unit,
+    onPlayTahrirStudentSnippet: (TahrirComparison) -> Unit,
+    onPlayTahrirTeacherSnippet: (TahrirComparison) -> Unit,
     onRetryRecording: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -859,6 +865,34 @@ private fun HolisticScoreResultCard(
                             isPlayingTeacherSample,
                         onPlayStudentSnippet = { onPlayCorrectionStudentSnippet(correction) },
                         onPlayTeacherSnippet = { onPlayCorrectionTeacherSnippet(correction) }
+                    )
+                }
+            }
+
+            if (result.tahrirComparisons.isNotEmpty()) {
+                Text(
+                    text = "مقایسه تحریرها",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    textAlign = TextAlign.Start
+                )
+                Text(
+                    text = "تحریرهای استاد و همان بخش از اجرای شما را جداگانه بشنوید و مقایسه کنید.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.55f),
+                    textAlign = TextAlign.Start
+                )
+                result.tahrirComparisons.forEach { comparison ->
+                    VocalTrainingTahrirRow(
+                        comparison = comparison,
+                        isStudentSnippetPlaying = playingSnippetStartMs == comparison.key &&
+                            playingSnippetTarget == PlaybackTarget.USER &&
+                            isPlayingUserRecording,
+                        isTeacherSnippetPlaying = playingSnippetStartMs == comparison.key &&
+                            playingSnippetTarget == PlaybackTarget.TEACHER &&
+                            isPlayingTeacherSample,
+                        onPlayStudentSnippet = { onPlayTahrirStudentSnippet(comparison) },
+                        onPlayTeacherSnippet = { onPlayTahrirTeacherSnippet(comparison) }
                     )
                 }
             }

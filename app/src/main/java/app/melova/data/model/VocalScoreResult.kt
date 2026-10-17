@@ -10,6 +10,7 @@ data class VocalScoreResult(
     val technicalAnalysis: String,
     val weakPoints: List<String>,
     val corrections: List<VocalScorer.PitchCorrection> = emptyList(),
+    val tahrirComparisons: List<TahrirComparison> = emptyList(),
     val requiresReRecord: Boolean = false,
     val reRecordReason: ReRecordReason? = null
 )

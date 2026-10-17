@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.melova.audio.io.WaveformPeaksExtractor
 import app.melova.audio.scoring.VocalScorer
+import app.melova.data.model.TahrirComparison
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.repository.RemoteVocalScoringRepository
 import app.melova.data.repository.RemoteTeacherReferenceRepository
@@ -275,6 +276,85 @@ class VocalTrainingViewModel(application: Application) : AndroidViewModel(applic
                             },
                             teacherPlaybackPositionMs = if (target == PlaybackTarget.TEACHER) {
                                 endMs
+                            } else {
+                                it.teacherPlaybackPositionMs
+                            }
+                        )
+                    }
+                    break
+                }
+                delay(40)
+            }
+        }
+    }
+
+    fun playTahrirStudentSnippet(comparison: TahrirComparison) {
+        val start = comparison.studentStartMs ?: return
+        val end = comparison.studentEndMs ?: return
+        playRegionSnippet(PlaybackTarget.USER, start, end, comparison.key)
+    }
+
+    fun playTahrirTeacherSnippet(comparison: TahrirComparison) {
+        playRegionSnippet(PlaybackTarget.TEACHER, comparison.refStartMs, comparison.refEndMs, comparison.key)
+    }
+
+    /** پخش گزیده‌ی یک بازه‌ی دقیق [startMs, endMs] از صدای استاد یا هنرجو. */
+    private fun playRegionSnippet(
+        target: PlaybackTarget,
+        startMs: Long,
+        endMs: Long,
+        snippetKey: Long
+    ) {
+        if (_uiState.value.mode != VocalTrainingMode.RESULT) return
+        if (target == PlaybackTarget.NONE) return
+
+        if (target == PlaybackTarget.USER) {
+            if (!userRecordingFile.exists() || userRecordingFile.length() <= 44L) return
+        } else if (!canPlayTeacher()) return
+
+        cancelSnippetStop()
+
+        val totalMs = when (target) {
+            PlaybackTarget.USER -> (_uiState.value.userRecordingDurationSeconds * 1000L).coerceAtLeast(1L)
+            PlaybackTarget.TEACHER -> (lesson?.durationMs ?: 0L).coerceAtLeast(1L)
+            PlaybackTarget.NONE -> return
+        }
+
+        val clipStartMs = startMs.coerceIn(0L, totalMs)
+        val clipEndMs = endMs.coerceIn(clipStartMs + 1L, totalMs)
+
+        when (target) {
+            PlaybackTarget.USER -> playUserRecordingFrom(clipStartMs, null)
+            PlaybackTarget.TEACHER -> playTeacherFrom(clipStartMs)
+            PlaybackTarget.NONE -> return
+        }
+
+        _uiState.update {
+            it.copy(
+                playingSnippetStartMs = snippetKey,
+                playingSnippetTarget = target,
+                selectedCorrectionStartMs = null
+            )
+        }
+
+        snippetStopJob = viewModelScope.launch {
+            while (isActive && _uiState.value.playbackTarget == target) {
+                if (player.currentPositionMs() >= clipEndMs - 40L) {
+                    player.pause()
+                    val endAtMs = clipEndMs.coerceAtMost(totalMs)
+                    _uiState.update {
+                        it.copy(
+                            isPlaying = false,
+                            progress = endAtMs.toFloat() / totalMs,
+                            playingSnippetStartMs = null,
+                            playingSnippetTarget = null,
+                            userPlaybackPositionMs = if (target == PlaybackTarget.USER) {
+                                endAtMs
+                            } else {
+                                it.userPlaybackPositionMs
+                            },
+                            teacherPlaybackPositionMs = if (target == PlaybackTarget.TEACHER) {
+                                endAtMs
                             } else {
                                 it.teacherPlaybackPositionMs
                             }

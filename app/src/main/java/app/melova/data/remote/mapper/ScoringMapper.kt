@@ -4,11 +4,14 @@ import app.melova.audio.playback.ExpectedSegment
 import app.melova.audio.scoring.ReRecordReason
 import app.melova.audio.scoring.VocalScorer
 import app.melova.data.model.ScoreMetric
+import app.melova.data.model.TahrirComparison
+import app.melova.data.model.TahrirKind
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.remote.dto.ExpectedSegmentDto
 import app.melova.data.remote.dto.PitchCorrectionDto
 import app.melova.data.remote.dto.ScoreMetricDto
 import app.melova.data.remote.dto.ScoringResponseDto
+import app.melova.data.remote.dto.TahrirComparisonDto
 
 fun ScoringResponseDto.toDomain(): VocalScoreResult {
     val resolvedSummary = if (hasValidInput) {
@@ -24,6 +27,7 @@ fun ScoringResponseDto.toDomain(): VocalScoreResult {
         technicalAnalysis = technicalAnalysis.ifBlank { failureReason.orEmpty() },
         weakPoints = weakPoints,
         corrections = corrections.map { it.toDomain() },
+        tahrirComparisons = tahrirComparisons.map { it.toDomain() },
         requiresReRecord = requiresReRecord,
         reRecordReason = reRecordReason.toDomain()
     )
@@ -62,6 +66,18 @@ fun PitchCorrectionDto.toDomain(): VocalScorer.PitchCorrection =
         message = message,
         referenceStartMs = referenceStartMs,
         referenceEndMs = referenceEndMs
+    )
+
+fun TahrirComparisonDto.toDomain(): TahrirComparison =
+    TahrirComparison(
+        kind = TahrirKind.fromRaw(kind),
+        refStartMs = refStartMs,
+        refEndMs = refEndMs,
+        studentStartMs = studentStartMs,
+        studentEndMs = studentEndMs,
+        score = score,
+        vowelCount = vowelCount,
+        message = message
     )
 
 private fun String.toCorrectionDirection(): VocalScorer.CorrectionDirection =
