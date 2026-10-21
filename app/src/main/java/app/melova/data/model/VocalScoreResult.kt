@@ -11,6 +11,8 @@ data class VocalScoreResult(
     val weakPoints: List<String>,
     val corrections: List<VocalScorer.PitchCorrection> = emptyList(),
     val tahrirComparisons: List<TahrirComparison> = emptyList(),
+    /** Glide/eshareh shape feedback; reuses PitchCorrection for snippet playback. */
+    val ornamentCorrections: List<VocalScorer.PitchCorrection> = emptyList(),
     val requiresReRecord: Boolean = false,
     val reRecordReason: ReRecordReason? = null
 )

@@ -659,7 +659,7 @@ private fun HeadphoneHintBanner() {
             )
             Text(
                 text = "۱) نمونه WAV استاد را پخش کنید  ۲) همان ملودی را ضبط کنید (اکتاو بالاتر یا پایین‌تر هم درست است). " +
-                    "تحلیل با RMVPE و DTW انجام می‌شود — سرعت آزاد؛ ±۲۵ سنت عالی، تا ±۵۰ سنت قابل قبول.",
+                    "تحلیل با RMVPE و DTW انجام می‌شود — سرعت آزاد؛ اختلاف کمتر از نصف ربع‌پرده عالی، تا ربع‌پرده قابل قبول.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.8f),
                 lineHeight = MaterialTheme.typography.bodySmall.lineHeight * 1.3f,
@@ -865,6 +865,37 @@ private fun HolisticScoreResultCard(
                             isPlayingTeacherSample,
                         onPlayStudentSnippet = { onPlayCorrectionStudentSnippet(correction) },
                         onPlayTeacherSnippet = { onPlayCorrectionTeacherSnippet(correction) }
+                    )
+                }
+            }
+
+            if (result.ornamentCorrections.isNotEmpty()) {
+                Text(
+                    text = "ظرافت‌های اجرا",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    textAlign = TextAlign.Start
+                )
+                Text(
+                    text = "شیوه‌ی رسیدن به نت‌ها و اتصال آن‌ها در اجرای شما با استاد مقایسه شده؛ هر دو را بشنوید.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.55f),
+                    textAlign = TextAlign.Start
+                )
+                result.ornamentCorrections.forEach { ornament ->
+                    VocalTrainingCorrectionRow(
+                        correction = ornament,
+                        isSelected = selectedCorrectionStartMs == ornament.startMs,
+                        isStudentSnippetPlaying = playingSnippetStartMs == ornament.startMs &&
+                            playingSnippetTarget == PlaybackTarget.USER &&
+                            isPlayingUserRecording,
+                        isTeacherSnippetPlaying = playingSnippetStartMs == ornament.startMs &&
+                            playingSnippetTarget == PlaybackTarget.TEACHER &&
+                            isPlayingTeacherSample,
+                        onPlayStudentSnippet = { onPlayCorrectionStudentSnippet(ornament) },
+                        onPlayTeacherSnippet = { onPlayCorrectionTeacherSnippet(ornament) },
+                        header = "زمان \u200E${ornament.timeLabel}\u200F • رسیدن به نت",
+                        accentColor = Color(0xFFCE93D8)
                     )
                 }
             }

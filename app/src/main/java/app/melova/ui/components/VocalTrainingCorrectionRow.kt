@@ -37,9 +37,11 @@ fun VocalTrainingCorrectionRow(
     isStudentSnippetPlaying: Boolean,
     isTeacherSnippetPlaying: Boolean,
     onPlayStudentSnippet: () -> Unit,
-    onPlayTeacherSnippet: () -> Unit
+    onPlayTeacherSnippet: () -> Unit,
+    header: String = "زمان \u200E${correction.timeLabel}\u200F • نت هدف: ${correction.expectedNote}",
+    accentColor: Color? = null
 ) {
-    val accent = when (correction.direction) {
+    val accent = accentColor ?: when (correction.direction) {
         VocalScorer.CorrectionDirection.SHARP -> Color(0xFFFFB74D)
         VocalScorer.CorrectionDirection.FLAT -> Color(0xFF81D4FA)
         VocalScorer.CorrectionDirection.GOOD -> Color(0xFF81C784)
@@ -60,7 +62,7 @@ fun VocalTrainingCorrectionRow(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "زمان \u200E${correction.timeLabel}\u200F • نت هدف: ${correction.expectedNote}",
+            text = header,
             style = MaterialTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.7f),
             textAlign = TextAlign.Start

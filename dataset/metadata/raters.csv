@@ -1,0 +1,4 @@
+rater_id,role,singer_id,active,notes
+R01,teacher,S001,yes,خود شما — singer_id یعنی صداهای خودتان به خودتان برای ارزیابی داده نمی‌شود
+R02,teacher,,yes,
+R03,teacher,,yes,

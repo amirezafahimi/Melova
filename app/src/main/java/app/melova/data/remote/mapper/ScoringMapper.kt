@@ -8,6 +8,7 @@ import app.melova.data.model.TahrirComparison
 import app.melova.data.model.TahrirKind
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.remote.dto.ExpectedSegmentDto
+import app.melova.data.remote.dto.OrnamentCorrectionDto
 import app.melova.data.remote.dto.PitchCorrectionDto
 import app.melova.data.remote.dto.ScoreMetricDto
 import app.melova.data.remote.dto.ScoringResponseDto
@@ -28,6 +29,7 @@ fun ScoringResponseDto.toDomain(): VocalScoreResult {
         weakPoints = weakPoints,
         corrections = corrections.map { it.toDomain() },
         tahrirComparisons = tahrirComparisons.map { it.toDomain() },
+        ornamentCorrections = ornamentCorrections.map { it.toDomain() },
         requiresReRecord = requiresReRecord,
         reRecordReason = reRecordReason.toDomain()
     )
@@ -49,7 +51,7 @@ private fun List<ScoreMetricDto>.toDomainMetrics(pitchAccuracyFallback: Int): Li
             id = "pitch_accuracy",
             label = "دقت نت",
             value = pitchAccuracyFallback,
-            hint = "±۲۵ سنت عالی"
+            hint = "اختلاف کمتر از نصف ربع‌پرده عالی"
         )
     )
 }
@@ -63,6 +65,20 @@ fun PitchCorrectionDto.toDomain(): VocalScorer.PitchCorrection =
         sungNote = sungNote,
         centsOff = centsOff,
         direction = direction.toCorrectionDirection(),
+        message = message,
+        referenceStartMs = referenceStartMs,
+        referenceEndMs = referenceEndMs
+    )
+
+fun OrnamentCorrectionDto.toDomain(): VocalScorer.PitchCorrection =
+    VocalScorer.PitchCorrection(
+        startMs = startMs,
+        endMs = endMs,
+        timeLabel = timeLabel,
+        expectedNote = "",
+        sungNote = "",
+        centsOff = 0f,
+        direction = VocalScorer.CorrectionDirection.GOOD,
         message = message,
         referenceStartMs = referenceStartMs,
         referenceEndMs = referenceEndMs

@@ -1,0 +1,8 @@
+# Audio and anything derived from it never goes into git (privacy + size).
+data/
+# Real names / phone numbers of singers and raters live only here.
+metadata/*_private.csv
+consents/
+__pycache__/
+.pytest_cache/
+.venv/

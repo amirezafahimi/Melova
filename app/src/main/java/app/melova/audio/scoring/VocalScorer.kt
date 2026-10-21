@@ -142,10 +142,8 @@ class VocalScorer {
                         centsOff = cents,
                         direction = direction,
                         message = when (direction) {
-                            CorrectionDirection.SHARP ->
-                                "در $timeRange — کمی بم‌تر بخوانید (${abs(cents).roundToInt()} سنت)"
-                            CorrectionDirection.FLAT ->
-                                "در $timeRange — کمی زیرتر بخوانید (${abs(cents).roundToInt()} سنت)"
+                            CorrectionDirection.SHARP,
+                            CorrectionDirection.FLAT -> IntervalLabel.directionMessage(timeRange, cents)
                             CorrectionDirection.GOOD -> "عالی"
                         }
                     )

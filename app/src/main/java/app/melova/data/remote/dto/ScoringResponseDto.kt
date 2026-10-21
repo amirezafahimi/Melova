@@ -14,5 +14,6 @@ data class ScoringResponseDto(
     @SerializedName("technical_analysis") val technicalAnalysis: String = "",
     @SerializedName("weak_points") val weakPoints: List<String> = emptyList(),
     @SerializedName("corrections") val corrections: List<PitchCorrectionDto> = emptyList(),
-    @SerializedName("tahrir_comparisons") val tahrirComparisons: List<TahrirComparisonDto> = emptyList()
+    @SerializedName("tahrir_comparisons") val tahrirComparisons: List<TahrirComparisonDto> = emptyList(),
+    @SerializedName("ornament_corrections") val ornamentCorrections: List<OrnamentCorrectionDto> = emptyList()
 )

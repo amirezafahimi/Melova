@@ -1,0 +1,16 @@
+prompt_id,type,style,text,melody_ref,conditions,targets,notes
+V01,sustained_vowel,any,آ,راحت‌ترین نت گفتاری,normal|soft|full|tired,quality|power,۴ ثانیه بدون ویبراتوی عمدی
+V02,sustained_vowel,any,ای,راحت‌ترین نت گفتاری,normal|soft|full,quality|power,۴ ثانیه
+V03,sustained_vowel,any,او,راحت‌ترین نت گفتاری,normal|soft|full,quality|power,۴ ثانیه
+V04,messa_di_voce,any,آ,یک نت میانی,normal,power,۶ ثانیه: آرام ← اوج ← آرام
+G01,glide,any,او,از بم‌ترین تا زیرترین و برگشت,normal,quality|range,سیرن آرام
+S01,scale,western,آ,دو ر می فا سل فا می ر دو (در کوک خودش),normal|offpitch,pitch,
+S02,scale,traditional,آ,دانگ شور با سُری/کُرن (استاد تعیین کند),normal|offpitch,pitch,
+S03,arpeggio,western,آ,۱-۳-۵-۸-۵-۳-۱,normal,pitch,
+T01,tahrir,traditional,تحریر روی آ,یک تحریر استاندارد در شور (استاد تعیین کند),normal|expressive,pitch|tahrir,
+P01,phrase,traditional,الا یا ایها الساقی ادر کاسا و ناولها,ملودی را استاد ضبط مرجع کند,normal|neutral|expressive,expression|pitch|quality,حافظ — مالکیت عمومی
+P02,phrase,traditional,بشنو این نی چون شکایت می‌کند,ملودی را استاد ضبط مرجع کند,normal|neutral|expressive,expression|pitch|quality,مولانا — مالکیت عمومی
+P03,phrase,traditional,بنی آدم اعضای یکدیگرند,ملودی را استاد ضبط مرجع کند,normal|neutral|expressive,expression|pitch|quality,سعدی — مالکیت عمومی
+P04,phrase,pop,,یک جمله‌ی پاپ با ملودی و متن ساخته‌ی خودتان,normal|neutral|expressive,expression|pitch|quality,برای حق تجاری از متن/ملودی کپی‌رایت‌دار استفاده نکنید
+P05,phrase,pop,,یک جمله‌ی پاپ دیگر (اوج‌دار) ساخته‌ی خودتان,normal|neutral|expressive|full,expression|power,
+P06,phrase,pop,,یک جمله‌ی پاپ آرام ساخته‌ی خودتان,normal|neutral|expressive|soft,expression|quality,
