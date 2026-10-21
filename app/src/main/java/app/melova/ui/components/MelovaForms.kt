@@ -6,18 +6,21 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -33,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
@@ -76,9 +80,61 @@ fun MelovaTextField(
 }
 
 /**
- * A dialog holding a small form; [confirmEnabled] guards required fields. The whole dialog is
- * laid out RTL (not just its texts) so the confirm button sits at the start, the Persian way.
- * While [busy], the confirm button shows progress and the dialog can't be dismissed.
+ * The app's dialog. A dialog is its own window with its own Compose root, and that root
+ * takes its layout direction from the (LTR) window, so a stock AlertDialog draws its first
+ * frame LTR and flips a frame later. Here RTL is provided as the very first thing inside
+ * the window, so the dialog is RTL from its first frame: title at the right, confirm at
+ * the left end of the button row.
+ */
+@Composable
+fun MelovaDialog(
+    title: String,
+    onDismissRequest: () -> Unit,
+    buttons: @Composable RowScope.() -> Unit,
+    properties: DialogProperties = DialogProperties(),
+    content: @Composable ColumnScope.() -> Unit
+) {
+    RtlContent {
+        Dialog(onDismissRequest = onDismissRequest, properties = properties) {
+            RtlContent {
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MelovaCard,
+                    tonalElevation = 6.dp,
+                    modifier = Modifier.widthIn(min = 280.dp, max = 560.dp)
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MelovaText,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Column(
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            content = content
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                            verticalAlignment = Alignment.CenterVertically,
+                            content = buttons
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A dialog holding a small form; [confirmEnabled] guards required fields. While [busy], the
+ * confirm button shows progress and the dialog can't be dismissed.
  */
 @Composable
 fun FormDialog(
@@ -91,33 +147,21 @@ fun FormDialog(
     dismissOnOutsideTap: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    RtlContent {
-        AlertDialog(
-            onDismissRequest = { if (!busy && dismissOnOutsideTap) onDismiss() },
-            properties = DialogProperties(dismissOnBackPress = !busy, dismissOnClickOutside = !busy && dismissOnOutsideTap),
-            containerColor = MelovaCard,
-            shape = RoundedCornerShape(28.dp),
-            title = { DialogTitle(title) },
-            text = {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) { content() }
-            },
-            confirmButton = {
-                TextButton(onClick = onConfirm, enabled = confirmEnabled && !busy) {
-                    if (busy) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MelovaAccent, strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(confirmLabel, color = if (confirmEnabled && !busy) MelovaAccent else MelovaTextMuted)
+    MelovaDialog(
+        title = title,
+        onDismissRequest = { if (!busy && dismissOnOutsideTap) onDismiss() },
+        properties = DialogProperties(dismissOnBackPress = !busy, dismissOnClickOutside = !busy && dismissOnOutsideTap),
+        buttons = {
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("انصراف", color = MelovaTextMuted) }
+            TextButton(onClick = onConfirm, enabled = confirmEnabled && !busy) {
+                if (busy) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MelovaAccent, strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss, enabled = !busy) { Text("انصراف", color = MelovaTextMuted) }
+                Text(confirmLabel, color = if (confirmEnabled && !busy) MelovaAccent else MelovaTextMuted)
             }
-        )
-    }
+        }
+    ) { content() }
 }
 
 @Composable
@@ -129,41 +173,23 @@ fun ConfirmDialog(
     onDismiss: () -> Unit,
     destructive: Boolean = true
 ) {
-    RtlContent {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            containerColor = MelovaCard,
-            shape = RoundedCornerShape(28.dp),
-            title = { DialogTitle(title) },
-            text = {
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MelovaTextMuted,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = onConfirm) {
-                    Text(confirmLabel, color = if (destructive) MelovaError else MelovaAccent)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) { Text("انصراف", color = MelovaTextMuted) }
+    MelovaDialog(
+        title = title,
+        onDismissRequest = onDismiss,
+        buttons = {
+            TextButton(onClick = onDismiss) { Text("انصراف", color = MelovaTextMuted) }
+            TextButton(onClick = onConfirm) {
+                Text(confirmLabel, color = if (destructive) MelovaError else MelovaAccent)
             }
+        }
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MelovaTextMuted,
+            modifier = Modifier.fillMaxWidth()
         )
     }
-}
-
-/** Fills the width so the title starts at the right edge instead of centering. */
-@Composable
-private fun DialogTitle(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleLarge,
-        color = MelovaText,
-        modifier = Modifier.fillMaxWidth()
-    )
 }
 
 /** Dims the screen and blocks touches while a change is uploading or saving. */

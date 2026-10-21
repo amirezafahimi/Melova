@@ -32,7 +32,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import app.melova.presentation.CourseViewModel
+import app.melova.presentation.CatalogViewModel
 import app.melova.presentation.LessonIntroViewModel
 import app.melova.presentation.TeacherViewModel
 import app.melova.presentation.VocalTrainingViewModel
@@ -50,15 +50,15 @@ fun MelovaApp(
 ) {
     val navController = rememberNavController()
     // Activity-scoped: shared by the tabs, lesson screens and the teacher panel.
-    val courseViewModel: CourseViewModel = viewModel()
+    val catalogViewModel: CatalogViewModel = viewModel()
     val teacherViewModel: TeacherViewModel = viewModel()
-    val courseState by courseViewModel.uiState.collectAsStateWithLifecycle()
+    val catalogState by catalogViewModel.uiState.collectAsStateWithLifecycle()
     val teacherState by teacherViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Teacher edits, sign-in and sign-out change which courses the student side sees.
+    // Teacher edits, sign-in and sign-out change which lessons the student side sees.
     LaunchedEffect(teacherState.revision) {
-        if (teacherState.revision > 0) courseViewModel.refresh(silent = true)
+        if (teacherState.revision > 0) catalogViewModel.refresh(silent = true)
     }
     LaunchedEffect(teacherState.message) {
         teacherState.message?.let {
@@ -69,6 +69,14 @@ fun MelovaApp(
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentTab = AppScreen.tabFor(backStackEntry?.destination?.route)
+    val selectTab: (MainTab) -> Unit = { tab ->
+        navController.navigate(AppScreen.tabRoute(tab)) {
+            // Home is always the bottom of the stack (the splash removes itself).
+            popUpTo(AppScreen.HOME) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // The UI is RTL, so "forward" slides in from the left.
@@ -96,29 +104,37 @@ fun MelovaApp(
 
             composable(AppScreen.HOME, enterTransition = { fadeIn() }, exitTransition = { fadeOut() }) {
                 HomeScreen(
-                    state = courseState,
-                    onRefresh = { courseViewModel.refresh() },
+                    state = catalogState,
+                    onRefresh = { catalogViewModel.refresh() },
                     onAppear = {
-                        courseViewModel.refresh(silent = true)
-                        courseViewModel.refreshProgress()
+                        catalogViewModel.refresh(silent = true)
+                        catalogViewModel.refreshProgress()
                     },
                     onLessonClick = { navController.navigate(AppScreen.lesson(it)) },
+                    onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
                     onSolfegeClick = { navController.navigate(AppScreen.SOLFEGE) },
-                    onFollowChange = courseViewModel::setFollowed
+                    onFollowChange = catalogViewModel::setFollowed,
+                    onExploreClick = { selectTab(MainTab.EXPLORE) }
                 )
             }
 
             composable(AppScreen.EXPLORE, enterTransition = { fadeIn() }, exitTransition = { fadeOut() }) {
-                ExploreScreen()
+                ExploreScreen(
+                    state = catalogState,
+                    onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
+                    onFollowChange = catalogViewModel::setFollowed,
+                    onRetry = { catalogViewModel.refresh() }
+                )
             }
 
             composable(AppScreen.PROFILE, enterTransition = { fadeIn() }, exitTransition = { fadeOut() }) {
                 ProfileScreen(
-                    courseState = courseState,
+                    catalogState = catalogState,
                     teacherState = teacherState,
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
-                    onFollowChange = courseViewModel::setFollowed,
+                    onFollowChange = catalogViewModel::setFollowed,
+                    onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
                     onTeacherSignIn = teacherViewModel::signIn,
                     onTeacherSignOut = teacherViewModel::signOut,
                     onOpenTeacherPanel = { navController.navigate(AppScreen.TEACHER_PANEL) }
@@ -132,11 +148,11 @@ fun MelovaApp(
                 val lessonId = entry.arguments?.getString(LessonIntroViewModel.ARG_LESSON_ID).orEmpty()
                 LessonScreen(
                     lessonId = lessonId,
-                    courseState = courseState,
+                    catalogState = catalogState,
                     onBack = { navController.popBackStack() },
-                    onRetry = { courseViewModel.refresh() },
+                    onRetry = { catalogViewModel.refresh() },
                     onSectionClick = { sectionId -> navController.navigate(AppScreen.practice(lessonId, sectionId)) },
-                    onResume = courseViewModel::refreshProgress
+                    onResume = catalogViewModel::refreshProgress
                 )
             }
 
@@ -154,28 +170,27 @@ fun MelovaApp(
                 MelovaScreen(onBack = { navController.popBackStack() })
             }
 
-            composable(AppScreen.TEACHER_PANEL) {
-                TeacherPanelScreen(
-                    state = teacherState,
-                    viewModel = teacherViewModel,
-                    followedIds = courseState.followedIds,
-                    onFollowChange = courseViewModel::setFollowed,
-                    onOpenCourse = { navController.navigate(AppScreen.courseEditor(it)) },
+            composable(
+                AppScreen.TEACHER_PAGE,
+                arguments = listOf(navArgument(AppScreen.ARG_TEACHER_ID) { type = NavType.StringType })
+            ) { entry ->
+                val teacherId = entry.arguments?.getString(AppScreen.ARG_TEACHER_ID).orEmpty()
+                TeacherPageScreen(
+                    teacherId = teacherId,
+                    state = catalogState,
+                    onFollowChange = { catalogViewModel.setFollowed(teacherId, it) },
+                    onLessonClick = { navController.navigate(AppScreen.lesson(it)) },
                     onBack = { navController.popBackStack() }
                 )
             }
 
-            composable(
-                AppScreen.COURSE_EDITOR,
-                arguments = listOf(navArgument(AppScreen.ARG_COURSE_ID) { type = NavType.StringType })
-            ) { entry ->
-                val courseId = entry.arguments?.getString(AppScreen.ARG_COURSE_ID).orEmpty()
-                CourseEditorScreen(
-                    courseId = courseId,
+            composable(AppScreen.TEACHER_PANEL) {
+                val ownId = teacherState.profile?.id
+                TeacherPanelScreen(
                     state = teacherState,
                     viewModel = teacherViewModel,
-                    isFollowed = courseState.isFollowed(courseId),
-                    onFollowChange = { courseViewModel.setFollowed(courseId, it) },
+                    isFollowingSelf = ownId != null && catalogState.isFollowed(ownId),
+                    onFollowSelfChange = { followed -> ownId?.let { catalogViewModel.setFollowed(it, followed) } },
                     onOpenLesson = { navController.navigate(AppScreen.lessonEditor(it)) },
                     onBack = { navController.popBackStack() }
                 )
@@ -204,15 +219,7 @@ fun MelovaApp(
         ) {
             MelovaBottomBar(
                 selected = currentTab ?: MainTab.PRACTICE,
-                onSelect = { tab ->
-                    if (tab == currentTab) return@MelovaBottomBar
-                    navController.navigate(AppScreen.tabRoute(tab)) {
-                        // Home is always the bottom of the stack (the splash removes itself).
-                        popUpTo(AppScreen.HOME) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
+                onSelect = { tab -> if (tab != currentTab) selectTab(tab) }
             )
         }
 

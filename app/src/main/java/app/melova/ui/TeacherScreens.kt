@@ -55,10 +55,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.melova.data.model.Course
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
-import app.melova.data.repository.CourseFields
 import app.melova.data.repository.LessonFields
 import app.melova.presentation.TeacherUiState
 import app.melova.presentation.TeacherViewModel
@@ -71,6 +69,7 @@ import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTextField
 import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.SectionHeader
+import app.melova.ui.components.TeacherAvatar
 import app.melova.ui.components.TakeController
 import app.melova.ui.components.TakeKind
 import app.melova.ui.components.TakePhase
@@ -93,13 +92,13 @@ import app.melova.ui.theme.MelovaTextMuted
 fun TeacherPanelScreen(
     state: TeacherUiState,
     viewModel: TeacherViewModel,
-    followedIds: Set<String>,
-    onFollowChange: (courseId: String, followed: Boolean) -> Unit,
-    onOpenCourse: (String) -> Unit,
+    isFollowingSelf: Boolean,
+    onFollowSelfChange: (Boolean) -> Unit,
+    onOpenLesson: (String) -> Unit,
     onBack: () -> Unit
 ) {
     var editingProfile by rememberSaveable { mutableStateOf(false) }
-    var creatingCourse by rememberSaveable { mutableStateOf(false) }
+    var creatingLesson by rememberSaveable { mutableStateOf(false) }
     val profile = state.profile
 
     TeacherScaffold(title = "پنل استاد", subtitle = profile?.name, onBack = onBack, busyLabel = state.busyLabel) {
@@ -110,15 +109,7 @@ fun TeacherPanelScreen(
         item {
             MelovaSurfaceCard {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(MelovaAccent, MelovaSecondary))),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(profile.name.take(1), style = MaterialTheme.typography.headlineSmall, color = Color.White)
-                    }
+                    TeacherAvatar(profile.name, size = 56.dp)
                     Column(modifier = Modifier.weight(1f)) {
                         Text(profile.name, style = MaterialTheme.typography.titleLarge, color = MelovaText)
                         Text(
@@ -136,24 +127,32 @@ fun TeacherPanelScreen(
             }
         }
         item {
-            HeaderWithAction(
-                title = "دوره‌های شما",
-                actionLabel = "دوره‌ی جدید",
-                onAction = { creatingCourse = true }
-            )
-        }
-        if (profile.courses.isEmpty()) {
-            item { EmptyHint(Icons.Outlined.LibraryMusic, "اولین دوره‌تان را بسازید؛ بعد درس‌ها و بخش‌ها را به آن اضافه می‌کنید.") }
-        }
-        profile.courses.forEach { course ->
-            item(key = course.id) {
-                TeacherCourseCard(
-                    course = course,
-                    isFollowed = course.id in followedIds,
-                    onFollowChange = { onFollowChange(course.id, it) },
-                    onClick = { onOpenCourse(course.id) }
+            MelovaSurfaceCard(contentPadding = 14.dp) {
+                SwitchRow(
+                    title = "درس‌هایم در تب تمرین من",
+                    description = "خودتان را مثل یک هنرجو دنبال کنید تا درس‌ها را تمرین کنید.",
+                    checked = isFollowingSelf,
+                    onCheckedChange = onFollowSelfChange
                 )
             }
+        }
+        item {
+            HeaderWithAction(
+                title = "درس‌های شما",
+                actionLabel = "درس جدید",
+                onAction = { creatingLesson = true }
+            )
+        }
+        if (profile.lessons.isEmpty()) {
+            item {
+                EmptyHint(
+                    Icons.Outlined.LibraryMusic,
+                    "اولین درستان را بسازید. هر درس یک آموزش کلی و چند بخش برای تمرین دارد؛ هنرجوهایی که شما را دنبال می‌کنند آن را می‌بینند."
+                )
+            }
+        }
+        itemsIndexed(profile.lessons, key = { _, lesson -> lesson.id }) { index, lesson ->
+            TeacherLessonRow(number = index + 1, lesson = lesson, onClick = { onOpenLesson(lesson.id) })
         }
     }
 
@@ -174,185 +173,28 @@ fun TeacherPanelScreen(
             MelovaTextField(value = bio, onValueChange = { bio = it }, label = "معرفی کوتاه", singleLine = false, minLines = 3)
         }
     }
-    if (creatingCourse) {
-        CourseFormDialog(
-            title = "دوره‌ی جدید",
-            initial = CourseFields("", "", "مقدماتی", ""),
-            confirmLabel = "ساختن",
-            onConfirm = {
-                viewModel.createCourse(it)
-                creatingCourse = false
-            },
-            onDismiss = { creatingCourse = false }
-        )
-    }
-}
-
-@Composable
-private fun TeacherCourseCard(
-    course: Course,
-    isFollowed: Boolean,
-    onFollowChange: (Boolean) -> Unit,
-    onClick: () -> Unit
-) {
-    MelovaSurfaceCard(onClick = onClick) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = course.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MelovaText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${course.lessons.size} درس • ${course.sectionCount} بخش",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MelovaTextMuted
-                    )
-                }
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PublishChip(course.published)
-                if (course.level.isNotBlank()) MelovaChip(text = course.level)
-                androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                Text("در تب تمرین", style = MaterialTheme.typography.labelMedium, color = MelovaTextMuted)
-                MelovaSwitch(checked = isFollowed, onCheckedChange = onFollowChange)
-            }
-        }
-    }
-}
-
-// ------------------------------------------------------------------ course
-
-@Composable
-fun CourseEditorScreen(
-    courseId: String,
-    state: TeacherUiState,
-    viewModel: TeacherViewModel,
-    isFollowed: Boolean,
-    onFollowChange: (Boolean) -> Unit,
-    onOpenLesson: (String) -> Unit,
-    onBack: () -> Unit
-) {
-    val course = state.course(courseId)
-    var editing by rememberSaveable { mutableStateOf(false) }
-    var addingLesson by rememberSaveable { mutableStateOf(false) }
-    var confirmDelete by rememberSaveable { mutableStateOf(false) }
-
-    TeacherScaffold(
-        title = course?.title ?: "دوره",
-        subtitle = "ویرایش دوره",
-        onBack = onBack,
-        busyLabel = state.busyLabel
-    ) {
-        if (course == null) {
-            item { LoadingOrRetry(state, onRetry = viewModel::refresh, missingMessage = "این دوره حذف شده است.") }
-            return@TeacherScaffold
-        }
-        item {
-            MelovaSurfaceCard {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(course.title, style = MaterialTheme.typography.titleLarge, color = MelovaText)
-                            if (course.subtitle.isNotBlank()) {
-                                Text(course.subtitle, style = MaterialTheme.typography.bodyMedium, color = MelovaAccentSoft)
-                            }
-                        }
-                        IconButton(onClick = { editing = true }) {
-                            Icon(Icons.Outlined.Edit, contentDescription = "ویرایش اطلاعات دوره", tint = MelovaAccentSoft)
-                        }
-                    }
-                    if (course.level.isNotBlank()) MelovaChip(text = course.level)
-                    Text(
-                        text = course.description.ifBlank { "توضیحی برای این دوره ننوشته‌اید." },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MelovaTextMuted
-                    )
-                }
-            }
-        }
-        item {
-            MelovaSurfaceCard(contentPadding = 14.dp) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SwitchRow(
-                        title = "انتشار برای هنرجوها",
-                        description = if (course.published) {
-                            "همه‌ی هنرجوها این دوره را می‌بینند."
-                        } else {
-                            "پیش‌نویس است؛ فقط شما آن را می‌بینید."
-                        },
-                        checked = course.published,
-                        onCheckedChange = { viewModel.setCoursePublished(course.id, it) }
-                    )
-                    SwitchRow(
-                        title = "نمایش در تب تمرین من",
-                        description = "دوره را مثل یک هنرجو دنبال کنید تا خودتان تمرینش کنید.",
-                        checked = isFollowed,
-                        onCheckedChange = onFollowChange
-                    )
-                }
-            }
-        }
-        item { HeaderWithAction(title = "درس‌ها", actionLabel = "درس جدید", onAction = { addingLesson = true }) }
-        if (course.lessons.isEmpty()) {
-            item { EmptyHint(Icons.Outlined.GraphicEq, "درسی ندارید. هر درس یک آموزش کلی و چند بخش برای تمرین دارد.") }
-        }
-        itemsIndexed(course.lessons, key = { _, lesson -> lesson.id }) { index, lesson ->
-            TeacherLessonRow(number = index + 1, lesson = lesson, onClick = { onOpenLesson(lesson.id) })
-        }
-        item { DangerButton(label = "حذف دوره", onClick = { confirmDelete = true }) }
-    }
-
-    if (editing && course != null) {
-        CourseFormDialog(
-            title = "ویرایش دوره",
-            initial = CourseFields(course.title, course.subtitle, course.level, course.description),
-            confirmLabel = "ذخیره",
-            onConfirm = {
-                viewModel.updateCourse(course.id, it)
-                editing = false
-            },
-            onDismiss = { editing = false }
-        )
-    }
-    if (addingLesson && course != null) {
+    if (creatingLesson) {
         LessonFormDialog(
             title = "درس جدید",
-            initial = LessonFields("", "", ""),
-            confirmLabel = "ساختن",
+            initial = LessonFields("", "", profile?.lessons?.lastOrNull()?.level ?: "مقدماتی", ""),
+            confirmLabel = "ساختن و افزودن صدا",
             onConfirm = {
-                viewModel.createLesson(course.id, it)
-                addingLesson = false
+                creatingLesson = false
+                // Straight into the new lesson, where the intro and sections are recorded.
+                viewModel.createLesson(it, onCreated = onOpenLesson)
             },
-            onDismiss = { addingLesson = false }
-        )
-    }
-    if (confirmDelete && course != null) {
-        ConfirmDialog(
-            title = "حذف دوره؟",
-            message = "«${course.title}» با همه‌ی درس‌ها و فایل‌های صوتی‌اش حذف می‌شود و برنمی‌گردد.",
-            confirmLabel = "حذف",
-            onConfirm = {
-                confirmDelete = false
-                viewModel.deleteCourse(course.id)
-                onBack()
-            },
-            onDismiss = { confirmDelete = false }
+            onDismiss = { creatingLesson = false }
         )
     }
 }
 
 @Composable
 private fun TeacherLessonRow(number: Int, lesson: Lesson, onClick: () -> Unit) {
-    val ready = lesson.sections.count { it.isAvailable }
+    val ready = lesson.availableSections
     MelovaSurfaceCard(onClick = onClick, contentPadding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             NumberBadge(number)
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = lesson.title,
                     style = MaterialTheme.typography.titleMedium,
@@ -360,14 +202,17 @@ private fun TeacherLessonRow(number: Int, lesson: Lesson, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = buildString {
-                        append(if (lesson.hasIntro) "آموزش کلی ✓" else "بدون آموزش کلی")
-                        append(" • $ready بخش")
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MelovaTextMuted
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PublishChip(lesson.published)
+                    Text(
+                        text = buildString {
+                            append(if (lesson.hasIntro) "آموزش ✓" else "بدون آموزش")
+                            append(" • $ready بخش")
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MelovaTextMuted
+                    )
+                }
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
         }
@@ -384,8 +229,7 @@ fun LessonEditorScreen(
     onPreview: () -> Unit,
     onBack: () -> Unit
 ) {
-    val found = state.lesson(lessonId)
-    val lesson = found?.second
+    val lesson = state.lesson(lessonId)
     var editing by rememberSaveable { mutableStateOf(false) }
     var addingSection by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
@@ -400,7 +244,7 @@ fun LessonEditorScreen(
 
     TeacherScaffold(
         title = lesson?.title ?: "درس",
-        subtitle = found?.first?.title,
+        subtitle = lesson?.let { if (it.published) "منتشرشده" else "پیش‌نویس" },
         onBack = { leave(onBack) },
         busyLabel = state.busyLabel
     ) {
@@ -416,6 +260,7 @@ fun LessonEditorScreen(
                         if (lesson.subtitle.isNotBlank()) {
                             Text(lesson.subtitle, style = MaterialTheme.typography.bodyMedium, color = MelovaAccentSoft)
                         }
+                        if (lesson.level.isNotBlank()) MelovaChip(text = lesson.level)
                         Text(
                             text = lesson.description.ifBlank { "توضیحی برای این درس ننوشته‌اید." },
                             style = MaterialTheme.typography.bodySmall,
@@ -426,6 +271,22 @@ fun LessonEditorScreen(
                         Icon(Icons.Outlined.Edit, contentDescription = "ویرایش اطلاعات درس", tint = MelovaAccentSoft)
                     }
                 }
+            }
+        }
+        item {
+            val canPublish = lesson.published || lesson.availableSections > 0
+            MelovaSurfaceCard(contentPadding = 14.dp) {
+                SwitchRow(
+                    title = "انتشار برای هنرجوها",
+                    description = when {
+                        lesson.published -> "هنرجوهایی که شما را دنبال می‌کنند این درس را می‌بینند."
+                        canPublish -> "پیش‌نویس است؛ فقط شما آن را می‌بینید."
+                        else -> "برای انتشار، دست‌کم یک بخش اضافه کنید."
+                    },
+                    checked = lesson.published,
+                    enabled = canPublish && state.busyLabel == null,
+                    onCheckedChange = { viewModel.setLessonPublished(lesson.id, it) }
+                )
             }
         }
         item { SectionHeader(title = "آموزش کلی") }
@@ -466,7 +327,7 @@ fun LessonEditorScreen(
     if (editing && lesson != null) {
         LessonFormDialog(
             title = "ویرایش درس",
-            initial = LessonFields(lesson.title, lesson.subtitle, lesson.description),
+            initial = LessonFields(lesson.title, lesson.subtitle, lesson.level, lesson.description),
             confirmLabel = "ذخیره",
             onConfirm = {
                 viewModel.updateLesson(lesson.id, it)
@@ -565,32 +426,6 @@ private fun TeacherSectionRow(number: Int, section: LessonSection, onDelete: () 
 // ------------------------------------------------------------------ dialogs
 
 @Composable
-private fun CourseFormDialog(
-    title: String,
-    initial: CourseFields,
-    confirmLabel: String,
-    onConfirm: (CourseFields) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var courseTitle by rememberSaveable { mutableStateOf(initial.title) }
-    var subtitle by rememberSaveable { mutableStateOf(initial.subtitle) }
-    var level by rememberSaveable { mutableStateOf(initial.level) }
-    var description by rememberSaveable { mutableStateOf(initial.description) }
-    FormDialog(
-        title = title,
-        confirmLabel = confirmLabel,
-        confirmEnabled = courseTitle.isNotBlank(),
-        onConfirm = { onConfirm(CourseFields(courseTitle.trim(), subtitle.trim(), level.trim(), description.trim())) },
-        onDismiss = onDismiss
-    ) {
-        MelovaTextField(value = courseTitle, onValueChange = { courseTitle = it }, label = "عنوان دوره *")
-        MelovaTextField(value = subtitle, onValueChange = { subtitle = it }, label = "زیرعنوان")
-        MelovaTextField(value = level, onValueChange = { level = it }, label = "سطح (مثلاً مقدماتی)")
-        MelovaTextField(value = description, onValueChange = { description = it }, label = "توضیحات", singleLine = false, minLines = 3)
-    }
-}
-
-@Composable
 private fun LessonFormDialog(
     title: String,
     initial: LessonFields,
@@ -600,16 +435,18 @@ private fun LessonFormDialog(
 ) {
     var lessonTitle by rememberSaveable { mutableStateOf(initial.title) }
     var subtitle by rememberSaveable { mutableStateOf(initial.subtitle) }
+    var level by rememberSaveable { mutableStateOf(initial.level) }
     var description by rememberSaveable { mutableStateOf(initial.description) }
     FormDialog(
         title = title,
         confirmLabel = confirmLabel,
         confirmEnabled = lessonTitle.isNotBlank(),
-        onConfirm = { onConfirm(LessonFields(lessonTitle.trim(), subtitle.trim(), description.trim())) },
+        onConfirm = { onConfirm(LessonFields(lessonTitle.trim(), subtitle.trim(), level.trim(), description.trim())) },
         onDismiss = onDismiss
     ) {
         MelovaTextField(value = lessonTitle, onValueChange = { lessonTitle = it }, label = "عنوان درس *")
         MelovaTextField(value = subtitle, onValueChange = { subtitle = it }, label = "زیرعنوان")
+        MelovaTextField(value = level, onValueChange = { level = it }, label = "سطح (مثلاً مقدماتی)")
         MelovaTextField(value = description, onValueChange = { description = it }, label = "توضیحات", singleLine = false, minLines = 3)
     }
 }
@@ -767,21 +604,28 @@ private fun IntroCard(hasIntro: Boolean, take: TakeController, busy: Boolean, on
 }
 
 @Composable
-private fun SwitchRow(title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SwitchRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
+) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = MelovaText)
             Text(description, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
         }
-        MelovaSwitch(checked = checked, onCheckedChange = onCheckedChange)
+        MelovaSwitch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 
 @Composable
-private fun MelovaSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun MelovaSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
     Switch(
         checked = checked,
         onCheckedChange = onCheckedChange,
+        enabled = enabled,
         colors = SwitchDefaults.colors(checkedTrackColor = MelovaAccent, checkedThumbColor = Color.White)
     )
 }

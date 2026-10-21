@@ -4,10 +4,8 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import app.melova.data.model.Course
 import app.melova.data.model.Lesson
 import app.melova.data.model.TeacherProfile
-import app.melova.data.repository.CourseFields
 import app.melova.data.repository.LessonFields
 import app.melova.data.repository.TeacherRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,8 +15,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Teacher mode: sign in with the teacher code and manage courses. Activity-scoped so the
- * panel, course and lesson editors share one profile. [TeacherUiState.revision] changes
+ * Teacher mode: sign in with the teacher code and manage lessons. Activity-scoped so the
+ * panel and the lesson editor share one profile. [TeacherUiState.revision] changes
  * whenever the catalog does, so the student side can reload.
  */
 class TeacherViewModel(application: Application) : AndroidViewModel(application) {
@@ -46,20 +44,18 @@ class TeacherViewModel(application: Application) : AndroidViewModel(application)
     fun updateProfile(name: String, bio: String) =
         run("در حال ذخیره…") { repository.updateProfile(name, bio) }
 
-    fun createCourse(fields: CourseFields) = run("در حال ساخت دوره…") { repository.createCourse(fields) }
+    /** [onCreated] gets the new lesson's id, so the panel can open it right away. */
+    fun createLesson(fields: LessonFields, onCreated: (String) -> Unit = {}) {
+        val before = _uiState.value.profile?.lessons.orEmpty().map { it.id }.toSet()
+        run("در حال ساخت درس…", onSuccess = {
+            _uiState.value.profile?.lessons?.firstOrNull { it.id !in before }?.let { onCreated(it.id) }
+        }) { repository.createLesson(fields) }
+    }
 
-    fun updateCourse(courseId: String, fields: CourseFields) =
-        run("در حال ذخیره…") { repository.updateCourse(courseId, fields) }
-
-    fun setCoursePublished(courseId: String, published: Boolean) =
+    fun setLessonPublished(lessonId: String, published: Boolean) =
         run(if (published) "در حال انتشار…" else "در حال برگرداندن به پیش‌نویس…") {
-            repository.setCoursePublished(courseId, published)
+            repository.setLessonPublished(lessonId, published)
         }
-
-    fun deleteCourse(courseId: String) = run("در حال حذف دوره…") { repository.deleteCourse(courseId) }
-
-    fun createLesson(courseId: String, fields: LessonFields) =
-        run("در حال ساخت درس…") { repository.createLesson(courseId, fields) }
 
     fun updateLesson(lessonId: String, fields: LessonFields) =
         run("در حال ذخیره…") { repository.updateLesson(lessonId, fields) }
@@ -137,9 +133,5 @@ data class TeacherUiState(
     val message: String? = null,
     val revision: Int = 0
 ) {
-    fun course(courseId: String): Course? = profile?.courses?.firstOrNull { it.id == courseId }
-
-    fun lesson(lessonId: String): Pair<Course, Lesson>? = profile?.courses?.firstNotNullOfOrNull { course ->
-        course.lessons.firstOrNull { it.id == lessonId }?.let { course to it }
-    }
+    fun lesson(lessonId: String): Lesson? = profile?.lessons?.firstOrNull { it.id == lessonId }
 }

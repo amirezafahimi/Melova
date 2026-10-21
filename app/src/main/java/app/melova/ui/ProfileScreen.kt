@@ -43,8 +43,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.melova.BuildConfig
-import app.melova.data.model.Course
-import app.melova.presentation.CourseUiState
+import app.melova.data.model.Teacher
+import app.melova.presentation.CatalogUiState
 import app.melova.presentation.TeacherUiState
 import app.melova.ui.components.BottomBarContentPadding
 import app.melova.ui.components.FollowButton
@@ -55,7 +55,7 @@ import app.melova.ui.components.MelovaSegmentedControl
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTextField
 import app.melova.ui.components.SectionHeader
-import app.melova.ui.components.courseMeta
+import app.melova.ui.components.TeacherAvatar
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
@@ -68,11 +68,12 @@ import app.melova.ui.theme.ThemeMode
 
 @Composable
 fun ProfileScreen(
-    courseState: CourseUiState,
+    catalogState: CatalogUiState,
     teacherState: TeacherUiState,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
-    onFollowChange: (courseId: String, followed: Boolean) -> Unit,
+    onFollowChange: (teacherId: String, followed: Boolean) -> Unit,
+    onTeacherClick: (teacherId: String) -> Unit,
     onTeacherSignIn: (code: String) -> Unit,
     onTeacherSignOut: () -> Unit,
     onOpenTeacherPanel: () -> Unit
@@ -90,35 +91,36 @@ fun ProfileScreen(
             ) {
                 item { Text(text = "پروفایل", style = MaterialTheme.typography.headlineSmall, color = MelovaText) }
                 item { IdentityCard(teacherState) }
-                item { StatsRow(courseState) }
+                item { StatsRow(catalogState) }
 
                 item {
                     SectionHeader(
-                        title = "دوره‌های من",
-                        trailing = courseState.followedCourses.size.takeIf { it > 0 }?.let { "$it دوره" }
+                        title = "اساتید من",
+                        trailing = catalogState.followedTeachers.size.takeIf { it > 0 }?.let { "$it استاد" }
                     )
                 }
-                if (courseState.followedCourses.isEmpty()) {
+                if (catalogState.followedTeachers.isEmpty()) {
                     item {
                         Text(
-                            text = "هنوز دوره‌ای دنبال نمی‌کنید. از تب تمرین یک دوره را دنبال کنید.",
+                            text = "هنوز استادی را دنبال نمی‌کنید. از تب اساتید یکی را دنبال کنید.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MelovaTextMuted
                         )
                     }
                 }
-                items(courseState.followedCourses, key = { it.id }) { course ->
-                    FollowedCourseRow(
-                        course = course,
-                        practiced = courseState.practicedSections(course),
-                        total = courseState.availableSections(course),
-                        onUnfollow = { onFollowChange(course.id, false) }
+                items(catalogState.followedTeachers, key = { it.id }) { teacher ->
+                    FollowedTeacherRow(
+                        teacher = teacher,
+                        practiced = catalogState.practicedSections(teacher.id),
+                        total = catalogState.availableSections(teacher.id),
+                        onClick = { onTeacherClick(teacher.id) },
+                        onUnfollow = { onFollowChange(teacher.id, false) }
                     )
                 }
 
                 item { SectionHeader(title = "پنل استاد") }
                 item {
-                    TeacherCard(
+                    TeacherModeCard(
                         state = teacherState,
                         onSignIn = { showSignIn = true },
                         onSignOut = onTeacherSignOut,
@@ -203,9 +205,9 @@ private fun IdentityCard(teacherState: TeacherUiState) {
 }
 
 @Composable
-private fun StatsRow(state: CourseUiState) {
+private fun StatsRow(state: CatalogUiState) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatTile(value = state.followedCourses.size.toString(), label = "دوره", modifier = Modifier.weight(1f))
+        StatTile(value = state.followedTeachers.size.toString(), label = "استاد", modifier = Modifier.weight(1f))
         StatTile(value = state.bestScores.size.toString(), label = "بخش تمرین‌شده", modifier = Modifier.weight(1f))
         StatTile(value = state.bestScoreOverall?.toString() ?: "—", label = "بهترین نمره", modifier = Modifier.weight(1f))
     }
@@ -222,22 +224,29 @@ private fun StatTile(value: String, label: String, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun FollowedCourseRow(course: Course, practiced: Int, total: Int, onUnfollow: () -> Unit) {
-    MelovaSurfaceCard(contentPadding = 14.dp) {
+private fun FollowedTeacherRow(
+    teacher: Teacher,
+    practiced: Int,
+    total: Int,
+    onClick: () -> Unit,
+    onUnfollow: () -> Unit
+) {
+    MelovaSurfaceCard(onClick = onClick, contentPadding = 14.dp) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            TeacherAvatar(teacher.name, size = 40.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = course.title,
+                    text = teacher.name,
                     style = MaterialTheme.typography.titleMedium,
                     color = MelovaText,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${courseMeta(course)} • $practiced/$total بخش",
+                    text = "$practiced از $total بخش تمرین شده",
                     style = MaterialTheme.typography.bodySmall,
                     color = MelovaTextMuted
                 )
@@ -248,7 +257,7 @@ private fun FollowedCourseRow(course: Course, practiced: Int, total: Int, onUnfo
 }
 
 @Composable
-private fun TeacherCard(
+private fun TeacherModeCard(
     state: TeacherUiState,
     onSignIn: () -> Unit,
     onSignOut: () -> Unit,
@@ -263,9 +272,9 @@ private fun TeacherCard(
                 ) {
                     TeacherIcon()
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "مدیریت دوره‌ها", style = MaterialTheme.typography.titleMedium, color = MelovaText)
+                        Text(text = "مدیریت درس‌ها", style = MaterialTheme.typography.titleMedium, color = MelovaText)
                         Text(
-                            text = state.profile?.let { "${it.courses.size} دوره • ${it.courses.count { c -> c.published }} منتشرشده" }
+                            text = state.profile?.let { "${it.lessons.size} درس • ${it.lessons.count { l -> l.published }} منتشرشده" }
                                 ?: "در حال بارگذاری…",
                             style = MaterialTheme.typography.bodySmall,
                             color = MelovaTextMuted
@@ -289,7 +298,7 @@ private fun TeacherCard(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "استاد هستید؟", style = MaterialTheme.typography.titleMedium, color = MelovaText)
                         Text(
-                            text = "دوره‌ی خودتان را بسازید، درس و بخش اضافه کنید و هنرجوها اجرایشان را با صدای شما مقایسه کنند.",
+                            text = "درس‌هایتان را بارگذاری یا همین‌جا ضبط کنید؛ هنرجوهایی که شما را دنبال می‌کنند اجرایشان را با صدای شما مقایسه می‌کنند.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MelovaTextMuted
                         )

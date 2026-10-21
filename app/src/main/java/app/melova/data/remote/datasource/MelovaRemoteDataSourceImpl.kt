@@ -3,7 +3,7 @@ package app.melova.data.remote.datasource
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.api.MelovaApi
 import app.melova.data.remote.dto.HealthResponseDto
-import app.melova.data.remote.dto.CoursesResponseDto
+import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.ScoringResponseDto
 import okhttp3.RequestBody
 
@@ -17,8 +17,8 @@ class MelovaRemoteDataSourceImpl(
 
     override suspend fun downloadTeacherSyllables() = MelovaNetwork.api.downloadTeacherSyllables()
 
-    override suspend fun getCourses(teacherToken: String?): CoursesResponseDto =
-        MelovaNetwork.api.courses(teacherToken)
+    override suspend fun getCatalog(teacherToken: String?): CatalogResponseDto =
+        MelovaNetwork.api.catalog(teacherToken)
 
     override suspend fun downloadLessonIntro(lessonId: String) =
         MelovaNetwork.api.downloadLessonIntro(lessonId)

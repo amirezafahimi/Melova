@@ -5,8 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import app.melova.audio.playback.ReferenceAudioPlayer
-import app.melova.data.repository.CourseRepository
-import app.melova.data.repository.RemoteCourseRepository
+import app.melova.data.repository.LessonRepository
+import app.melova.data.repository.RemoteLessonRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +22,7 @@ class LessonIntroViewModel(
     savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
     private val lessonId: String = checkNotNull(savedStateHandle[ARG_LESSON_ID])
-    private val repository: CourseRepository = RemoteCourseRepository()
+    private val repository: LessonRepository = RemoteLessonRepository()
     private val player = ReferenceAudioPlayer(application)
 
     private val _uiState = MutableStateFlow(LessonIntroUiState())

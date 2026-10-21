@@ -85,7 +85,7 @@ fun MelovaBottomBar(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 SideTab(
-                    label = "اکسپلور",
+                    label = "اساتید",
                     icon = if (selected == MainTab.EXPLORE) Icons.Filled.Explore else Icons.Outlined.Explore,
                     selected = selected == MainTab.EXPLORE,
                     onClick = { onSelect(MainTab.EXPLORE) },

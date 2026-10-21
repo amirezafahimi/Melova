@@ -58,7 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
-import app.melova.presentation.CourseUiState
+import app.melova.presentation.CatalogUiState
 import app.melova.presentation.IntroStatus
 import app.melova.presentation.LessonIntroUiState
 import app.melova.presentation.LessonIntroViewModel
@@ -83,7 +83,7 @@ import app.melova.ui.theme.LocalMelovaPalette
 @Composable
 fun LessonScreen(
     lessonId: String,
-    courseState: CourseUiState,
+    catalogState: CatalogUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onSectionClick: (sectionId: String) -> Unit,
@@ -91,7 +91,7 @@ fun LessonScreen(
     introViewModel: LessonIntroViewModel = viewModel()
 ) {
     val introState by introViewModel.uiState.collectAsStateWithLifecycle()
-    val lesson = courseState.lesson(lessonId)
+    val lesson = catalogState.lesson(lessonId)
 
     // Refresh best scores when the student comes back from a practice section.
     LaunchedEffect(Unit) { onResume() }
@@ -110,14 +110,14 @@ fun LessonScreen(
 
                 if (lesson == null) {
                     item {
-                        if (courseState.isLoading) {
+                        if (catalogState.isLoading) {
                             Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(color = MelovaAccent)
                             }
                         } else {
                             MessageCard(
                                 icon = Icons.Default.CloudOff,
-                                message = courseState.errorMessage ?: "این درس در دسترس نیست.",
+                                message = catalogState.errorMessage ?: "این درس در دسترس نیست.",
                                 actionLabel = "تلاش دوباره",
                                 onAction = onRetry
                             )
@@ -139,14 +139,14 @@ fun LessonScreen(
                 item {
                     SectionHeader(
                         title = "بخش‌های تمرین",
-                        trailing = "${courseState.practicedSections(lesson)} از ${lesson.sections.size}"
+                        trailing = "${catalogState.practicedSections(lesson)} از ${lesson.sections.size}"
                     )
                 }
                 itemsIndexed(lesson.sections, key = { _, section -> section.id }) { index, section ->
                     SectionCard(
                         number = index + 1,
                         section = section,
-                        bestScore = courseState.bestScore(lesson.id, section.id),
+                        bestScore = catalogState.bestScore(lesson.id, section.id),
                         onClick = { onSectionClick(section.id) }
                     )
                 }

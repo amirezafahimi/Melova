@@ -1,7 +1,7 @@
 package app.melova.data.remote.api
 
 import app.melova.data.remote.dto.HealthResponseDto
-import app.melova.data.remote.dto.CoursesResponseDto
+import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.ScoringResponseDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -25,9 +25,9 @@ interface MelovaApi {
     @GET("api/v1/assets/teacher_syllables.json")
     suspend fun downloadTeacherSyllables(): ResponseBody
 
-    /** Published courses; with a teacher code the teacher's own drafts are included. */
-    @GET("api/v1/courses")
-    suspend fun courses(@Header("X-Teacher-Token") teacherToken: String?): CoursesResponseDto
+    /** Teachers and their published lessons; with a teacher code that teacher's drafts too. */
+    @GET("api/v1/catalog")
+    suspend fun catalog(@Header("X-Teacher-Token") teacherToken: String?): CatalogResponseDto
 
     @Streaming
     @GET("api/v1/lessons/{lessonId}/intro")

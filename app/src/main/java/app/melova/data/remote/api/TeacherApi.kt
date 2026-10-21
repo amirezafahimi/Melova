@@ -16,7 +16,7 @@ import retrofit2.http.Path
 
 private const val TOKEN = "X-Teacher-Token"
 
-/** Every call returns the teacher's whole profile with their courses, already updated. */
+/** Every call returns the teacher's whole profile with their lessons, already updated. */
 interface TeacherApi {
     @GET("api/v1/teacher/me")
     suspend fun me(@Header(TOKEN) token: String): TeacherProfileDto
@@ -24,31 +24,14 @@ interface TeacherApi {
     @PUT("api/v1/teacher/me")
     suspend fun updateMe(@Header(TOKEN) token: String, @Body body: Map<String, String>): TeacherProfileDto
 
-    @POST("api/v1/teacher/courses")
-    suspend fun createCourse(@Header(TOKEN) token: String, @Body body: Map<String, String>): TeacherProfileDto
-
-    @PATCH("api/v1/teacher/courses/{courseId}")
-    suspend fun updateCourse(
-        @Header(TOKEN) token: String,
-        @Path("courseId") courseId: String,
-        @Body body: Map<String, @JvmSuppressWildcards Any>
-    ): TeacherProfileDto
-
-    @DELETE("api/v1/teacher/courses/{courseId}")
-    suspend fun deleteCourse(@Header(TOKEN) token: String, @Path("courseId") courseId: String): TeacherProfileDto
-
-    @POST("api/v1/teacher/courses/{courseId}/lessons")
-    suspend fun createLesson(
-        @Header(TOKEN) token: String,
-        @Path("courseId") courseId: String,
-        @Body body: Map<String, String>
-    ): TeacherProfileDto
+    @POST("api/v1/teacher/lessons")
+    suspend fun createLesson(@Header(TOKEN) token: String, @Body body: Map<String, String>): TeacherProfileDto
 
     @PATCH("api/v1/teacher/lessons/{lessonId}")
     suspend fun updateLesson(
         @Header(TOKEN) token: String,
         @Path("lessonId") lessonId: String,
-        @Body body: Map<String, String>
+        @Body body: Map<String, @JvmSuppressWildcards Any>
     ): TeacherProfileDto
 
     @DELETE("api/v1/teacher/lessons/{lessonId}")

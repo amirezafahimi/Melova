@@ -2,21 +2,22 @@ package app.melova.data.local
 
 import android.content.Context
 
-/** Courses the student follows; they make up the practice tab. Kept on the device. */
+/** Teachers the student follows; their lessons make up the practice tab. Kept on the device. */
 class FollowStore(context: Context) {
     private val prefs = context.applicationContext
         .getSharedPreferences("melova_follows", Context.MODE_PRIVATE)
 
-    fun followedIds(): Set<String> = prefs.getStringSet(KEY_COURSES, emptySet()).orEmpty().toSet()
+    fun followedIds(): Set<String> = prefs.getStringSet(KEY_TEACHERS, emptySet()).orEmpty().toSet()
 
-    fun setFollowed(courseId: String, followed: Boolean) {
+    fun setFollowed(teacherId: String, followed: Boolean) {
         val updated = followedIds().toMutableSet().apply {
-            if (followed) add(courseId) else remove(courseId)
+            if (followed) add(teacherId) else remove(teacherId)
         }
-        prefs.edit().putStringSet(KEY_COURSES, updated).apply()
+        prefs.edit().putStringSet(KEY_TEACHERS, updated).apply()
     }
 
     private companion object {
-        const val KEY_COURSES = "course_ids"
+        // Follows used to be per course; those ids are simply left behind under the old key.
+        const val KEY_TEACHERS = "teacher_ids"
     }
 }

@@ -1,7 +1,7 @@
 package app.melova.data.remote.datasource
 
 import app.melova.data.remote.dto.HealthResponseDto
-import app.melova.data.remote.dto.CoursesResponseDto
+import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.ScoringResponseDto
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
@@ -13,7 +13,7 @@ interface MelovaRemoteDataSource {
 
     suspend fun downloadTeacherSyllables(): ResponseBody
 
-    suspend fun getCourses(teacherToken: String?): CoursesResponseDto
+    suspend fun getCatalog(teacherToken: String?): CatalogResponseDto
 
     suspend fun downloadLessonIntro(lessonId: String): ResponseBody
 

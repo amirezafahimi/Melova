@@ -46,22 +46,13 @@ class TeacherRepository(
     suspend fun updateProfile(name: String, bio: String) =
         call { api.updateMe(token(), mapOf("name" to name, "bio" to bio)) }
 
-    suspend fun createCourse(fields: CourseFields) =
-        call { api.createCourse(token(), fields.toMap()) }
-
-    suspend fun updateCourse(courseId: String, fields: CourseFields) =
-        call { api.updateCourse(token(), courseId, fields.toMap()) }
-
-    suspend fun setCoursePublished(courseId: String, published: Boolean) =
-        call { api.updateCourse(token(), courseId, mapOf("published" to published)) }
-
-    suspend fun deleteCourse(courseId: String) = call { api.deleteCourse(token(), courseId) }
-
-    suspend fun createLesson(courseId: String, fields: LessonFields) =
-        call { api.createLesson(token(), courseId, fields.toMap()) }
+    suspend fun createLesson(fields: LessonFields) = call { api.createLesson(token(), fields.toMap()) }
 
     suspend fun updateLesson(lessonId: String, fields: LessonFields) =
         call { api.updateLesson(token(), lessonId, fields.toMap()) }
+
+    suspend fun setLessonPublished(lessonId: String, published: Boolean) =
+        call { api.updateLesson(token(), lessonId, mapOf("published" to published)) }
 
     suspend fun deleteLesson(lessonId: String) = call { api.deleteLesson(token(), lessonId) }
 
@@ -153,7 +144,7 @@ class TeacherRepository(
     }
 }
 
-data class CourseFields(
+data class LessonFields(
     val title: String,
     val subtitle: String,
     val level: String,
@@ -165,12 +156,4 @@ data class CourseFields(
         "level" to level,
         "description" to description
     )
-}
-
-data class LessonFields(
-    val title: String,
-    val subtitle: String,
-    val description: String
-) {
-    fun toMap() = mapOf("title" to title, "subtitle" to subtitle, "description" to description)
 }

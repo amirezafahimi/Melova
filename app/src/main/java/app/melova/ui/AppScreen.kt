@@ -19,10 +19,11 @@ object AppScreen {
     const val PRACTICE =
         "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}"
 
-    const val ARG_COURSE_ID = "courseId"
+    const val ARG_TEACHER_ID = "teacherId"
     const val ARG_LESSON_ID = "lessonId"
+    /** A teacher's public page, as students see it. */
+    const val TEACHER_PAGE = "teachers/{$ARG_TEACHER_ID}"
     const val TEACHER_PANEL = "teacher"
-    const val COURSE_EDITOR = "teacher/course/{$ARG_COURSE_ID}"
     const val LESSON_EDITOR = "teacher/lesson/{$ARG_LESSON_ID}"
 
     fun tabRoute(tab: MainTab) = when (tab) {
@@ -43,7 +44,7 @@ object AppScreen {
     fun practice(lessonId: String, sectionId: String) =
         "practice/${Uri.encode(lessonId)}/${Uri.encode(sectionId)}"
 
-    fun courseEditor(courseId: String) = "teacher/course/${Uri.encode(courseId)}"
+    fun teacherPage(teacherId: String) = "teachers/${Uri.encode(teacherId)}"
 
     fun lessonEditor(lessonId: String) = "teacher/lesson/${Uri.encode(lessonId)}"
 }

@@ -1,49 +1,40 @@
 package app.melova.data.remote.mapper
 
-import app.melova.data.model.Course
+import app.melova.data.model.Catalog
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
+import app.melova.data.model.Teacher
 import app.melova.data.model.TeacherProfile
-import app.melova.data.remote.dto.CourseDto
-import app.melova.data.remote.dto.CoursesResponseDto
+import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.LessonDto
 import app.melova.data.remote.dto.TeacherProfileDto
 
-fun CoursesResponseDto.toDomain(): List<Course> =
-    courses.orEmpty().mapNotNull { it.toDomain() }
+fun CatalogResponseDto.toDomain(): Catalog = Catalog(
+    teachers = teachers.orEmpty().mapNotNull { dto ->
+        val teacherId = dto.id?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        Teacher(id = teacherId, name = dto.name.orEmpty(), bio = dto.bio.orEmpty())
+    },
+    lessons = lessons.orEmpty().mapNotNull { it.toDomain() }
+)
 
 fun TeacherProfileDto.toDomain(): TeacherProfile = TeacherProfile(
     id = id.orEmpty(),
     name = name.orEmpty(),
     bio = bio.orEmpty(),
-    courses = courses.orEmpty().mapNotNull { it.toDomain() }
+    lessons = lessons.orEmpty().mapNotNull { it.toDomain() }
 )
 
-private fun CourseDto.toDomain(): Course? {
-    val courseId = id?.takeIf { it.isNotBlank() } ?: return null
-    return Course(
-        id = courseId,
+private fun LessonDto.toDomain(): Lesson? {
+    val lessonId = id?.takeIf { it.isNotBlank() } ?: return null
+    return Lesson(
+        id = lessonId,
+        teacherId = teacherId.orEmpty(),
+        teacher = teacher.orEmpty(),
         title = title.orEmpty(),
         subtitle = subtitle.orEmpty(),
         description = description.orEmpty(),
         level = level.orEmpty(),
         published = published == true,
-        teacherId = teacherId.orEmpty(),
-        teacherName = teacherName.orEmpty(),
-        lessons = lessons.orEmpty().mapNotNull { it.toDomain(courseId) }
-    )
-}
-
-private fun LessonDto.toDomain(fallbackCourseId: String): Lesson? {
-    val lessonId = id?.takeIf { it.isNotBlank() } ?: return null
-    return Lesson(
-        id = lessonId,
-        courseId = courseId ?: fallbackCourseId,
-        title = title.orEmpty(),
-        subtitle = subtitle.orEmpty(),
-        description = description.orEmpty(),
-        teacher = teacher.orEmpty(),
-        level = level.orEmpty(),
         hasIntro = hasIntro == true,
         introVersion = introVersion.orEmpty(),
         sections = sections.orEmpty().mapNotNull { dto ->

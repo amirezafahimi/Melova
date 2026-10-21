@@ -10,8 +10,8 @@ import app.melova.data.model.TahrirComparison
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.repository.RemoteVocalScoringRepository
 import app.melova.data.local.PracticeProgressStore
-import app.melova.data.repository.CourseRepository
-import app.melova.data.repository.RemoteCourseRepository
+import app.melova.data.repository.LessonRepository
+import app.melova.data.repository.RemoteLessonRepository
 import app.melova.data.repository.VocalScoringRepository
 import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.playback.TeacherVocalGenerator
@@ -38,7 +38,7 @@ class VocalTrainingViewModel(
     private val sectionId: String = checkNotNull(savedStateHandle[ARG_SECTION_ID])
 
     private val scoringRepository: VocalScoringRepository = RemoteVocalScoringRepository()
-    private val courseRepository: CourseRepository = RemoteCourseRepository()
+    private val lessonRepository: LessonRepository = RemoteLessonRepository()
     private val progressStore = PracticeProgressStore(application)
     private val player = ReferenceAudioPlayer(application)
     private val recorder = VocalRecorder(application)
@@ -76,20 +76,20 @@ class VocalTrainingViewModel(
                 )
             }
             runCatching {
-                val course = courseRepository.lessons(getApplication())
+                val remoteLesson = lessonRepository.lessons(getApplication())
                     .firstOrNull { it.id == lessonId }
                     ?: error("این درس پیدا نشد.")
-                val section = course.section(sectionId) ?: error("این بخش پیدا نشد.")
-                val referenceFile = courseRepository.sectionAudioFile(getApplication(), course, section)
+                val section = remoteLesson.section(sectionId) ?: error("این بخش پیدا نشد.")
+                val referenceFile = lessonRepository.sectionAudioFile(getApplication(), remoteLesson, section)
                 val prepared = withContext(Dispatchers.IO) {
                     TeacherVocalGenerator.lessonFromFile(
                         referenceFile = referenceFile,
                         title = section.title,
-                        teacherName = course.teacher,
+                        teacherName = remoteLesson.teacher,
                         description = section.description
                     )
                 }
-                Triple(course.title, prepared, withContext(Dispatchers.IO) {
+                Triple(remoteLesson.title, prepared, withContext(Dispatchers.IO) {
                     WaveformPeaksExtractor.fromWavFile(prepared.referenceFile)
                 })
             }.onSuccess { (courseTitle, prepared, teacherPeaks) ->
