@@ -23,7 +23,9 @@ class RemoteVocalScoringRepository(
     override suspend fun score(
         referenceFile: File,
         studentFile: File,
-        expectedSegments: List<ExpectedSegment>?
+        expectedSegments: List<ExpectedSegment>?,
+        lessonId: String?,
+        sectionId: String?
     ): VocalScoreResult {
         require(studentFile.exists() && studentFile.length() > 44L) {
             "فایل ضبط هنرجو یافت نشد"
@@ -39,6 +41,11 @@ class RemoteVocalScoringRepository(
                 filename = studentFile.name,
                 body = studentFile.asRequestBody(wavMediaType)
             )
+
+        if (lessonId != null && sectionId != null) {
+            multipartBuilder.addFormDataPart("lesson_id", lessonId)
+            multipartBuilder.addFormDataPart("section_id", sectionId)
+        }
 
         expectedSegments.toRequestJson()?.let { json ->
             multipartBuilder.addFormDataPart("expected_segments_json", json)

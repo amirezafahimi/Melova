@@ -40,8 +40,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +47,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +68,13 @@ import app.melova.presentation.MelovaUiState
 import app.melova.presentation.MelovaViewModel
 import app.melova.presentation.SessionMode
 import app.melova.data.ScaleExercise
+import app.melova.data.ScalePattern
+import app.melova.ui.components.MelovaBackground
+import app.melova.ui.components.MelovaSegmentedControl
+import app.melova.ui.components.MelovaTopBar
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import app.melova.audio.scoring.VocalScorer
 import app.melova.ui.components.MelovaMediaIconButton
 import app.melova.ui.components.MelovaProgressBar
@@ -81,6 +87,12 @@ import app.melova.ui.theme.MelovaBackgroundEnd
 import app.melova.ui.theme.MelovaBackgroundStart
 import app.melova.ui.theme.MelovaCard
 import app.melova.ui.theme.MelovaSecondary
+import app.melova.ui.theme.MelovaCardElevated
+import app.melova.ui.theme.MelovaGold
+import app.melova.ui.theme.MelovaSuccess
+import app.melova.ui.theme.MelovaWarning
+import app.melova.ui.theme.MelovaError
+import app.melova.ui.theme.MelovaText
 
 @Composable
 fun MelovaScreen(
@@ -111,61 +123,57 @@ fun MelovaScreen(
         }
     }
 
-    Scaffold(
-        containerColor = Color.Transparent
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(MelovaBackgroundStart, MelovaBackgroundEnd)
-                    )
-                )
-                .padding(padding)
-        ) {
+    val isBusy = uiState.mode == SessionMode.LISTENING ||
+        uiState.mode == SessionMode.MATCHING ||
+        uiState.mode == SessionMode.ANALYZING
+
+    MelovaBackground {
+        RtlContent {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.systemBars)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                LtrContent {
-                    HeaderSection(
-                        uiState = uiState,
-                        onExerciseSelected = viewModel::selectExercise,
-                        onBack = onBack
-                    )
-                }
+                MelovaTopBar(
+                    title = "گام و سلفژ",
+                    subtitle = uiState.exerciseTitle,
+                    onBack = { onBack?.invoke() }
+                )
 
-                RtlContent {
-                    ExerciseCard(uiState)
+                ExercisePicker(
+                    selected = uiState.selectedExercise,
+                    enabled = !isBusy,
+                    onExerciseSelected = viewModel::selectExercise
+                )
 
-                    ProgressSection(
-                        uiState = uiState,
-                        onTogglePlayback = viewModel::togglePlayback
-                    )
+                ExerciseCard(uiState)
 
-                    HeadphoneHintBanner()
+                ProgressSection(
+                    uiState = uiState,
+                    onTogglePlayback = viewModel::togglePlayback
+                )
 
-                    ActionButtons(
-                        uiState = uiState,
-                        onListen = viewModel::onListenClicked,
-                        onMatch = ::requestMatch,
-                        onStop = viewModel::onStopClicked
-                    )
+                HeadphoneHintBanner()
 
-                    AnimatedVisibility(
-                        visible = uiState.scoreResult != null,
-                        enter = fadeIn() + slideInVertically { it / 2 }
-                    ) {
-                        uiState.scoreResult?.let { result ->
-                            ScoreResultCard(
-                                result = result,
-                                onDismiss = viewModel::dismissResults
-                            )
-                        }
+                ActionButtons(
+                    uiState = uiState,
+                    onListen = viewModel::onListenClicked,
+                    onMatch = ::requestMatch,
+                    onStop = viewModel::onStopClicked
+                )
+
+                AnimatedVisibility(
+                    visible = uiState.scoreResult != null,
+                    enter = fadeIn() + slideInVertically { it / 2 }
+                ) {
+                    uiState.scoreResult?.let { result ->
+                        ScoreResultCard(
+                            result = result,
+                            onDismiss = viewModel::dismissResults
+                        )
                     }
                 }
             }
@@ -173,109 +181,32 @@ fun MelovaScreen(
     }
 }
 
+/** Scale (major/minor) and direction as two visible selectors instead of a hidden menu. */
 @Composable
-private fun HeaderSection(
-    uiState: MelovaUiState,
-    onExerciseSelected: (ScaleExercise) -> Unit,
-    onBack: (() -> Unit)? = null
+private fun ExercisePicker(
+    selected: ScaleExercise,
+    enabled: Boolean,
+    onExerciseSelected: (ScaleExercise) -> Unit
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    val isBusy = uiState.mode == SessionMode.LISTENING ||
-            uiState.mode == SessionMode.MATCHING ||
-            uiState.mode == SessionMode.ANALYZING
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (onBack != null) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "بازگشت",
-                        tint = Color.White
-                    )
-                }
-            }
-
-            Box {
-                IconButton(
-                    onClick = { menuExpanded = true },
-                    enabled = !isBusy
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "انتخاب تمرین",
-                        tint = if (isBusy) Color.White.copy(alpha = 0.4f) else Color.White
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false }
-                ) {
-                    ScaleExercise.all.forEach { exercise ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = exercise.title,
-                                    fontWeight = if (exercise == uiState.selectedExercise) {
-                                        FontWeight.SemiBold
-                                    } else {
-                                        FontWeight.Normal
-                                    }
-                                )
-                            },
-                            leadingIcon = {
-                                if (exercise == uiState.selectedExercise) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Check,
-                                        contentDescription = null,
-                                        tint = MelovaAccent
-                                    )
-                                }
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onExerciseSelected(exercise)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(horizontalAlignment = Alignment.Start) {
-
-                Text(
-                    text = "Melova",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    text = "تمرین آواز هوشمند",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.75f),
-                )
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(MelovaAccent.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = MelovaAccent
-                )
-            }
-        }
+    val patterns = listOf(ScalePattern.ASCENDING, ScalePattern.DESCENDING, ScalePattern.ASCENDING_DESCENDING)
+    fun select(isMinor: Boolean, pattern: ScalePattern) {
+        ScaleExercise.all
+            .firstOrNull { it.isMinor == isMinor && it.pattern == pattern }
+            ?.let(onExerciseSelected)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        MelovaSegmentedControl(
+            options = listOf("ماژور", "مینور"),
+            selectedIndex = if (selected.isMinor) 1 else 0,
+            enabled = enabled,
+            onSelect = { index -> select(isMinor = index == 1, pattern = selected.pattern) }
+        )
+        MelovaSegmentedControl(
+            options = listOf("بالارونده", "پایین‌رونده", "بالا و پایین"),
+            selectedIndex = patterns.indexOf(selected.pattern),
+            enabled = enabled,
+            onSelect = { index -> select(isMinor = selected.isMinor, pattern = patterns[index]) }
+        )
     }
 }
 
@@ -294,32 +225,16 @@ private fun ExerciseCard(uiState: MelovaUiState) {
                 text = uiState.exerciseTitle,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = MelovaText,
                 textAlign = TextAlign.Start
             )
             Text(
                 text = uiState.exerciseDescription,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f),
+                color = MelovaText.copy(alpha = 0.8f),
                 lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
                 textAlign = TextAlign.Start
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = MelovaAccentSoft,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                LtrContent {
-                    Text(
-                        text = "تحلیل pitch با TarsosDSP (YIN)",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MelovaAccentSoft
-                    )
-                }
-            }
         }
     }
 }
@@ -345,7 +260,7 @@ private fun ProgressSection(
             Text(
                 text = statusLabel(uiState.mode, uiState.isPlaying),
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
+                color = MelovaText,
                 textAlign = TextAlign.Start,
                 modifier = Modifier.weight(1f)
             )
@@ -360,7 +275,7 @@ private fun ProgressSection(
                         progress = uiState.progress,
                         modifier = Modifier.fillMaxWidth(),
                         color = MelovaAccent,
-                        trackColor = Color.White.copy(alpha = 0.15f)
+                        trackColor = MelovaText.copy(alpha = 0.15f)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -382,7 +297,7 @@ private fun ProgressSection(
             Text(
                 text = uiState.statusMessage,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.75f),
+                color = MelovaText.copy(alpha = 0.75f),
                 textAlign = TextAlign.Start
             )
 
@@ -397,9 +312,9 @@ private fun ProgressSection(
                         strokeWidth = 2.dp
                     )
                     Text(
-                        text = "الگوریتم YIN در حال استخراج فاکتورهای آواز...",
+                        text = "در حال بررسی نت‌های اجرای شما…",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = MelovaText.copy(alpha = 0.7f),
                         textAlign = TextAlign.Start
                     )
                 }
@@ -414,7 +329,7 @@ private fun HeadphoneHintBanner() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF4A3F6B))
+            .background(MelovaCardElevated)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -422,7 +337,7 @@ private fun HeadphoneHintBanner() {
         Icon(
             imageVector = Icons.Outlined.Headphones,
             contentDescription = null,
-            tint = Color(0xFFFFD180),
+            tint = MelovaGold,
             modifier = Modifier.size(20.dp)
         )
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -430,13 +345,13 @@ private fun HeadphoneHintBanner() {
                 text = "هندزفری توصیه می‌شود",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = MelovaText,
                 textAlign = TextAlign.Start
             )
             Text(
                 text = "هندزفری بزنید تا نمونه در گوش شما پخش شود. اپ تلاش می‌کند از میکروفون خود گوشی ضبط کند، نه میکروفون هندزفری.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.8f),
+                color = MelovaText.copy(alpha = 0.8f),
                 lineHeight = MaterialTheme.typography.bodySmall.lineHeight * 1.3f,
                 textAlign = TextAlign.Start
             )
@@ -496,9 +411,9 @@ private fun ActionButtons(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(Icons.Default.Stop, contentDescription = null, tint = Color.White)
+                Icon(Icons.Default.Stop, contentDescription = null, tint = MelovaText)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("توقف", color = Color.White)
+                Text("توقف", color = MelovaText)
             }
         }
     }
@@ -522,7 +437,7 @@ private fun ScoreResultCard(
                 text = "نتیجه تحلیل",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = MelovaText,
                 textAlign = TextAlign.Start
             )
 
@@ -546,7 +461,7 @@ private fun ScoreResultCard(
                     Text(
                         text = "امتیاز کلی",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = MelovaText.copy(alpha = 0.8f),
                         textAlign = TextAlign.Center
                     )
                 }
@@ -560,7 +475,7 @@ private fun ScoreResultCard(
             Text(
                 text = result.summary,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.85f),
+                color = MelovaText.copy(alpha = 0.85f),
                 textAlign = TextAlign.Start
             )
 
@@ -568,7 +483,7 @@ private fun ScoreResultCard(
                 Text(
                     text = "تصحیح‌های پیشنهادی",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = MelovaText,
                     textAlign = TextAlign.Start
                 )
                 result.corrections.forEach { correction ->
@@ -581,7 +496,7 @@ private fun ScoreResultCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text("تلاش دوباره", color = Color.White)
+                Text("تلاش دوباره", color = MelovaText)
             }
         }
     }
@@ -602,7 +517,7 @@ private fun ScoreRow(label: String, score: Int, ltrSuffix: String? = null) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.85f),
+                color = MelovaText.copy(alpha = 0.85f),
                 textAlign = TextAlign.Start
             )
             if (ltrSuffix != null) {
@@ -610,7 +525,7 @@ private fun ScoreRow(label: String, score: Int, ltrSuffix: String? = null) {
                     Text(
                         text = ltrSuffix,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.55f)
+                        color = MelovaText.copy(alpha = 0.55f)
                     )
                 }
             }
@@ -641,8 +556,10 @@ private fun statusLabel(mode: SessionMode, isPlaying: Boolean): String = when (m
     SessionMode.RESULT -> "نتیجه"
 }
 
+@Composable
+@ReadOnlyComposable
 private fun scoreColor(score: Int): Color = when {
-    score >= 80 -> Color(0xFF81C784)
-    score >= 60 -> Color(0xFFFFB74D)
-    else -> Color(0xFFE57373)
+    score >= 80 -> MelovaSuccess
+    score >= 60 -> MelovaWarning
+    else -> MelovaError
 }

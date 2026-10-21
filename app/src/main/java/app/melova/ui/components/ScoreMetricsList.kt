@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import app.melova.data.model.ScoreMetric
 import app.melova.ui.layout.LtrContent
 import app.melova.ui.theme.MelovaAccentSoft
+import app.melova.ui.theme.MelovaText
 
 @Composable
 fun ScoreMetricsList(
@@ -48,7 +49,7 @@ private fun ScoreMetricRow(metric: ScoreMetric) {
             Text(
                 text = metric.label,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.85f),
+                color = MelovaText.copy(alpha = 0.85f),
                 textAlign = TextAlign.Start
             )
             if (!metric.hint.isNullOrBlank()) {
@@ -57,7 +58,7 @@ private fun ScoreMetricRow(metric: ScoreMetric) {
                     Text(
                         text = metric.hint,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.45f)
+                        color = MelovaText.copy(alpha = 0.45f)
                     )
                 }
             }

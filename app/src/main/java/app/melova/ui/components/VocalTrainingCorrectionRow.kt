@@ -29,6 +29,10 @@ import androidx.compose.ui.unit.dp
 import app.melova.audio.scoring.VocalScorer
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaSecondary
+import app.melova.ui.theme.MelovaSuccess
+import app.melova.ui.theme.MelovaWarning
+import app.melova.ui.theme.MelovaInfo
+import app.melova.ui.theme.MelovaText
 
 @Composable
 fun VocalTrainingCorrectionRow(
@@ -42,15 +46,15 @@ fun VocalTrainingCorrectionRow(
     accentColor: Color? = null
 ) {
     val accent = accentColor ?: when (correction.direction) {
-        VocalScorer.CorrectionDirection.SHARP -> Color(0xFFFFB74D)
-        VocalScorer.CorrectionDirection.FLAT -> Color(0xFF81D4FA)
-        VocalScorer.CorrectionDirection.GOOD -> Color(0xFF81C784)
+        VocalScorer.CorrectionDirection.SHARP -> MelovaWarning
+        VocalScorer.CorrectionDirection.FLAT -> MelovaInfo
+        VocalScorer.CorrectionDirection.GOOD -> MelovaSuccess
     }
 
     val backgroundColor = when {
         isStudentSnippetPlaying || isTeacherSnippetPlaying -> MelovaSecondary.copy(alpha = 0.22f)
-        isSelected -> Color.White.copy(alpha = 0.12f)
-        else -> Color.White.copy(alpha = 0.06f)
+        isSelected -> MelovaText.copy(alpha = 0.12f)
+        else -> MelovaText.copy(alpha = 0.06f)
     }
 
     Column(
@@ -64,7 +68,7 @@ fun VocalTrainingCorrectionRow(
         Text(
             text = header,
             style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.7f),
+            color = MelovaText.copy(alpha = 0.7f),
             textAlign = TextAlign.Start
         )
         Text(
@@ -83,7 +87,7 @@ fun VocalTrainingCorrectionRow(
                 icon = Icons.Outlined.Mic,
                 isPlaying = isStudentSnippetPlaying,
                 containerColor = MelovaSecondary.copy(alpha = 0.38f),
-                contentColor = Color.White,
+                contentColor = MelovaText,
                 onClick = onPlayStudentSnippet,
                 modifier = Modifier.weight(1f)
             )
@@ -92,7 +96,7 @@ fun VocalTrainingCorrectionRow(
                 icon = Icons.Outlined.Hearing,
                 isPlaying = isTeacherSnippetPlaying,
                 containerColor = MelovaAccent.copy(alpha = 0.28f),
-                contentColor = Color.White,
+                contentColor = MelovaText,
                 onClick = onPlayTeacherSnippet,
                 modifier = Modifier.weight(1f)
             )

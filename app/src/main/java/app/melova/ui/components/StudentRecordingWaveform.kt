@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import app.melova.audio.scoring.VocalScorer
 import kotlin.math.abs
 import kotlin.math.hypot
+import app.melova.ui.theme.LocalMelovaPalette
+import app.melova.ui.theme.MelovaPalette
 
 @Composable
 fun StudentRecordingWaveform(
@@ -34,6 +36,7 @@ fun StudentRecordingWaveform(
     val density = LocalDensity.current
     val markerHitRadiusPx = with(density) { 18.dp.toPx() }
     val totalMs = durationMs.coerceAtLeast(1L)
+    val palette = LocalMelovaPalette.current
 
     Canvas(
         modifier = modifier
@@ -77,7 +80,7 @@ fun StudentRecordingWaveform(
         val playheadX = (playheadMs.toFloat() / totalMs) * width
 
         drawRoundRect(
-            color = Color.White.copy(alpha = 0.04f),
+            color = palette.text.copy(alpha = 0.04f),
             size = Size(width, height),
             cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx())
         )
@@ -87,7 +90,7 @@ fun StudentRecordingWaveform(
             val x = index * barWidth + barWidth * 0.15f
             val barW = barWidth * 0.7f
             drawRoundRect(
-                color = Color.White.copy(alpha = 0.28f),
+                color = palette.text.copy(alpha = 0.28f),
                 topLeft = Offset(x, centerY - barHeight / 2f),
                 size = Size(barW, barHeight),
                 cornerRadius = CornerRadius(barW / 2f, barW / 2f)
@@ -96,7 +99,7 @@ fun StudentRecordingWaveform(
 
         if (playheadMs > 0L) {
             drawLine(
-                color = Color(0xFFFFB74D),
+                color = palette.warning,
                 start = Offset(playheadX, 8f),
                 end = Offset(playheadX, height - 8f),
                 strokeWidth = 3f
@@ -114,7 +117,7 @@ fun StudentRecordingWaveform(
             val correction = layout.correction
             val marker = layout.position
             val isSelected = selectedMarkerStartMs == markerStartMs(correction)
-            val color = correctionMarkerColor(correction)
+            val color = correctionMarkerColor(correction, palette)
             val radius = if (isSelected) 10f else 7f
 
             drawLine(
@@ -129,7 +132,7 @@ fun StudentRecordingWaveform(
                 center = marker
             )
             drawCircle(
-                color = Color.White.copy(alpha = 0.95f),
+                color = palette.card.copy(alpha = 0.95f),
                 radius = radius,
                 center = marker,
                 style = Stroke(width = if (isSelected) 2.5f else 1.5f)
@@ -184,9 +187,12 @@ private fun layoutCorrectionMarkers(
     return layouts
 }
 
-private fun correctionMarkerColor(correction: VocalScorer.PitchCorrection): Color = when {
-    correction.sungNote == "—" -> Color(0xFFB0BEC5)
-    correction.direction == VocalScorer.CorrectionDirection.SHARP -> Color(0xFFFFB74D)
-    correction.direction == VocalScorer.CorrectionDirection.FLAT -> Color(0xFF81D4FA)
-    else -> Color(0xFF81C784)
+private fun correctionMarkerColor(
+    correction: VocalScorer.PitchCorrection,
+    palette: MelovaPalette
+): Color = when {
+    correction.sungNote == "—" -> palette.textMuted
+    correction.direction == VocalScorer.CorrectionDirection.SHARP -> palette.warning
+    correction.direction == VocalScorer.CorrectionDirection.FLAT -> palette.info
+    else -> palette.success
 }

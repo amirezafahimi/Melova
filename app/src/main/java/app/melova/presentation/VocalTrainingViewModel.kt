@@ -2,14 +2,16 @@ package app.melova.presentation
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import app.melova.audio.io.WaveformPeaksExtractor
 import app.melova.audio.scoring.VocalScorer
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.repository.RemoteVocalScoringRepository
-import app.melova.data.repository.RemoteTeacherReferenceRepository
-import app.melova.data.repository.TeacherReferenceRepository
+import app.melova.data.local.PracticeProgressStore
+import app.melova.data.repository.CourseRepository
+import app.melova.data.repository.RemoteCourseRepository
 import app.melova.data.repository.VocalScoringRepository
 import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.playback.TeacherVocalGenerator
@@ -28,9 +30,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-class VocalTrainingViewModel(application: Application) : AndroidViewModel(application) {
+class VocalTrainingViewModel(
+    application: Application,
+    savedStateHandle: SavedStateHandle
+) : AndroidViewModel(application) {
+    private val lessonId: String = checkNotNull(savedStateHandle[ARG_LESSON_ID])
+    private val sectionId: String = checkNotNull(savedStateHandle[ARG_SECTION_ID])
+
     private val scoringRepository: VocalScoringRepository = RemoteVocalScoringRepository()
-    private val teacherReferenceRepository: TeacherReferenceRepository = RemoteTeacherReferenceRepository()
+    private val courseRepository: CourseRepository = RemoteCourseRepository()
+    private val progressStore = PracticeProgressStore(application)
     private val player = ReferenceAudioPlayer(application)
     private val recorder = VocalRecorder(application)
 
@@ -43,7 +52,9 @@ class VocalTrainingViewModel(application: Application) : AndroidViewModel(applic
     @Volatile
     private var lastRecordingDurationMs: Long = 0L
 
-    private val _uiState = MutableStateFlow(VocalTrainingUiState())
+    private val _uiState = MutableStateFlow(
+        VocalTrainingUiState(bestScore = progressStore.bestScore(lessonId, sectionId))
+    )
     val uiState: StateFlow<VocalTrainingUiState> = _uiState.asStateFlow()
 
     private var sessionJob: Job? = null
@@ -51,22 +62,41 @@ class VocalTrainingViewModel(application: Application) : AndroidViewModel(applic
     private var snippetStopJob: Job? = null
 
     init {
+        loadLesson()
+    }
+
+    fun loadLesson() {
+        if (_uiState.value.isLessonLoading) return
         viewModelScope.launch {
             _uiState.update {
-                it.copy(statusMessage = "در حال دریافت نمونه استاد از سرور…")
+                it.copy(
+                    isLessonLoading = true,
+                    lessonLoadFailed = false,
+                    statusMessage = "در حال آماده‌سازی نمونه استاد…"
+                )
             }
             runCatching {
-                withContext(Dispatchers.IO) {
-                    teacherReferenceRepository.ensureCached(getApplication())
-                    TeacherVocalGenerator.prepareLesson(getApplication())
+                val course = courseRepository.lessons(getApplication())
+                    .firstOrNull { it.id == lessonId }
+                    ?: error("این درس پیدا نشد.")
+                val section = course.section(sectionId) ?: error("این بخش پیدا نشد.")
+                val referenceFile = courseRepository.sectionAudioFile(getApplication(), course, section)
+                val prepared = withContext(Dispatchers.IO) {
+                    TeacherVocalGenerator.lessonFromFile(
+                        referenceFile = referenceFile,
+                        title = section.title,
+                        teacherName = course.teacher,
+                        description = section.description
+                    )
                 }
-            }.onSuccess { prepared ->
-                lesson = prepared
-                val teacherPeaks = withContext(Dispatchers.IO) {
+                Triple(course.title, prepared, withContext(Dispatchers.IO) {
                     WaveformPeaksExtractor.fromWavFile(prepared.referenceFile)
-                }
+                })
+            }.onSuccess { (courseTitle, prepared, teacherPeaks) ->
+                lesson = prepared
                 _uiState.update {
                     it.copy(
+                        courseTitle = courseTitle,
                         lessonTitle = prepared.title,
                         teacherName = prepared.teacherName,
                         lessonDescription = prepared.description,
@@ -75,13 +105,16 @@ class VocalTrainingViewModel(application: Application) : AndroidViewModel(applic
                         teacherAudioFormatLabel = prepared.audioFormatLabel,
                         teacherWaveformPeaks = teacherPeaks,
                         isLessonReady = true,
-                        statusMessage = "نمونه استاد آماده است — پخش کنید و سپس ضبط کنید"
+                        isLessonLoading = false,
+                        statusMessage = "اول نمونه استاد را گوش دهید، بعد ضبط را شروع کنید."
                     )
                 }
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
                         isLessonReady = false,
+                        isLessonLoading = false,
+                        lessonLoadFailed = true,
                         statusMessage = error.message ?: "خطا در بارگذاری نمونه استاد"
                     )
                 }
@@ -636,9 +669,13 @@ class VocalTrainingViewModel(application: Application) : AndroidViewModel(applic
                 scoringRepository.score(
                     referenceFile = referenceFile,
                     studentFile = recordingFile,
-                    expectedSegments = segments
+                    expectedSegments = segments,
+                    lessonId = lessonId,
+                    sectionId = sectionId
                 )
             }
+            val isNewBest = !score.requiresReRecord && score.overall > 0 &&
+                progressStore.recordScore(lessonId, sectionId, score.overall)
 
             val peaks = withContext(Dispatchers.IO) {
                 WaveformPeaksExtractor.fromWavFile(recordingFile)
@@ -659,6 +696,8 @@ class VocalTrainingViewModel(application: Application) : AndroidViewModel(applic
                     playingSnippetStartMs = null,
                     playingSnippetTarget = null,
                     scoreResult = score,
+                    isNewBest = isNewBest,
+                    bestScore = progressStore.bestScore(lessonId, sectionId),
                     statusMessage = score.summary.ifBlank {
                         if (score.overall > 0) "نمره: ${score.overall}" else "تحلیل انجام شد"
                     }
@@ -751,6 +790,8 @@ class VocalTrainingViewModel(application: Application) : AndroidViewModel(applic
     }
 
     companion object {
+        const val ARG_LESSON_ID = "lessonId"
+        const val ARG_SECTION_ID = "sectionId"
         private const val USER_RECORDING_FILE_NAME = "user_vocal.wav"
         private const val CORRECTION_CLIP_PADDING_MS = 1_000L
     }
@@ -761,6 +802,7 @@ enum class VocalTrainingMode { IDLE, RECORDING, ANALYZING, RESULT }
 enum class PlaybackTarget { NONE, TEACHER, USER }
 
 data class VocalTrainingUiState(
+    val courseTitle: String = "",
     val lessonTitle: String = "",
     val teacherName: String = "",
     val lessonDescription: String = "",
@@ -770,6 +812,8 @@ data class VocalTrainingUiState(
     val teacherWaveformPeaks: List<Float> = emptyList(),
     val teacherPlaybackPositionMs: Long = 0L,
     val isLessonReady: Boolean = false,
+    val isLessonLoading: Boolean = false,
+    val lessonLoadFailed: Boolean = false,
     val mode: VocalTrainingMode = VocalTrainingMode.IDLE,
     val progress: Float = 0f,
     val isPlaying: Boolean = false,
@@ -781,7 +825,10 @@ data class VocalTrainingUiState(
     val playingSnippetStartMs: Long? = null,
     val playingSnippetTarget: PlaybackTarget? = null,
     val statusMessage: String = "",
-    val scoreResult: VocalScoreResult? = null
+    val scoreResult: VocalScoreResult? = null,
+    /** Best score for this section on this device, including the latest attempt. */
+    val bestScore: Int? = null,
+    val isNewBest: Boolean = false
 ) {
     val isPlayingTeacherSample: Boolean
         get() = playbackTarget == PlaybackTarget.TEACHER && isPlaying

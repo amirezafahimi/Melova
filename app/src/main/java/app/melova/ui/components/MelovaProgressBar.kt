@@ -18,10 +18,12 @@ fun MelovaProgressBar(
     progress: Float,
     modifier: Modifier = Modifier,
     color: Color,
-    trackColor: Color
+    trackColor: Color,
+    /** False keeps the timeline-style left-to-right fill; true fills from the start side (RTL in Persian). */
+    followLayoutDirection: Boolean = false
 ) {
     val fraction = progress.coerceIn(0f, 1f)
-    LtrContent {
+    val bar: @Composable () -> Unit = {
         Box(
             modifier = modifier
                 .height(8.dp)
@@ -37,4 +39,5 @@ fun MelovaProgressBar(
             )
         }
     }
+    if (followLayoutDirection) bar() else LtrContent(bar)
 }

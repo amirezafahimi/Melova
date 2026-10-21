@@ -30,6 +30,10 @@ import app.melova.data.model.TahrirComparison
 import app.melova.data.model.TahrirKind
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaSecondary
+import app.melova.ui.theme.MelovaSuccess
+import app.melova.ui.theme.MelovaWarning
+import app.melova.ui.theme.MelovaError
+import app.melova.ui.theme.MelovaText
 
 @Composable
 fun VocalTrainingTahrirRow(
@@ -40,14 +44,14 @@ fun VocalTrainingTahrirRow(
     onPlayTeacherSnippet: () -> Unit
 ) {
     val scoreColor = when {
-        comparison.score >= 80 -> Color(0xFF81C784)
-        comparison.score >= 55 -> Color(0xFFFFB74D)
-        else -> Color(0xFFE57373)
+        comparison.score >= 80 -> MelovaSuccess
+        comparison.score >= 55 -> MelovaWarning
+        else -> MelovaError
     }
 
     val backgroundColor = when {
         isStudentSnippetPlaying || isTeacherSnippetPlaying -> MelovaSecondary.copy(alpha = 0.22f)
-        else -> Color.White.copy(alpha = 0.06f)
+        else -> MelovaText.copy(alpha = 0.06f)
     }
 
     val kindLabel = when (comparison.kind) {
@@ -72,7 +76,7 @@ fun VocalTrainingTahrirRow(
             Text(
                 text = "$kindLabel • زمان ‎${formatTahrirClock(comparison.refStartMs)}‏",
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.7f),
+                color = MelovaText.copy(alpha = 0.7f),
                 textAlign = TextAlign.Start
             )
             Text(
@@ -86,7 +90,7 @@ fun VocalTrainingTahrirRow(
         Text(
             text = comparison.message,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.9f),
+            color = MelovaText.copy(alpha = 0.9f),
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Start
         )
@@ -100,7 +104,7 @@ fun VocalTrainingTahrirRow(
                 isPlaying = isStudentSnippetPlaying,
                 enabled = comparison.hasStudentRegion,
                 containerColor = MelovaSecondary.copy(alpha = 0.38f),
-                contentColor = Color.White,
+                contentColor = MelovaText,
                 onClick = onPlayStudentSnippet,
                 modifier = Modifier.weight(1f)
             )
@@ -110,7 +114,7 @@ fun VocalTrainingTahrirRow(
                 isPlaying = isTeacherSnippetPlaying,
                 enabled = true,
                 containerColor = MelovaAccent.copy(alpha = 0.28f),
-                contentColor = Color.White,
+                contentColor = MelovaText,
                 onClick = onPlayTeacherSnippet,
                 modifier = Modifier.weight(1f)
             )
@@ -132,7 +136,7 @@ private fun TahrirSnippetButton(
     val effectiveContainer = if (enabled) {
         if (isPlaying) containerColor.copy(alpha = 0.95f) else containerColor
     } else {
-        Color.White.copy(alpha = 0.06f)
+        MelovaText.copy(alpha = 0.06f)
     }
     val effectiveContent = if (enabled) contentColor else contentColor.copy(alpha = 0.4f)
 

@@ -8,6 +8,9 @@ interface VocalScoringRepository {
     suspend fun score(
         referenceFile: File,
         studentFile: File,
-        expectedSegments: List<ExpectedSegment>? = null
+        expectedSegments: List<ExpectedSegment>? = null,
+        /** When set, the server scores against its own copy of this lesson section. */
+        lessonId: String? = null,
+        sectionId: String? = null
     ): VocalScoreResult
 }

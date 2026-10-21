@@ -16,6 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.melova.audio.scoring.VocalScorer
+import app.melova.ui.theme.MelovaSuccess
+import app.melova.ui.theme.MelovaWarning
+import app.melova.ui.theme.MelovaInfo
+import app.melova.ui.theme.MelovaText
 
 @Composable
 fun PitchCorrectionRow(
@@ -24,9 +28,9 @@ fun PitchCorrectionRow(
     onClick: (() -> Unit)? = null
 ) {
     val accent = when (correction.direction) {
-        VocalScorer.CorrectionDirection.SHARP -> Color(0xFFFFB74D)
-        VocalScorer.CorrectionDirection.FLAT -> Color(0xFF81D4FA)
-        VocalScorer.CorrectionDirection.GOOD -> Color(0xFF81C784)
+        VocalScorer.CorrectionDirection.SHARP -> MelovaWarning
+        VocalScorer.CorrectionDirection.FLAT -> MelovaInfo
+        VocalScorer.CorrectionDirection.GOOD -> MelovaSuccess
     }
 
     Column(
@@ -34,8 +38,8 @@ fun PitchCorrectionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(
-                if (isSelected) Color.White.copy(alpha = 0.12f)
-                else Color.White.copy(alpha = 0.06f)
+                if (isSelected) MelovaText.copy(alpha = 0.12f)
+                else MelovaText.copy(alpha = 0.06f)
             )
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick)
@@ -47,7 +51,7 @@ fun PitchCorrectionRow(
         Text(
             text = "زمان \u200E${correction.timeLabel}\u200F • نت هدف: ${correction.expectedNote}",
             style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.7f),
+            color = MelovaText.copy(alpha = 0.7f),
             textAlign = TextAlign.Start
         )
         Text(

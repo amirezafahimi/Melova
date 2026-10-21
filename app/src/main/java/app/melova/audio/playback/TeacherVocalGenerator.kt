@@ -46,6 +46,26 @@ object TeacherVocalGenerator {
         return buildLessonFromReference(referenceFile, sourceLabel)
     }
 
+    /** Lesson for one course section whose teacher WAV is already on disk. */
+    fun lessonFromFile(
+        referenceFile: File,
+        title: String,
+        teacherName: String,
+        description: String
+    ): TeacherLesson {
+        val (sampleRate, formatLabel) = readWavMetadata(referenceFile)
+        return TeacherLesson(
+            title = title,
+            teacherName = teacherName,
+            description = description,
+            referenceFile = referenceFile,
+            durationMs = readDurationMs(referenceFile, sampleRate),
+            sourceLabel = "",
+            audioFormatLabel = formatLabel,
+            sampleRate = sampleRate
+        )
+    }
+
     private fun readSourceLabel(context: Context): String {
         val meta = TeacherReferenceCache.metaFile(context)
             .takeIf { it.exists() }
