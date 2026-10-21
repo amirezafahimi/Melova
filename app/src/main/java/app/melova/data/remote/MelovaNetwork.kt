@@ -2,6 +2,7 @@ package app.melova.data.remote
 
 import app.melova.BuildConfig
 import app.melova.data.remote.api.MelovaApi
+import app.melova.data.remote.api.TeacherApi
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import java.util.concurrent.TimeUnit
@@ -42,6 +43,21 @@ object MelovaNetwork {
                 .writeTimeout(300, TimeUnit.SECONDS)
                 .build()
         )
+    }
+
+    /** Teacher panel; uploads of lesson audio can be large. */
+    val teacherApi: TeacherApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(BuildConfig.SCORING_API_BASE_URL)
+            .client(
+                baseClient.newBuilder()
+                    .readTimeout(300, TimeUnit.SECONDS)
+                    .writeTimeout(300, TimeUnit.SECONDS)
+                    .build()
+            )
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+            .create(TeacherApi::class.java)
     }
 
     fun createApi(

@@ -2,11 +2,13 @@ package app.melova.data.repository
 
 import android.content.Context
 import app.melova.data.local.TeacherReferenceCache
+import app.melova.data.local.TeacherSession
+import app.melova.data.model.Course
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
 import app.melova.data.remote.datasource.MelovaRemoteDataSource
 import app.melova.data.remote.datasource.MelovaRemoteDataSourceImpl
-import app.melova.data.remote.dto.LessonsResponseDto
+import app.melova.data.remote.dto.CoursesResponseDto
 import app.melova.data.remote.mapper.toDomain
 import app.melova.data.remote.writeAtomically
 import app.melova.audio.io.WavUtils
@@ -21,26 +23,26 @@ class RemoteCourseRepository(
 ) : CourseRepository {
     private val gson = Gson()
 
-    override suspend fun lessons(context: Context, forceRefresh: Boolean): List<Lesson> =
+    override suspend fun courses(context: Context, forceRefresh: Boolean): List<Course> =
         withContext(Dispatchers.IO) {
             memoryCache?.takeIf { !forceRefresh }?.let { return@withContext it }
 
             val cacheFile = File(coursesDir(context), CATALOG_CACHE_NAME)
-            val lessons = try {
-                val response = remoteDataSource.getLessons()
+            val courses = try {
+                val response = remoteDataSource.getCourses(TeacherSession(context).token)
                 cacheFile.writeText(gson.toJson(response))
                 response.toDomain()
             } catch (error: Exception) {
                 val cached = cacheFile.takeIf { it.exists() }?.let {
-                    runCatching { gson.fromJson(it.readText(), LessonsResponseDto::class.java) }.getOrNull()
+                    runCatching { gson.fromJson(it.readText(), CoursesResponseDto::class.java) }.getOrNull()
                 } ?: throw IOException(
-                    "دریافت فهرست درس‌ها ممکن نشد. اتصال اینترنت را بررسی کنید.",
+                    "دریافت فهرست دوره‌ها ممکن نشد. اتصال اینترنت را بررسی کنید.",
                     error
                 )
                 cached.toDomain()
             }
-            memoryCache = lessons
-            lessons
+            memoryCache = courses
+            courses
         }
 
     override suspend fun introFile(context: Context, lesson: Lesson): File =
@@ -112,10 +114,10 @@ class RemoteCourseRepository(
     private fun safeName(raw: String): String = raw.replace(Regex("[^A-Za-z0-9_-]"), "_")
 
     private companion object {
-        const val CATALOG_CACHE_NAME = "catalog.json"
+        const val CATALOG_CACHE_NAME = "courses.json"
 
         /** Shared across screens so opening a lesson or section needs no extra request. */
         @Volatile
-        var memoryCache: List<Lesson>? = null
+        var memoryCache: List<Course>? = null
     }
 }

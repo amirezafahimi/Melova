@@ -17,15 +17,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.LaunchedEffect
+import app.melova.ui.components.BottomBarContentPadding
+import app.melova.ui.components.CourseCard
+import app.melova.ui.components.CourseHeading
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.BrightnessAuto
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material3.Button
@@ -62,52 +65,48 @@ import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaSecondary
 import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaTextMuted
-import app.melova.ui.theme.ThemeMode
 import app.melova.ui.theme.MelovaCard
 import app.melova.ui.theme.MelovaOutline
 import app.melova.ui.theme.MelovaText
 
+/** The practice tab: lessons of the courses the student follows, plus courses to follow. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     state: CourseUiState,
-    themeMode: ThemeMode,
-    onThemeModeChange: (ThemeMode) -> Unit,
     onRefresh: () -> Unit,
+    onAppear: () -> Unit,
     onLessonClick: (String) -> Unit,
-    onSolfegeClick: () -> Unit
+    onSolfegeClick: () -> Unit,
+    onFollowChange: (courseId: String, followed: Boolean) -> Unit
 ) {
+    // Catch up with changes made in the teacher panel or by another device.
+    LaunchedEffect(Unit) { onAppear() }
+
     MelovaBackground {
         RtlContent {
             PullToRefreshBox(
-                isRefreshing = state.isLoading && state.lessons.isNotEmpty(),
+                isRefreshing = state.isLoading && state.courses.isNotEmpty(),
                 onRefresh = onRefresh,
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .windowInsetsPadding(WindowInsets.statusBars)
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                    contentPadding = PaddingValues(
+                        start = 20.dp,
+                        end = 20.dp,
+                        top = 16.dp,
+                        bottom = BottomBarContentPadding
+                    ),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    item { HomeHeader(themeMode = themeMode, onThemeModeChange = onThemeModeChange) }
-                    item {
-                        ProgressHeroCard(
-                            practiced = state.totalPracticed,
-                            total = state.totalSections
-                        )
-                    }
-                    item {
-                        SectionHeader(
-                            title = "درس‌ها",
-                            trailing = state.lessons.takeIf { it.isNotEmpty() }?.let { "${it.size} درس" }
-                        )
-                    }
+                    item { HomeHeader() }
 
                     when {
-                        state.lessons.isEmpty() && state.isLoading -> item { LoadingCard() }
-                        state.lessons.isEmpty() && state.errorMessage != null -> item {
+                        state.courses.isEmpty() && state.isLoading -> item { LoadingCard() }
+                        state.courses.isEmpty() && state.errorMessage != null -> item {
                             MessageCard(
                                 icon = Icons.Default.CloudOff,
                                 message = state.errorMessage ?: "",
@@ -115,18 +114,55 @@ fun HomeScreen(
                                 onAction = onRefresh
                             )
                         }
-                        state.lessons.isEmpty() -> item {
+                        state.courses.isEmpty() -> item {
                             MessageCard(
                                 icon = Icons.Outlined.LibraryMusic,
-                                message = "هنوز درسی منتشر نشده است. به‌زودی برمی‌گردیم!"
+                                message = "هنوز دوره‌ای منتشر نشده است. به‌زودی برمی‌گردیم!"
                             )
                         }
-                        else -> itemsIndexed(state.lessons, key = { _, lesson -> lesson.id }) { index, lesson ->
-                            LessonCard(
-                                number = index + 1,
-                                lesson = lesson,
-                                practiced = state.practicedSections(lesson),
-                                onClick = { onLessonClick(lesson.id) }
+                        state.followedCourses.isEmpty() -> item {
+                            MessageCard(
+                                icon = Icons.Outlined.LibraryMusic,
+                                message = "هنوز دوره‌ای را دنبال نمی‌کنید. یکی از دوره‌های زیر را دنبال کنید تا درس‌هایش اینجا بیاید."
+                            )
+                        }
+                        else -> {
+                            item {
+                                ProgressHeroCard(
+                                    practiced = state.totalPracticed,
+                                    total = state.totalSections
+                                )
+                            }
+                            state.followedCourses.forEach { course ->
+                                item(key = "course-${course.id}") { CourseHeading(course) }
+                                if (course.lessons.isEmpty()) {
+                                    item(key = "empty-${course.id}") {
+                                        Text(
+                                            text = "این دوره هنوز درسی ندارد.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MelovaTextMuted
+                                        )
+                                    }
+                                }
+                                itemsIndexed(course.lessons, key = { _, lesson -> lesson.id }) { index, lesson ->
+                                    LessonCard(
+                                        number = index + 1,
+                                        lesson = lesson,
+                                        practiced = state.practicedSections(lesson),
+                                        onClick = { onLessonClick(lesson.id) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (state.suggestedCourses.isNotEmpty()) {
+                        item { SectionHeader(title = "دوره‌های پیشنهادی") }
+                        items(state.suggestedCourses, key = { "suggested-${it.id}" }) { course ->
+                            CourseCard(
+                                course = course,
+                                isFollowed = false,
+                                onFollowChange = { onFollowChange(course.id, it) }
                             )
                         }
                     }
@@ -140,7 +176,6 @@ fun HomeScreen(
                             onClick = onSolfegeClick
                         )
                     }
-                    item { Spacer(Modifier.height(12.dp)) }
                 }
             }
         }
@@ -148,7 +183,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
+private fun HomeHeader() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -169,33 +204,6 @@ private fun HomeHeader(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> U
                 color = MelovaTextMuted
             )
         }
-        ThemeModeButton(themeMode = themeMode, onThemeModeChange = onThemeModeChange)
-    }
-}
-
-/** Cycles system → light → dark. */
-@Composable
-private fun ThemeModeButton(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
-    val (icon, label) = when (themeMode) {
-        ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto to "پوسته: هماهنگ با گوشی"
-        ThemeMode.LIGHT -> Icons.Default.LightMode to "پوسته: روشن"
-        ThemeMode.DARK -> Icons.Default.DarkMode to "پوسته: تیره"
-    }
-    val next = when (themeMode) {
-        ThemeMode.SYSTEM -> ThemeMode.LIGHT
-        ThemeMode.LIGHT -> ThemeMode.DARK
-        ThemeMode.DARK -> ThemeMode.SYSTEM
-    }
-    Surface(
-        onClick = { onThemeModeChange(next) },
-        shape = CircleShape,
-        color = MelovaCard,
-        border = BorderStroke(1.dp, MelovaOutline),
-        modifier = Modifier.size(44.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = label, tint = MelovaAccentSoft)
-        }
     }
 }
 
@@ -203,7 +211,7 @@ private fun ThemeModeButton(themeMode: ThemeMode, onThemeModeChange: (ThemeMode)
 private fun ProgressHeroCard(practiced: Int, total: Int) {
     val fraction = if (total > 0) practiced.toFloat() / total else 0f
     val message = when {
-        total == 0 -> "درس‌ها در حال آماده‌سازی‌اند."
+        total == 0 -> "درس‌های دوره‌هایتان به‌زودی آماده می‌شوند."
         practiced == 0 -> "با اولین درس شروع کنید؛ هر بخش فقط چند دقیقه وقت می‌گیرد."
         practiced >= total -> "همه‌ی بخش‌ها را تمرین کرده‌اید. برای نمره‌ی بهتر دوباره بخوانید!"
         else -> "عالی پیش می‌روید؛ ادامه دهید."

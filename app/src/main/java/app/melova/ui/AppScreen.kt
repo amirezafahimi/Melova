@@ -1,19 +1,49 @@
 package app.melova.ui
 
+import android.net.Uri
 import app.melova.presentation.LessonIntroViewModel
 import app.melova.presentation.VocalTrainingViewModel
+import app.melova.ui.components.MainTab
 
 /** Navigation routes; argument names match the keys the ViewModels read from SavedStateHandle. */
 object AppScreen {
     const val SPLASH = "splash"
+
+    // Bottom-bar tabs.
     const val HOME = "home"
+    const val EXPLORE = "explore"
+    const val PROFILE = "profile"
+
     const val SOLFEGE = "solfege"
     const val LESSON = "lesson/{${LessonIntroViewModel.ARG_LESSON_ID}}"
     const val PRACTICE =
         "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}"
 
-    fun lesson(lessonId: String) = "lesson/${android.net.Uri.encode(lessonId)}"
+    const val ARG_COURSE_ID = "courseId"
+    const val ARG_LESSON_ID = "lessonId"
+    const val TEACHER_PANEL = "teacher"
+    const val COURSE_EDITOR = "teacher/course/{$ARG_COURSE_ID}"
+    const val LESSON_EDITOR = "teacher/lesson/{$ARG_LESSON_ID}"
+
+    fun tabRoute(tab: MainTab) = when (tab) {
+        MainTab.EXPLORE -> EXPLORE
+        MainTab.PRACTICE -> HOME
+        MainTab.PROFILE -> PROFILE
+    }
+
+    fun tabFor(route: String?): MainTab? = when (route) {
+        EXPLORE -> MainTab.EXPLORE
+        HOME -> MainTab.PRACTICE
+        PROFILE -> MainTab.PROFILE
+        else -> null
+    }
+
+    fun lesson(lessonId: String) = "lesson/${Uri.encode(lessonId)}"
 
     fun practice(lessonId: String, sectionId: String) =
-        "practice/${android.net.Uri.encode(lessonId)}/${android.net.Uri.encode(sectionId)}"
+        "practice/${Uri.encode(lessonId)}/${Uri.encode(sectionId)}"
+
+    fun courseEditor(courseId: String) = "teacher/course/${Uri.encode(courseId)}"
+
+    fun lessonEditor(lessonId: String) = "teacher/lesson/${Uri.encode(lessonId)}"
 }

@@ -1,17 +1,44 @@
 package app.melova.data.remote.mapper
 
+import app.melova.data.model.Course
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
+import app.melova.data.model.TeacherProfile
+import app.melova.data.remote.dto.CourseDto
+import app.melova.data.remote.dto.CoursesResponseDto
 import app.melova.data.remote.dto.LessonDto
-import app.melova.data.remote.dto.LessonsResponseDto
+import app.melova.data.remote.dto.TeacherProfileDto
 
-fun LessonsResponseDto.toDomain(): List<Lesson> =
-    lessons.orEmpty().mapNotNull { it.toDomain() }
+fun CoursesResponseDto.toDomain(): List<Course> =
+    courses.orEmpty().mapNotNull { it.toDomain() }
 
-private fun LessonDto.toDomain(): Lesson? {
+fun TeacherProfileDto.toDomain(): TeacherProfile = TeacherProfile(
+    id = id.orEmpty(),
+    name = name.orEmpty(),
+    bio = bio.orEmpty(),
+    courses = courses.orEmpty().mapNotNull { it.toDomain() }
+)
+
+private fun CourseDto.toDomain(): Course? {
+    val courseId = id?.takeIf { it.isNotBlank() } ?: return null
+    return Course(
+        id = courseId,
+        title = title.orEmpty(),
+        subtitle = subtitle.orEmpty(),
+        description = description.orEmpty(),
+        level = level.orEmpty(),
+        published = published == true,
+        teacherId = teacherId.orEmpty(),
+        teacherName = teacherName.orEmpty(),
+        lessons = lessons.orEmpty().mapNotNull { it.toDomain(courseId) }
+    )
+}
+
+private fun LessonDto.toDomain(fallbackCourseId: String): Lesson? {
     val lessonId = id?.takeIf { it.isNotBlank() } ?: return null
     return Lesson(
         id = lessonId,
+        courseId = courseId ?: fallbackCourseId,
         title = title.orEmpty(),
         subtitle = subtitle.orEmpty(),
         description = description.orEmpty(),

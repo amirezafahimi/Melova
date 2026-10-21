@@ -1,7 +1,31 @@
 package app.melova.data.model
 
+data class Course(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val description: String,
+    val level: String,
+    /** False for a teacher's draft, which only that teacher sees. */
+    val published: Boolean,
+    val teacherId: String,
+    val teacherName: String,
+    val lessons: List<Lesson>
+) {
+    val sectionCount: Int
+        get() = lessons.sumOf { lesson -> lesson.sections.size }
+}
+
+data class TeacherProfile(
+    val id: String,
+    val name: String,
+    val bio: String,
+    val courses: List<Course>
+)
+
 data class Lesson(
     val id: String,
+    val courseId: String,
     val title: String,
     val subtitle: String,
     val description: String,
