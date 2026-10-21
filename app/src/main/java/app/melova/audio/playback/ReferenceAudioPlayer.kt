@@ -36,9 +36,16 @@ class ReferenceAudioPlayer(context: Context) {
         file: File,
         onFinished: () -> Unit,
         onReady: () -> Unit = {}
+    ) = prepare(Uri.fromFile(file), onFinished, onReady)
+
+    /** Same as the file version, for a picked document (content://) or any other Uri. */
+    fun prepare(
+        uri: Uri,
+        onFinished: () -> Unit,
+        onReady: () -> Unit = {}
     ) {
         removeListener()
-        player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
+        player.setMediaItem(MediaItem.fromUri(uri))
         player.playWhenReady = false
         player.prepare()
 

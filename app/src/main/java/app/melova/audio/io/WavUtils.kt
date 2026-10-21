@@ -8,6 +8,7 @@ import kotlin.math.abs
 
 object WavUtils {
     const val SAMPLE_RATE = 44100
+    const val WAV_HEADER_BYTES = 44
 
     fun normalizePeak(samples: ShortArray, targetPeakRatio: Float = 0.92f): ShortArray {
         if (samples.isEmpty()) return samples
@@ -31,31 +32,56 @@ object WavUtils {
     }
 
     fun writePcm16Wav(file: File, samples: ShortArray, sampleRate: Int = SAMPLE_RATE) {
-        val dataSize = samples.size * 2
-        val totalSize = 36 + dataSize
-
         RandomAccessFile(file, "rw").use { raf ->
             raf.setLength(0)
-            val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
-            header.put("RIFF".toByteArray())
-            header.putInt(totalSize)
-            header.put("WAVE".toByteArray())
-            header.put("fmt ".toByteArray())
-            header.putInt(16)
-            header.putShort(1)
-            header.putShort(1)
-            header.putInt(sampleRate)
-            header.putInt(sampleRate * 2)
-            header.putShort(2)
-            header.putShort(16)
-            header.put("data".toByteArray())
-            header.putInt(dataSize)
-            raf.write(header.array())
+            raf.write(pcm16MonoHeader(samples.size * 2, sampleRate))
 
             val chunk = ByteBuffer.allocate(samples.size * 2).order(ByteOrder.LITTLE_ENDIAN)
             samples.forEach { chunk.putShort(it) }
             raf.write(chunk.array())
         }
+    }
+
+    /** The 44-byte header of a mono 16-bit PCM WAV holding [dataSize] bytes of samples. */
+    fun pcm16MonoHeader(dataSize: Int, sampleRate: Int = SAMPLE_RATE): ByteArray {
+        val header = ByteBuffer.allocate(WAV_HEADER_BYTES).order(ByteOrder.LITTLE_ENDIAN)
+        header.put("RIFF".toByteArray())
+        header.putInt(36 + dataSize)
+        header.put("WAVE".toByteArray())
+        header.put("fmt ".toByteArray())
+        header.putInt(16)
+        header.putShort(1)
+        header.putShort(1)
+        header.putInt(sampleRate)
+        header.putInt(sampleRate * 2)
+        header.putShort(2)
+        header.putShort(16)
+        header.put("data".toByteArray())
+        header.putInt(dataSize)
+        return header.array()
+    }
+
+    /**
+     * Cuts the silence before the first and after the last sung note (keeping [marginMs] of
+     * air) and normalizes the peak, so a reference recorded in the app starts on the music.
+     * Returns the new duration in milliseconds.
+     */
+    fun trimSilenceAndNormalize(file: File, marginMs: Int = 250): Long {
+        val (samples, sampleRate) = readPcm16Samples(file)
+        if (samples.isEmpty()) return 0L
+        var peak = 0
+        for (sample in samples) peak = maxOf(peak, abs(sample.toInt()))
+        val threshold = maxOf(300, peak / 25)
+        val first = samples.indexOfFirst { abs(it.toInt()) >= threshold }
+        val last = samples.indexOfLast { abs(it.toInt()) >= threshold }
+        val trimmed = if (first < 0) {
+            samples
+        } else {
+            val margin = sampleRate * marginMs / 1000
+            samples.copyOfRange((first - margin).coerceAtLeast(0), (last + margin + 1).coerceAtMost(samples.size))
+        }
+        writePcm16Wav(file, normalizePeak(trimmed), sampleRate)
+        return trimmed.size * 1000L / sampleRate
     }
 
     fun readPcm16Samples(file: File): Pair<ShortArray, Int> {

@@ -66,13 +66,20 @@ class TeacherViewModel(application: Application) : AndroidViewModel(application)
 
     fun deleteLesson(lessonId: String) = run("در حال حذف درس…") { repository.deleteLesson(lessonId) }
 
-    fun uploadIntro(lessonId: String, audio: Uri) =
-        run("در حال بارگذاری آموزش…") { repository.uploadIntro(lessonId, audio) }
+    fun uploadIntro(lessonId: String, audio: Uri, onSuccess: () -> Unit = {}) =
+        run("در حال بارگذاری آموزش…", onSuccess = onSuccess) { repository.uploadIntro(lessonId, audio) }
 
-    fun addSection(lessonId: String, title: String, description: String, audio: Uri) =
-        run("در حال بارگذاری و آماده‌سازی بخش…") {
-            repository.addSection(lessonId, title, description, audio)
-        }
+    /** [onFailure] gets the error instead of the snackbar, for a dialog that stays open. */
+    fun addSection(
+        lessonId: String,
+        title: String,
+        description: String,
+        audio: Uri,
+        onSuccess: () -> Unit = {},
+        onFailure: ((String) -> Unit)? = null
+    ) = run("در حال بارگذاری و آماده‌سازی بخش…", onSuccess = onSuccess, onFailure = onFailure) {
+        repository.addSection(lessonId, title, description, audio)
+    }
 
     fun deleteSection(lessonId: String, sectionId: String) =
         run("در حال حذف بخش…") { repository.deleteSection(lessonId, sectionId) }
@@ -84,6 +91,8 @@ class TeacherViewModel(application: Application) : AndroidViewModel(application)
     private fun run(
         busyLabel: String?,
         changesCatalog: Boolean = true,
+        onSuccess: () -> Unit = {},
+        onFailure: ((String) -> Unit)? = null,
         action: suspend () -> TeacherProfile
     ) {
         if (_uiState.value.busyLabel != null) return
@@ -100,16 +109,19 @@ class TeacherViewModel(application: Application) : AndroidViewModel(application)
                             revision = if (changesCatalog) it.revision + 1 else it.revision
                         )
                     }
+                    onSuccess()
                 }
                 .onFailure { error ->
+                    val text = error.message ?: "خطا"
                     _uiState.update {
                         it.copy(
                             isSignedIn = repository.isSignedIn,
                             busyLabel = null,
                             isLoading = false,
-                            message = error.message ?: "خطا"
+                            message = if (onFailure == null) text else it.message
                         )
                     }
+                    onFailure?.invoke(text)
                 }
         }
     }

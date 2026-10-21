@@ -100,7 +100,7 @@ class TeacherRepository(
             }
         }
         return try {
-            val mediaType = (appContext.contentResolver.getType(uri) ?: "audio/*").toMediaType()
+            val mediaType = (appContext.contentResolver.getType(uri) ?: mediaTypeFor(name)).toMediaType()
             val part = MultipartBody.Part.createFormData("audio", name, temp.asRequestBody(mediaType))
             call { send(part) }
         } finally {
@@ -109,6 +109,8 @@ class TeacherRepository(
     }
 
     private fun displayName(uri: Uri): String {
+        // A take recorded in the app is a plain file; its name carries the extension the server checks.
+        if (uri.scheme == "file") uri.lastPathSegment?.let { return it }
         appContext.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { cursor ->
                 if (cursor.moveToFirst()) {
@@ -116,6 +118,14 @@ class TeacherRepository(
                 }
             }
         return "audio"
+    }
+
+    private fun mediaTypeFor(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+        "wav" -> "audio/wav"
+        "m4a", "aac" -> "audio/mp4"
+        "mp3" -> "audio/mpeg"
+        "ogg" -> "audio/ogg"
+        else -> "audio/*"
     }
 
     /** Runs a call and turns server errors into the Persian message the server sent. */
