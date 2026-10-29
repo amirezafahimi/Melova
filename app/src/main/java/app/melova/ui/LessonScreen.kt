@@ -88,6 +88,9 @@ fun LessonScreen(
     onRetry: () -> Unit,
     onSectionClick: (sectionId: String) -> Unit,
     onResume: () -> Unit,
+    /** Signed in as this lesson's teacher: a paid lesson is open to them. */
+    isOwnTeacher: Boolean = false,
+    studentId: String? = null,
     introViewModel: LessonIntroViewModel = viewModel()
 ) {
     val introState by introViewModel.uiState.collectAsStateWithLifecycle()
@@ -127,6 +130,8 @@ fun LessonScreen(
                 }
 
                 item { LessonHero(lesson) }
+                val locked = !lesson.isOpen && !isOwnTeacher
+                if (locked) item { LockedLessonCard(lesson, studentId) }
                 item {
                     IntroPlayerCard(
                         state = introState,
@@ -147,6 +152,7 @@ fun LessonScreen(
                         number = index + 1,
                         section = section,
                         bestScore = catalogState.bestScore(lesson.id, section.id),
+                        locked = locked,
                         onClick = { onSectionClick(section.id) }
                     )
                 }
@@ -322,12 +328,14 @@ private fun SectionCard(
     number: Int,
     section: LessonSection,
     bestScore: Int?,
+    locked: Boolean,
     onClick: () -> Unit
 ) {
+    val enabled = section.isAvailable && !locked
     MelovaSurfaceCard(
         onClick = onClick,
-        enabled = section.isAvailable,
-        modifier = Modifier.alpha(if (section.isAvailable) 1f else 0.55f)
+        enabled = enabled,
+        modifier = Modifier.alpha(if (enabled) 1f else 0.55f)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

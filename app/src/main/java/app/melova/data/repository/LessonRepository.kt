@@ -4,6 +4,7 @@ import android.content.Context
 import app.melova.data.model.Catalog
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
+import app.melova.data.model.TeacherOrnament
 import java.io.File
 
 interface LessonRepository {
@@ -21,4 +22,7 @@ interface LessonRepository {
 
     /** Local copy of the teacher's performance for one section (16-bit PCM WAV). */
     suspend fun sectionAudioFile(context: Context, lesson: Lesson, section: LessonSection): File
+
+    /** The teacher's tahrir and vibrato vowels in one section, in time order. */
+    suspend fun sectionOrnaments(lesson: Lesson, section: LessonSection): List<TeacherOrnament>
 }

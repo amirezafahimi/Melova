@@ -6,6 +6,8 @@ import app.melova.data.local.TeacherSession
 import app.melova.data.model.Catalog
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
+import app.melova.data.model.TeacherOrnament
+import app.melova.data.model.TeacherOrnamentKind
 import app.melova.data.remote.datasource.MelovaRemoteDataSource
 import app.melova.data.remote.datasource.MelovaRemoteDataSourceImpl
 import app.melova.data.remote.dto.CatalogResponseDto
@@ -83,6 +85,27 @@ class RemoteLessonRepository(
         }
     }
 
+    override suspend fun sectionOrnaments(
+        lesson: Lesson,
+        section: LessonSection
+    ): List<TeacherOrnament> = withContext(Dispatchers.IO) {
+        val key = "${lesson.id}/${section.id}/${section.audioVersion}"
+        ornamentCache[key]?.let { return@withContext it }
+
+        val response = try {
+            remoteDataSource.getSectionOrnaments(lesson.id, section.id)
+        } catch (error: Exception) {
+            throw IOException("دریافت تحریرهای استاد ممکن نشد. اتصال اینترنت را بررسی کنید.", error)
+        }
+        response.failureReason?.takeIf { it.isNotBlank() }?.let { throw IOException(it) }
+        val ornaments = response.ornaments.mapNotNull { dto ->
+            val kind = TeacherOrnamentKind.fromRaw(dto.kind) ?: return@mapNotNull null
+            TeacherOrnament(kind, dto.startMs, dto.endMs).takeIf { dto.endMs > dto.startMs }
+        }.sortedBy { it.startMs }
+        ornamentCache[key] = ornaments
+        ornaments
+    }
+
     /** Keeps one file per [prefix]; a new server [version] replaces the old download. */
     private suspend fun cachedDownload(
         dir: File,
@@ -119,5 +142,8 @@ class RemoteLessonRepository(
         /** Shared across screens so opening a lesson or section needs no extra request. */
         @Volatile
         var memoryCache: Catalog? = null
+
+        /** Teacher ornaments per section audio version; the server's first analysis is slow. */
+        val ornamentCache = java.util.concurrent.ConcurrentHashMap<String, List<TeacherOrnament>>()
     }
 }

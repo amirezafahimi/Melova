@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,8 +44,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.melova.BuildConfig
+import app.melova.data.model.Review
 import app.melova.data.model.Teacher
 import app.melova.presentation.CatalogUiState
+import app.melova.presentation.StudentUiState
 import app.melova.presentation.TeacherUiState
 import app.melova.ui.components.BottomBarContentPadding
 import app.melova.ui.components.FollowButton
@@ -76,9 +79,17 @@ fun ProfileScreen(
     onTeacherClick: (teacherId: String) -> Unit,
     onTeacherSignIn: (code: String) -> Unit,
     onTeacherSignOut: () -> Unit,
-    onOpenTeacherPanel: () -> Unit
+    onOpenTeacherPanel: () -> Unit,
+    studentState: StudentUiState = StudentUiState(),
+    onStudentNameChange: (String) -> Unit = {},
+    onToggleReply: (Review) -> Unit = {},
+    onStudentAppear: () -> Unit = {}
 ) {
     var showSignIn by rememberSaveable { mutableStateOf(false) }
+    var editingName by rememberSaveable { mutableStateOf(false) }
+
+    // The teacher may have answered since the last visit.
+    LaunchedEffect(Unit) { onStudentAppear() }
 
     MelovaBackground {
         RtlContent {
@@ -92,6 +103,25 @@ fun ProfileScreen(
                 item { Text(text = "پروفایل", style = MaterialTheme.typography.headlineSmall, color = MelovaText) }
                 item { IdentityCard(teacherState) }
                 item { StatsRow(catalogState) }
+                item { StudentAccountCard(studentState, onEditName = { editingName = true }) }
+
+                if (studentState.reviews.isNotEmpty()) {
+                    item {
+                        SectionHeader(
+                            title = "پاسخ‌های استاد",
+                            trailing = studentState.answeredCount.takeIf { it > 0 }?.let { "$it پاسخ" }
+                        )
+                    }
+                    items(studentState.reviews, key = { "review-" + it.id }) { review ->
+                        ReviewReplyCard(
+                            review = review,
+                            lessonTitle = catalogState.lesson(review.lessonId)?.title,
+                            isPlaying = studentState.playingReviewId == review.id,
+                            isLoading = studentState.loadingReviewId == review.id,
+                            onTogglePlay = { onToggleReply(review) }
+                        )
+                    }
+                }
 
                 item {
                     SectionHeader(
@@ -160,6 +190,27 @@ fun ProfileScreen(
                 color = MelovaTextMuted
             )
             MelovaTextField(value = code, onValueChange = { code = it }, label = "کد استاد", isSecret = true)
+        }
+    }
+
+    if (editingName) {
+        var name by rememberSaveable { mutableStateOf(studentState.account?.name.orEmpty()) }
+        FormDialog(
+            title = "نام شما",
+            confirmLabel = "ذخیره",
+            confirmEnabled = name.isNotBlank(),
+            onConfirm = {
+                onStudentNameChange(name)
+                editingName = false
+            },
+            onDismiss = { editingName = false }
+        ) {
+            Text(
+                text = "استاد این نام را کنار اجراهایی که می‌فرستید می‌بیند.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MelovaTextMuted
+            )
+            MelovaTextField(value = name, onValueChange = { name = it.take(60) }, label = "نام")
         }
     }
 }

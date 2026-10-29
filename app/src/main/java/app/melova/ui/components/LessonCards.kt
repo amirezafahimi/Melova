@@ -99,6 +99,7 @@ fun LessonTile(
                 LessonBadge(number, isDone = available > 0 && practiced >= available, size = 40)
                 Spacer(Modifier.weight(1f))
                 if (!lesson.published) MelovaChip(text = "پیش‌نویس", color = MelovaGold)
+                else if (!lesson.isOpen) MelovaChip(text = "پولی", color = MelovaGold)
                 else if (lesson.hasIntro) MelovaChip(text = "آموزش صوتی", color = MelovaGold)
             }
             Column(modifier = Modifier.height(44.dp)) {
@@ -156,6 +157,7 @@ fun LessonRowCard(
                     )
                 }
                 if (!lesson.published) MelovaChip(text = "پیش‌نویس", color = MelovaGold)
+                else if (!lesson.isOpen) MelovaChip(text = "پولی", color = MelovaGold)
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
             }
             LessonProgress(practiced, available, Modifier.fillMaxWidth())

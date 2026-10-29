@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import app.melova.data.repository.StudentRepository
 import app.melova.ui.MelovaApp
 import app.melova.ui.theme.MelovaTheme
 import app.melova.ui.theme.ThemeMode
@@ -24,6 +25,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Before any request, so the catalog already knows which lessons this student owns.
+        StudentRepository(this).restoreSession()
         val themePreferences = ThemePreferences(this)
         setContent {
             var themeMode by remember { mutableStateOf(themePreferences.mode) }

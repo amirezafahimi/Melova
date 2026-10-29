@@ -37,6 +37,11 @@ private fun LessonDto.toDomain(): Lesson? {
         published = published == true,
         hasIntro = hasIntro == true,
         introVersion = introVersion.orEmpty(),
+        isFree = isFree != false,
+        priceToman = priceToman ?: 0L,
+        bazaarSku = bazaarSku.orEmpty(),
+        includedReviews = includedReviews ?: 0,
+        isOwned = isOwned,
         sections = sections.orEmpty().mapNotNull { dto ->
             val sectionId = dto.id?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             LessonSection(

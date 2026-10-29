@@ -34,8 +34,20 @@ data class Lesson(
     val published: Boolean,
     val hasIntro: Boolean,
     val introVersion: String,
-    val sections: List<LessonSection>
+    val sections: List<LessonSection>,
+    /** A free lesson is open to everyone; a paid one to whoever bought it. */
+    val isFree: Boolean = true,
+    val priceToman: Long = 0L,
+    /** Cafe Bazaar product id; empty for a free lesson. */
+    val bazaarSku: String = "",
+    /** Teacher reviews that come with the lesson. */
+    val includedReviews: Int = 0,
+    /** Whether this student bought it; null when the server didn't say (no student account yet). */
+    val isOwned: Boolean? = null
 ) {
+    val isOpen: Boolean
+        get() = isFree || isOwned == true
+
     fun section(sectionId: String): LessonSection? = sections.firstOrNull { it.id == sectionId }
 
     val availableSections: Int

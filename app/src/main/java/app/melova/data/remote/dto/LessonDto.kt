@@ -31,7 +31,12 @@ data class LessonDto(
     @SerializedName("published") val published: Boolean?,
     @SerializedName("has_intro") val hasIntro: Boolean?,
     @SerializedName("intro_version") val introVersion: String?,
-    @SerializedName("sections") val sections: List<LessonSectionDto>?
+    @SerializedName("sections") val sections: List<LessonSectionDto>?,
+    @SerializedName("is_free") val isFree: Boolean? = null,
+    @SerializedName("price_toman") val priceToman: Long? = null,
+    @SerializedName("bazaar_sku") val bazaarSku: String? = null,
+    @SerializedName("included_reviews") val includedReviews: Int? = null,
+    @SerializedName("is_owned") val isOwned: Boolean? = null
 )
 
 data class LessonSectionDto(
