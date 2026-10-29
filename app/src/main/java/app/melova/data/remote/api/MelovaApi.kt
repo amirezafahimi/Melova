@@ -3,6 +3,7 @@ package app.melova.data.remote.api
 import app.melova.data.remote.dto.HealthResponseDto
 import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.ScoringResponseDto
+import app.melova.data.remote.dto.TeacherOrnamentsResponseDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
@@ -39,6 +40,13 @@ interface MelovaApi {
         @Path("lessonId") lessonId: String,
         @Path("sectionId") sectionId: String
     ): ResponseBody
+
+    /** The teacher's tahrir and vibrato vowels in one section. */
+    @GET("api/v1/lessons/{lessonId}/sections/{sectionId}/ornaments")
+    suspend fun sectionOrnaments(
+        @Path("lessonId") lessonId: String,
+        @Path("sectionId") sectionId: String
+    ): TeacherOrnamentsResponseDto
 
     @POST("api/v1/score")
     suspend fun score(@Body body: RequestBody): ScoringResponseDto

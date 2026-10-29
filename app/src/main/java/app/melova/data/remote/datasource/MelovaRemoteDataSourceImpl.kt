@@ -5,6 +5,7 @@ import app.melova.data.remote.api.MelovaApi
 import app.melova.data.remote.dto.HealthResponseDto
 import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.ScoringResponseDto
+import app.melova.data.remote.dto.TeacherOrnamentsResponseDto
 import okhttp3.RequestBody
 
 class MelovaRemoteDataSourceImpl(
@@ -25,6 +26,10 @@ class MelovaRemoteDataSourceImpl(
 
     override suspend fun downloadSectionAudio(lessonId: String, sectionId: String) =
         MelovaNetwork.api.downloadSectionAudio(lessonId, sectionId)
+
+    // The first request analyses the teacher's file, which takes as long as scoring.
+    override suspend fun getSectionOrnaments(lessonId: String, sectionId: String): TeacherOrnamentsResponseDto =
+        api.sectionOrnaments(lessonId, sectionId)
 
     override suspend fun scorePerformance(body: RequestBody): ScoringResponseDto =
         api.score(body)
