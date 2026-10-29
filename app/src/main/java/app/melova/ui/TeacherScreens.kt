@@ -95,7 +95,10 @@ fun TeacherPanelScreen(
     isFollowingSelf: Boolean,
     onFollowSelfChange: (Boolean) -> Unit,
     onOpenLesson: (String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenReviews: () -> Unit = {},
+    onOpenStudents: () -> Unit = {},
+    onOpenReport: () -> Unit = {}
 ) {
     var editingProfile by rememberSaveable { mutableStateOf(false) }
     var creatingLesson by rememberSaveable { mutableStateOf(false) }
@@ -136,6 +139,7 @@ fun TeacherPanelScreen(
                 )
             }
         }
+        item { TeacherDeskEntryCard(onOpenReviews, onOpenStudents, onOpenReport) }
         item {
             HeaderWithAction(
                 title = "درس‌های شما",
@@ -208,6 +212,7 @@ private fun TeacherLessonRow(number: Int, lesson: Lesson, onClick: () -> Unit) {
                         text = buildString {
                             append(if (lesson.hasIntro) "آموزش ✓" else "بدون آموزش")
                             append(" • $ready بخش")
+                            if (!lesson.isFree) append(" • ${formatToman(lesson.priceToman)}")
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MelovaTextMuted
@@ -233,6 +238,7 @@ fun LessonEditorScreen(
     var editing by rememberSaveable { mutableStateOf(false) }
     var addingSection by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var editingSale by rememberSaveable { mutableStateOf(false) }
     var sectionToDelete by remember { mutableStateOf<LessonSection?>(null) }
     val introTake = rememberTakeController(TakeKind.INTRO)
     // Leaving the screen drops a take that isn't uploaded yet, so ask first.
@@ -289,6 +295,7 @@ fun LessonEditorScreen(
                 )
             }
         }
+        item { SaleCard(lesson, onEdit = { editingSale = true }) }
         item { SectionHeader(title = "آموزش کلی") }
         item {
             IntroCard(
@@ -324,6 +331,16 @@ fun LessonEditorScreen(
         item { DangerButton(label = "حذف درس", onClick = { confirmDelete = true }) }
     }
 
+    if (editingSale && lesson != null) {
+        SaleDialog(
+            lesson = lesson,
+            onConfirm = { sku, price, reviews ->
+                editingSale = false
+                viewModel.setLessonSale(lesson.id, sku, price, reviews)
+            },
+            onDismiss = { editingSale = false }
+        )
+    }
     if (editing && lesson != null) {
         LessonFormDialog(
             title = "ویرایش درس",
@@ -495,10 +512,62 @@ private fun SectionFormDialog(
     }
 }
 
+@Composable
+private fun SaleCard(lesson: Lesson, onEdit: () -> Unit) {
+    MelovaSurfaceCard(onClick = onEdit, contentPadding = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (lesson.isFree) "درس رایگان" else "قیمت: ${formatToman(lesson.priceToman)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MelovaText
+                )
+                Text(
+                    text = if (lesson.isFree) {
+                        "همه می‌توانند تمرینش کنند. برای فروش، قیمت بگذارید."
+                    } else {
+                        "${lesson.includedReviews} بازبینی همراه درس" +
+                            if (lesson.bazaarSku.isNotBlank()) " • کافه‌بازار: ${lesson.bazaarSku}" else " • فعلاً فروش مستقیم"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MelovaTextMuted
+                )
+            }
+            Icon(Icons.Outlined.Edit, contentDescription = "قیمت درس", tint = MelovaAccentSoft)
+        }
+    }
+}
+
+/** Price 0 makes the lesson free again. */
+@Composable
+private fun SaleDialog(lesson: Lesson, onConfirm: (sku: String, priceToman: Long, includedReviews: Int) -> Unit, onDismiss: () -> Unit) {
+    var priceText by rememberSaveable { mutableStateOf(lesson.priceToman.takeIf { it > 0 }?.toString().orEmpty()) }
+    var reviewsText by rememberSaveable { mutableStateOf(lesson.includedReviews.toString()) }
+    var sku by rememberSaveable { mutableStateOf(lesson.bazaarSku) }
+    val price = priceText.filter { it.isDigit() }.toLongOrNull() ?: 0L
+    val reviews = reviewsText.filter { it.isDigit() }.toIntOrNull() ?: 0
+    FormDialog(
+        title = "قیمت درس",
+        confirmLabel = "ذخیره",
+        onConfirm = { onConfirm(if (price > 0) sku else "", price, if (price > 0) reviews else 0) },
+        onDismiss = onDismiss
+    ) {
+        Text(
+            text = "قیمت را خالی بگذارید تا درس رایگان بماند. هنرجو فعلاً مبلغ را مستقیم به شما می‌دهد و شما در «هنرجوها و پرداخت‌ها» ثبتش می‌کنید.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MelovaTextMuted
+        )
+        MelovaTextField(value = priceText, onValueChange = { priceText = it.take(12) }, label = "قیمت (تومان)")
+        if (price > 0) Text(formatToman(price), style = MaterialTheme.typography.bodySmall, color = MelovaAccentSoft)
+        MelovaTextField(value = reviewsText, onValueChange = { reviewsText = it.take(3) }, label = "تعداد بازبینی همراه درس")
+        MelovaTextField(value = sku, onValueChange = { sku = it.trim().take(80) }, label = "شناسه محصول کافه‌بازار (بعداً)")
+    }
+}
+
 // ------------------------------------------------------------------ shared pieces
 
 @Composable
-private fun TeacherScaffold(
+internal fun TeacherScaffold(
     title: String,
     subtitle: String?,
     onBack: () -> Unit,
@@ -649,7 +718,7 @@ private fun NumberBadge(number: Int) {
 }
 
 @Composable
-private fun EmptyHint(icon: ImageVector, text: String) {
+internal fun EmptyHint(icon: ImageVector, text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

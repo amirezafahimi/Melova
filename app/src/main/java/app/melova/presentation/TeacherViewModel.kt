@@ -60,6 +60,10 @@ class TeacherViewModel(application: Application) : AndroidViewModel(application)
     fun updateLesson(lessonId: String, fields: LessonFields) =
         run("در حال ذخیره…") { repository.updateLesson(lessonId, fields) }
 
+    /** [priceToman] 0 makes the lesson free. */
+    fun setLessonSale(lessonId: String, bazaarSku: String, priceToman: Long, includedReviews: Int) =
+        run("در حال ذخیره قیمت…") { repository.setLessonSale(lessonId, bazaarSku, priceToman, includedReviews) }
+
     fun deleteLesson(lessonId: String) = run("در حال حذف درس…") { repository.deleteLesson(lessonId) }
 
     fun uploadIntro(lessonId: String, audio: Uri, onSuccess: () -> Unit = {}) =

@@ -54,6 +54,16 @@ class TeacherRepository(
     suspend fun setLessonPublished(lessonId: String, published: Boolean) =
         call { api.updateLesson(token(), lessonId, mapOf("published" to published)) }
 
+    /** An empty [bazaarSku] makes the lesson free; [includedReviews] come with it either way. */
+    suspend fun setLessonSale(lessonId: String, bazaarSku: String, priceToman: Long, includedReviews: Int) =
+        call {
+            api.updateLesson(
+                token(),
+                lessonId,
+                mapOf("bazaar_sku" to bazaarSku.trim(), "price_toman" to priceToman, "included_reviews" to includedReviews)
+            )
+        }
+
     suspend fun deleteLesson(lessonId: String) = call { api.deleteLesson(token(), lessonId) }
 
     suspend fun uploadIntro(lessonId: String, audio: Uri) = withUpload(audio) { part ->
