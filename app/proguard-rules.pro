@@ -23,3 +23,5 @@
 # ViewModels (reflection-free, but safe for R8)
 -keep class * extends androidx.lifecycle.ViewModel { *; }
 -keep class * extends androidx.lifecycle.AndroidViewModel { *; }
+# kotlinx.serialization keeps its generated serializers through @Serializable; Ktor uses OkHttp.
+-dontwarn org.slf4j.**

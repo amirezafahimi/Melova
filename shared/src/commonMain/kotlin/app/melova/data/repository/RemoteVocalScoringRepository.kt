@@ -1,0 +1,89 @@
+package app.melova.data.repository
+
+import app.melova.audio.playback.ExpectedSegment
+import app.melova.data.model.VocalScoreResult
+import app.melova.data.remote.FilePart
+import app.melova.data.remote.datasource.MelovaRemoteDataSource
+import app.melova.data.remote.datasource.MelovaRemoteDataSourceImpl
+import app.melova.data.remote.mapper.toDomain
+import app.melova.data.remote.mapper.toRequestJson
+import app.melova.data.remote.multipartBody
+import app.melova.data.remote.serverBody
+import app.melova.platform.LocalFile
+import app.melova.platform.apiBaseUrl
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.ResponseException
+import kotlinx.coroutines.CancellationException
+import kotlinx.io.IOException
+
+class RemoteVocalScoringRepository(
+    private val remoteDataSource: MelovaRemoteDataSource = MelovaRemoteDataSourceImpl()
+) : VocalScoringRepository {
+
+    override suspend fun score(
+        referenceFile: LocalFile,
+        studentFile: LocalFile,
+        expectedSegments: List<ExpectedSegment>?,
+        lessonId: String?,
+        sectionId: String?
+    ): VocalScoreResult {
+        require(studentFile.exists() && studentFile.length() > 44L) {
+            "فایل ضبط هنرجو یافت نشد"
+        }
+
+        pingServer()
+
+        val fields = buildMap {
+            if (lessonId != null && sectionId != null) {
+                put("lesson_id", lessonId)
+                put("section_id", sectionId)
+            }
+            expectedSegments.toRequestJson()?.let { json -> put("expected_segments_json", json) }
+        }
+        val body = multipartBody(
+            fields,
+            listOf(FilePart("student", studentFile.name, "audio/wav", studentFile.readBytes()))
+        )
+
+        return try {
+            remoteDataSource.scorePerformance(body).toDomain()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: ResponseException) {
+            val code = error.response.status.value
+            val detail = serverBody(error)
+            throw IOException(
+                if (detail.isNotEmpty()) "HTTP $code: $detail"
+                else "HTTP $code ${error.response.status.description}",
+                error
+            )
+        } catch (error: HttpRequestTimeoutException) {
+            throw IOException(
+                "زمان انتظار تمام شد — سرور $apiBaseUrl پاسخ نداد.",
+                error
+            )
+        } catch (error: IOException) {
+            throw IOException(
+                "اتصال به سرور برقرار نشد ($apiBaseUrl). " +
+                    "backend/run_server.sh را اجرا کنید و IP در local.properties را بررسی کنید.",
+                error
+            )
+        }
+    }
+
+    private suspend fun pingServer() {
+        try {
+            remoteDataSource.getHealth()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: ResponseException) {
+            throw error
+        } catch (error: Exception) {
+            throw IOException(
+                "سرور در دسترس نیست ($apiBaseUrl). " +
+                    "اول ./backend/run_server.sh را اجرا کنید.",
+                error
+            )
+        }
+    }
+}

@@ -1,0 +1,61 @@
+package app.melova.data.remote.api
+
+import app.melova.data.remote.FilePart
+import app.melova.data.remote.MelovaNetwork.call
+import app.melova.data.remote.MelovaNetwork.decode
+import app.melova.data.remote.MelovaNetwork.jsonBody
+import app.melova.data.remote.MelovaNetwork.segment
+import app.melova.data.remote.dto.CreatedStudentDto
+import app.melova.data.remote.dto.ReviewsDto
+import app.melova.data.remote.dto.StudentMeDto
+import app.melova.data.remote.multipartBody
+import io.ktor.client.HttpClient
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsBytes
+import io.ktor.http.HttpMethod
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+
+/** The student's own account; the token header is added by [app.melova.data.remote.MelovaNetwork]. */
+class StudentApi(private val client: HttpClient) {
+    suspend fun create(body: Map<String, String>): CreatedStudentDto =
+        client.call(HttpMethod.Post, "api/v1/students") { jsonBody(body.toJson()) }.decode()
+
+    suspend fun me(): StudentMeDto = client.call(HttpMethod.Get, "api/v1/me").decode()
+
+    suspend fun updateMe(body: Map<String, String>): StudentMeDto =
+        client.call(HttpMethod.Put, "api/v1/me") { jsonBody(body.toJson()) }.decode()
+
+    /** Start a free lesson: it comes with its included teacher reviews. */
+    suspend fun claimFreeLesson(lessonId: String): StudentMeDto =
+        client.call(HttpMethod.Post, "api/v1/me/lessons/${segment(lessonId)}/claim").decode()
+
+    suspend fun sendForReview(
+        lessonId: String,
+        sectionId: String,
+        note: String,
+        referralId: String?,
+        scoreJson: String?,
+        audio: FilePart
+    ): StudentMeDto = client.call(HttpMethod.Post, "api/v1/me/reviews") {
+        setBody(
+            multipartBody(
+                mapOf(
+                    "lesson_id" to lessonId,
+                    "section_id" to sectionId,
+                    "note" to note,
+                    "referral_id" to referralId,
+                    "score_json" to scoreJson
+                ),
+                listOf(audio)
+            )
+        )
+    }.decode()
+
+    suspend fun reviews(): ReviewsDto = client.call(HttpMethod.Get, "api/v1/me/reviews").decode()
+
+    suspend fun replyAudio(reviewId: String): ByteArray =
+        client.call(HttpMethod.Get, "api/v1/me/reviews/${segment(reviewId)}/reply-audio").bodyAsBytes()
+}
+
+internal fun Map<String, String>.toJson() = JsonObject(mapValues { JsonPrimitive(it.value) })

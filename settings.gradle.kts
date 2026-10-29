@@ -29,7 +29,8 @@ pluginManagement {
     }
 }
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    // The wasm build adds its own repositories for Node.js, Yarn and Binaryen downloads.
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         // Google Maven (dl.google.com) is blocked on some networks; Myket mirrors it.
         maven {
@@ -50,4 +51,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Melova"
 include(":app")
+include(":shared")
  
