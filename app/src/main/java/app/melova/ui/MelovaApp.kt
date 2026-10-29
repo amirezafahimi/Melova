@@ -34,7 +34,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.melova.presentation.CatalogViewModel
 import app.melova.presentation.LessonIntroViewModel
+import app.melova.presentation.StudentViewModel
+import app.melova.presentation.TeacherDeskViewModel
 import app.melova.presentation.TeacherViewModel
+import app.melova.presentation.TeacherPerformanceViewModel
 import app.melova.presentation.VocalTrainingViewModel
 import app.melova.ui.components.MainTab
 import app.melova.ui.components.MelovaBottomBar
@@ -52,6 +55,10 @@ fun MelovaApp(
     // Activity-scoped: shared by the tabs, lesson screens and the teacher panel.
     val catalogViewModel: CatalogViewModel = viewModel()
     val teacherViewModel: TeacherViewModel = viewModel()
+    val studentViewModel: StudentViewModel = viewModel()
+    val teacherDeskViewModel: TeacherDeskViewModel = viewModel()
+    val deskState by teacherDeskViewModel.uiState.collectAsStateWithLifecycle()
+    val studentState by studentViewModel.uiState.collectAsStateWithLifecycle()
     val catalogState by catalogViewModel.uiState.collectAsStateWithLifecycle()
     val teacherState by teacherViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -59,6 +66,22 @@ fun MelovaApp(
     // Teacher edits, sign-in and sign-out change which lessons the student side sees.
     LaunchedEffect(teacherState.revision) {
         if (teacherState.revision > 0) catalogViewModel.refresh(silent = true)
+    }
+    // A new student account: reload so the catalog says which lessons are theirs.
+    LaunchedEffect(studentState.accountRevision) {
+        if (studentState.accountRevision > 0) catalogViewModel.refresh(silent = true)
+    }
+    LaunchedEffect(studentState.message) {
+        studentState.message?.let {
+            snackbarHostState.showSnackbar(it)
+            studentViewModel.consumeMessage()
+        }
+    }
+    LaunchedEffect(deskState.message) {
+        deskState.message?.let {
+            snackbarHostState.showSnackbar(it)
+            teacherDeskViewModel.consumeMessage()
+        }
     }
     LaunchedEffect(teacherState.message) {
         teacherState.message?.let {
@@ -137,7 +160,11 @@ fun MelovaApp(
                     onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
                     onTeacherSignIn = teacherViewModel::signIn,
                     onTeacherSignOut = teacherViewModel::signOut,
-                    onOpenTeacherPanel = { navController.navigate(AppScreen.TEACHER_PANEL) }
+                    onOpenTeacherPanel = { navController.navigate(AppScreen.TEACHER_PANEL) },
+                    studentState = studentState,
+                    onStudentNameChange = studentViewModel::setName,
+                    onToggleReply = studentViewModel::toggleReply,
+                    onStudentAppear = studentViewModel::refresh
                 )
             }
 
@@ -152,7 +179,10 @@ fun MelovaApp(
                     onBack = { navController.popBackStack() },
                     onRetry = { catalogViewModel.refresh() },
                     onSectionClick = { sectionId -> navController.navigate(AppScreen.practice(lessonId, sectionId)) },
-                    onResume = catalogViewModel::refreshProgress
+                    onResume = catalogViewModel::refreshProgress,
+                    isOwnTeacher = teacherState.isSignedIn &&
+                        teacherState.profile?.id == catalogState.lesson(lessonId)?.teacherId,
+                    studentId = studentState.studentId
                 )
             }
 
@@ -162,8 +192,25 @@ fun MelovaApp(
                     navArgument(VocalTrainingViewModel.ARG_LESSON_ID) { type = NavType.StringType },
                     navArgument(VocalTrainingViewModel.ARG_SECTION_ID) { type = NavType.StringType }
                 )
+            ) { entry ->
+                val lessonId = entry.arguments?.getString(VocalTrainingViewModel.ARG_LESSON_ID).orEmpty()
+                val sectionId = entry.arguments?.getString(VocalTrainingViewModel.ARG_SECTION_ID).orEmpty()
+                VocalTrainingScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTeacherDetails = {
+                        navController.navigate(AppScreen.teacherPerformance(lessonId, sectionId))
+                    }
+                )
+            }
+
+            composable(
+                AppScreen.TEACHER_PERFORMANCE,
+                arguments = listOf(
+                    navArgument(TeacherPerformanceViewModel.ARG_LESSON_ID) { type = NavType.StringType },
+                    navArgument(TeacherPerformanceViewModel.ARG_SECTION_ID) { type = NavType.StringType }
+                )
             ) {
-                VocalTrainingScreen(onBack = { navController.popBackStack() })
+                TeacherPerformanceScreen(onBack = { navController.popBackStack() })
             }
 
             composable(AppScreen.SOLFEGE) {
@@ -192,6 +239,50 @@ fun MelovaApp(
                     isFollowingSelf = ownId != null && catalogState.isFollowed(ownId),
                     onFollowSelfChange = { followed -> ownId?.let { catalogViewModel.setFollowed(it, followed) } },
                     onOpenLesson = { navController.navigate(AppScreen.lessonEditor(it)) },
+                    onBack = { navController.popBackStack() },
+                    onOpenReviews = { navController.navigate(AppScreen.TEACHER_REVIEWS) },
+                    onOpenStudents = { navController.navigate(AppScreen.TEACHER_STUDENTS) },
+                    onOpenReport = { navController.navigate(AppScreen.TEACHER_REPORT) }
+                )
+            }
+
+            composable(AppScreen.TEACHER_REVIEWS) {
+                TeacherReviewsScreen(
+                    state = deskState,
+                    viewModel = teacherDeskViewModel,
+                    lessonTitle = { teacherState.lesson(it)?.title },
+                    onOpenReview = { navController.navigate(AppScreen.teacherReview(it)) },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                AppScreen.TEACHER_REVIEW,
+                arguments = listOf(navArgument(AppScreen.ARG_REVIEW_ID) { type = NavType.StringType })
+            ) { entry ->
+                TeacherReviewScreen(
+                    reviewId = entry.arguments?.getString(AppScreen.ARG_REVIEW_ID).orEmpty(),
+                    state = deskState,
+                    viewModel = teacherDeskViewModel,
+                    lessonTitle = { teacherState.lesson(it)?.title },
+                    sectionTitle = { lessonId, sectionId -> teacherState.lesson(lessonId)?.section(sectionId)?.title },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(AppScreen.TEACHER_STUDENTS) {
+                TeacherStudentsScreen(
+                    state = deskState,
+                    viewModel = teacherDeskViewModel,
+                    lessons = teacherState.profile?.lessons.orEmpty(),
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(AppScreen.TEACHER_REPORT) {
+                TeacherReportScreen(
+                    state = deskState,
+                    viewModel = teacherDeskViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }

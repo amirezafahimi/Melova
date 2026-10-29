@@ -18,6 +18,9 @@ object AppScreen {
     const val LESSON = "lesson/{${LessonIntroViewModel.ARG_LESSON_ID}}"
     const val PRACTICE =
         "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}"
+    /** The teacher's performance in detail: waveform with tahrir/vibrato spans. */
+    const val TEACHER_PERFORMANCE =
+        "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}/teacher"
 
     const val ARG_TEACHER_ID = "teacherId"
     const val ARG_LESSON_ID = "lessonId"
@@ -25,6 +28,11 @@ object AppScreen {
     const val TEACHER_PAGE = "teachers/{$ARG_TEACHER_ID}"
     const val TEACHER_PANEL = "teacher"
     const val LESSON_EDITOR = "teacher/lesson/{$ARG_LESSON_ID}"
+    const val ARG_REVIEW_ID = "reviewId"
+    const val TEACHER_REVIEWS = "teacher/reviews"
+    const val TEACHER_REVIEW = "teacher/reviews/{$ARG_REVIEW_ID}"
+    const val TEACHER_STUDENTS = "teacher/students"
+    const val TEACHER_REPORT = "teacher/report"
 
     fun tabRoute(tab: MainTab) = when (tab) {
         MainTab.EXPLORE -> EXPLORE
@@ -44,7 +52,12 @@ object AppScreen {
     fun practice(lessonId: String, sectionId: String) =
         "practice/${Uri.encode(lessonId)}/${Uri.encode(sectionId)}"
 
+    fun teacherPerformance(lessonId: String, sectionId: String) =
+        "practice/${Uri.encode(lessonId)}/${Uri.encode(sectionId)}/teacher"
+
     fun teacherPage(teacherId: String) = "teachers/${Uri.encode(teacherId)}"
 
     fun lessonEditor(lessonId: String) = "teacher/lesson/${Uri.encode(lessonId)}"
+
+    fun teacherReview(reviewId: String) = "teacher/reviews/${Uri.encode(reviewId)}"
 }
