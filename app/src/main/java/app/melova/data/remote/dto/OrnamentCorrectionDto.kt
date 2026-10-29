@@ -9,5 +9,7 @@ data class OrnamentCorrectionDto(
     @SerializedName("kind") val kind: String,
     @SerializedName("message") val message: String,
     @SerializedName("reference_start_ms") val referenceStartMs: Long = 0L,
-    @SerializedName("reference_end_ms") val referenceEndMs: Long? = null
+    @SerializedName("reference_end_ms") val referenceEndMs: Long? = null,
+    @SerializedName("student_clip") val studentClip: PlaybackClipDto? = null,
+    @SerializedName("teacher_clip") val teacherClip: PlaybackClipDto? = null
 )

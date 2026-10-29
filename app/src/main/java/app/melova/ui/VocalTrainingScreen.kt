@@ -98,6 +98,7 @@ import app.melova.ui.theme.MelovaText
 @Composable
 fun VocalTrainingScreen(
     onBack: () -> Unit,
+    onOpenTeacherDetails: () -> Unit,
     viewModel: VocalTrainingViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -156,7 +157,11 @@ fun VocalTrainingScreen(
                                 uiState.mode != VocalTrainingMode.ANALYZING,
                             onTogglePlayback = viewModel::toggleTeacherPlayback,
                             onPlayAtMs = viewModel::playTeacherAt,
-                            onStopPlayback = viewModel::onStopClicked
+                            onStopPlayback = viewModel::onStopClicked,
+                            onOpenDetails = {
+                                if (uiState.playbackTarget != PlaybackTarget.NONE) viewModel.onStopClicked()
+                                onOpenTeacherDetails()
+                            }
                         )
                     }
 
@@ -197,6 +202,14 @@ fun VocalTrainingScreen(
                                 onDismiss = viewModel::dismissResults
                             )
                         }
+                    }
+
+                    uiState.scoreResult?.let { result ->
+                        AskTeacherCard(
+                            state = uiState.teacherAsk,
+                            referralReasons = result.teacherReferral?.reasons.orEmpty(),
+                            onSend = viewModel::sendToTeacher
+                        )
                     }
                 }
             }
@@ -303,7 +316,8 @@ private fun TeacherReferenceSection(
     enabled: Boolean,
     onTogglePlayback: () -> Unit,
     onPlayAtMs: (Long) -> Unit,
-    onStopPlayback: () -> Unit
+    onStopPlayback: () -> Unit,
+    onOpenDetails: () -> Unit
 ) {
     val totalMs = (durationSeconds.coerceAtLeast(1) * 1000L)
     val currentMs = if (isPlaybackActive) {
@@ -420,6 +434,26 @@ private fun TeacherReferenceSection(
                     style = MaterialTheme.typography.labelSmall,
                     color = MelovaText.copy(alpha = 0.45f),
                     textAlign = TextAlign.Start
+                )
+            }
+
+            OutlinedButton(
+                onClick = onOpenDetails,
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MelovaSecondary.copy(alpha = 0.6f))
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.GraphicEq,
+                    contentDescription = null,
+                    tint = MelovaSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "جزئیات اجرای استاد (تحریر و ویبراتو)",
+                    color = MelovaSecondary
                 )
             }
         }
@@ -825,7 +859,7 @@ private fun HolisticScoreResultCard(
 
             if (result.corrections.isNotEmpty()) {
                 Text(
-                    text = "تصحیح‌های پیشنهادی",
+                    text = "خطاهای دقت نت",
                     style = MaterialTheme.typography.titleMedium,
                     color = MelovaText,
                     textAlign = TextAlign.Start
@@ -852,46 +886,15 @@ private fun HolisticScoreResultCard(
                 }
             }
 
-            if (result.ornamentCorrections.isNotEmpty()) {
-                Text(
-                    text = "ظرافت‌های اجرا",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MelovaText,
-                    textAlign = TextAlign.Start
-                )
-                Text(
-                    text = "شیوه‌ی رسیدن به نت‌ها و اتصال آن‌ها در اجرای شما با استاد مقایسه شده؛ هر دو را بشنوید.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MelovaText.copy(alpha = 0.55f),
-                    textAlign = TextAlign.Start
-                )
-                result.ornamentCorrections.forEach { ornament ->
-                    VocalTrainingCorrectionRow(
-                        correction = ornament,
-                        isSelected = selectedCorrectionStartMs == ornament.startMs,
-                        isStudentSnippetPlaying = playingSnippetStartMs == ornament.startMs &&
-                            playingSnippetTarget == PlaybackTarget.USER &&
-                            isPlayingUserRecording,
-                        isTeacherSnippetPlaying = playingSnippetStartMs == ornament.startMs &&
-                            playingSnippetTarget == PlaybackTarget.TEACHER &&
-                            isPlayingTeacherSample,
-                        onPlayStudentSnippet = { onPlayCorrectionStudentSnippet(ornament) },
-                        onPlayTeacherSnippet = { onPlayCorrectionTeacherSnippet(ornament) },
-                        header = "زمان \u200E${ornament.timeLabel}\u200F • رسیدن به نت",
-                        accentColor = MelovaAccentSoft
-                    )
-                }
-            }
-
             if (FeatureFlags.SHOW_TAHRIR_FEEDBACK && result.tahrirComparisons.isNotEmpty()) {
                 Text(
-                    text = "مقایسه تحریرها",
+                    text = "مقایسه تحریر و ویبراتو",
                     style = MaterialTheme.typography.titleMedium,
                     color = MelovaText,
                     textAlign = TextAlign.Start
                 )
                 Text(
-                    text = "تحریرهای استاد و همان بخش از اجرای شما را جداگانه بشنوید و مقایسه کنید.",
+                    text = "تحریر و ویبراتوی استاد و همان بخش از اجرای شما را جداگانه بشنوید و مقایسه کنید.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MelovaText.copy(alpha = 0.55f),
                     textAlign = TextAlign.Start

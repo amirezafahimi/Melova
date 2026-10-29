@@ -6,12 +6,15 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import app.melova.audio.io.WaveformPeaksExtractor
 import app.melova.audio.scoring.VocalScorer
+import app.melova.data.model.PlaybackClip
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.repository.RemoteVocalScoringRepository
 import app.melova.data.local.PracticeProgressStore
 import app.melova.data.repository.LessonRepository
 import app.melova.data.repository.RemoteLessonRepository
+import app.melova.data.repository.StudentRepository
+import app.melova.data.remote.ApiException
 import app.melova.data.repository.VocalScoringRepository
 import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.playback.TeacherVocalGenerator
@@ -39,6 +42,7 @@ class VocalTrainingViewModel(
 
     private val scoringRepository: VocalScoringRepository = RemoteVocalScoringRepository()
     private val lessonRepository: LessonRepository = RemoteLessonRepository()
+    private val studentRepository = StudentRepository(application)
     private val progressStore = PracticeProgressStore(application)
     private val player = ReferenceAudioPlayer(application)
     private val recorder = VocalRecorder(application)
@@ -48,6 +52,9 @@ class VocalTrainingViewModel(
 
     private val userRecordingFile =
         File(getApplication<Application>().cacheDir, USER_RECORDING_FILE_NAME)
+
+    @Volatile
+    private var lessonTeacherId: String = ""
 
     @Volatile
     private var lastRecordingDurationMs: Long = 0L
@@ -89,6 +96,9 @@ class VocalTrainingViewModel(
                         description = section.description
                     )
                 }
+                lessonTeacherId = remoteLesson.teacherId
+                // A free lesson is claimed once so its reviews are on the student's account.
+                if (remoteLesson.isFree && remoteLesson.isOwned == false) claimFreeLesson()
                 Triple(remoteLesson.title, prepared, withContext(Dispatchers.IO) {
                     WaveformPeaksExtractor.fromWavFile(prepared.referenceFile)
                 })
@@ -261,6 +271,23 @@ class VocalTrainingViewModel(
             if (!userRecordingFile.exists() || userRecordingFile.length() <= 44L) return
         } else if (!canPlayTeacher()) return
 
+        val clip = when (target) {
+            PlaybackTarget.USER -> correction.studentClip
+            PlaybackTarget.TEACHER -> correction.teacherClip
+            PlaybackTarget.NONE -> null
+        }
+        if (clip != null) {
+            playRegionSnippet(
+                target = target,
+                startMs = clip.startMs,
+                endMs = clip.endMs,
+                snippetKey = correction.startMs,
+                clip = clip,
+                highlightCorrectionMs = if (target == PlaybackTarget.USER) correction.startMs else null
+            )
+            return
+        }
+
         cancelSnippetStop()
 
         val anchorMs = when (target) {
@@ -322,21 +349,34 @@ class VocalTrainingViewModel(
     }
 
     fun playTahrirStudentSnippet(comparison: TahrirComparison) {
+        comparison.studentClip?.let { clip ->
+            playRegionSnippet(PlaybackTarget.USER, clip.startMs, clip.endMs, comparison.key, clip)
+            return
+        }
         val start = comparison.studentStartMs ?: return
         val end = comparison.studentEndMs ?: return
         playRegionSnippet(PlaybackTarget.USER, start, end, comparison.key)
     }
 
     fun playTahrirTeacherSnippet(comparison: TahrirComparison) {
+        comparison.teacherClip?.let { clip ->
+            playRegionSnippet(PlaybackTarget.TEACHER, clip.startMs, clip.endMs, comparison.key, clip)
+            return
+        }
         playRegionSnippet(PlaybackTarget.TEACHER, comparison.refStartMs, comparison.refEndMs, comparison.key)
     }
 
-    /** پخش گزیده‌ی یک بازه‌ی دقیق [startMs, endMs] از صدای استاد یا هنرجو. */
+    /**
+     * پخش گزیده‌ی یک بازه‌ی دقیق [startMs, endMs] از صدای استاد یا هنرجو.
+     * با [clip]، سرعت پخش در محدوده‌ی خطا آرام‌آرام کم و بعد از آن آرام‌آرام زیاد می‌شود.
+     */
     private fun playRegionSnippet(
         target: PlaybackTarget,
         startMs: Long,
         endMs: Long,
-        snippetKey: Long
+        snippetKey: Long,
+        clip: PlaybackClip? = null,
+        highlightCorrectionMs: Long? = null
     ) {
         if (_uiState.value.mode != VocalTrainingMode.RESULT) return
         if (target == PlaybackTarget.NONE) return
@@ -357,23 +397,27 @@ class VocalTrainingViewModel(
         val clipEndMs = endMs.coerceIn(clipStartMs + 1L, totalMs)
 
         when (target) {
-            PlaybackTarget.USER -> playUserRecordingFrom(clipStartMs, null)
+            PlaybackTarget.USER -> playUserRecordingFrom(clipStartMs, highlightCorrectionMs)
             PlaybackTarget.TEACHER -> playTeacherFrom(clipStartMs)
             PlaybackTarget.NONE -> return
         }
+        clip?.let { player.setSpeed(it.speedAt(clipStartMs)) }
 
         _uiState.update {
             it.copy(
                 playingSnippetStartMs = snippetKey,
                 playingSnippetTarget = target,
-                selectedCorrectionStartMs = null
+                selectedCorrectionStartMs = highlightCorrectionMs
             )
         }
 
         snippetStopJob = viewModelScope.launch {
             while (isActive && _uiState.value.playbackTarget == target) {
-                if (player.currentPositionMs() >= clipEndMs - 40L) {
+                val positionMs = player.currentPositionMs()
+                clip?.let { player.setSpeed(it.speedAt(positionMs)) }
+                if (positionMs >= clipEndMs - 40L) {
                     player.pause()
+                    player.setSpeed(1f)
                     val endAtMs = clipEndMs.coerceAtMost(totalMs)
                     _uiState.update {
                         it.copy(
@@ -395,7 +439,7 @@ class VocalTrainingViewModel(
                     }
                     break
                 }
-                delay(40)
+                delay(if (clip != null) SPEED_TICK_MS else 40L)
             }
         }
     }
@@ -408,6 +452,7 @@ class VocalTrainingViewModel(
             it.copy(
                 mode = VocalTrainingMode.IDLE,
                 scoreResult = null,
+                teacherAsk = TeacherAskState(),
                 progress = 0f,
                 isPlaying = false,
                 playbackTarget = PlaybackTarget.NONE,
@@ -419,6 +464,49 @@ class VocalTrainingViewModel(
             )
         }
         startRecording()
+    }
+
+    private fun claimFreeLesson() {
+        viewModelScope.launch {
+            runCatching {
+                studentRepository.ensureAccount()
+                studentRepository.claimFreeLesson(lessonId)
+            }
+        }
+    }
+
+    /** Sends the take just scored to the teacher, with the score summary and an optional note. */
+    fun sendToTeacher(note: String) {
+        val score = _uiState.value.scoreResult ?: return
+        if (_uiState.value.teacherAsk.isSending || _uiState.value.teacherAsk.isSent) return
+        if (!userRecordingFile.exists() || userRecordingFile.length() <= 44L) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(teacherAsk = it.teacherAsk.copy(isSending = true, error = null)) }
+            runCatching {
+                studentRepository.ensureAccount()
+                studentRepository.sendForReview(lessonId, sectionId, userRecordingFile, note, score)
+            }.onSuccess { account ->
+                _uiState.update {
+                    it.copy(
+                        teacherAsk = TeacherAskState(
+                            isSent = true,
+                            creditsLeft = account.credits(lessonTeacherId),
+                            studentId = account.id
+                        )
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        teacherAsk = TeacherAskState(
+                            error = error.message ?: "ارسال ممکن نشد.",
+                            needsCredit = (error as? ApiException)?.code == 402,
+                            studentId = studentRepository.studentId
+                        )
+                    )
+                }
+            }
+        }
     }
 
     fun onRecordClicked() {
@@ -460,6 +548,7 @@ class VocalTrainingViewModel(
             it.copy(
                 mode = VocalTrainingMode.IDLE,
                 scoreResult = null,
+                teacherAsk = TeacherAskState(),
                 progress = 0f,
                 isPlaying = false,
                 playbackTarget = PlaybackTarget.NONE,
@@ -557,6 +646,7 @@ class VocalTrainingViewModel(
     private fun cancelSnippetStop() {
         snippetStopJob?.cancel()
         snippetStopJob = null
+        player.setSpeed(1f)
     }
 
     private fun startRecording() {
@@ -658,6 +748,7 @@ class VocalTrainingViewModel(
                 mode = VocalTrainingMode.ANALYZING,
                 progress = 0f,
                 scoreResult = null,
+                teacherAsk = TeacherAskState(),
                 statusMessage = "تحلیل اجرا روی سرور..."
             )
         }
@@ -696,6 +787,7 @@ class VocalTrainingViewModel(
                     playingSnippetStartMs = null,
                     playingSnippetTarget = null,
                     scoreResult = score,
+                    teacherAsk = TeacherAskState(),
                     isNewBest = isNewBest,
                     bestScore = progressStore.bestScore(lessonId, sectionId),
                     statusMessage = score.summary.ifBlank {
@@ -710,6 +802,7 @@ class VocalTrainingViewModel(
                     mode = VocalTrainingMode.IDLE,
                     progress = 0f,
                     scoreResult = null,
+                    teacherAsk = TeacherAskState(),
                     statusMessage = "خطا در ارتباط با سرور: ${e.message ?: "نامشخص"}"
                 )
             }
@@ -794,6 +887,8 @@ class VocalTrainingViewModel(
         const val ARG_SECTION_ID = "sectionId"
         private const val USER_RECORDING_FILE_NAME = "user_vocal.wav"
         private const val CORRECTION_CLIP_PADDING_MS = 1_000L
+        /** هر چند میلی‌ثانیه سرعت پخش به‌روز شود تا کم و زیاد شدنش نرم باشد. */
+        private const val SPEED_TICK_MS = 20L
     }
 }
 
@@ -828,7 +923,8 @@ data class VocalTrainingUiState(
     val scoreResult: VocalScoreResult? = null,
     /** Best score for this section on this device, including the latest attempt. */
     val bestScore: Int? = null,
-    val isNewBest: Boolean = false
+    val isNewBest: Boolean = false,
+    val teacherAsk: TeacherAskState = TeacherAskState()
 ) {
     val isPlayingTeacherSample: Boolean
         get() = playbackTarget == PlaybackTarget.TEACHER && isPlaying
@@ -838,3 +934,14 @@ data class VocalTrainingUiState(
             playbackTarget == PlaybackTarget.USER &&
             isPlaying
 }
+
+/** Sending the latest take to the teacher. */
+data class TeacherAskState(
+    val isSending: Boolean = false,
+    val isSent: Boolean = false,
+    val error: String? = null,
+    /** The server said no credit or no lesson: the student pays the teacher, who adds it. */
+    val needsCredit: Boolean = false,
+    val creditsLeft: Int? = null,
+    val studentId: String? = null
+)

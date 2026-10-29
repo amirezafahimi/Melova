@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import java.io.File
@@ -45,6 +46,7 @@ class ReferenceAudioPlayer(context: Context) {
         onReady: () -> Unit = {}
     ) {
         removeListener()
+        player.repeatMode = Player.REPEAT_MODE_OFF
         player.setMediaItem(MediaItem.fromUri(uri))
         player.playWhenReady = false
         player.prepare()
@@ -98,9 +100,22 @@ class ReferenceAudioPlayer(context: Context) {
 
     fun stop() {
         removeListener()
+        setSpeed(1f)
         player.playWhenReady = false
         player.stop()
         player.clearMediaItems()
+    }
+
+    /** سرعت پخش؛ زیر و بمی صدا عوض نمی‌شود تا فالشی همان‌طور که بوده شنیده شود. */
+    fun setSpeed(speed: Float) {
+        if (player.playbackParameters.speed != speed) {
+            player.playbackParameters = PlaybackParameters(speed, 1f)
+        }
+    }
+
+    /** پخش دوباره‌ی همان فایل از ابتدا تا وقتی خاموش شود (برای تکرار یک بازه). */
+    fun setLooping(loop: Boolean) {
+        player.repeatMode = if (loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
     }
 
     fun currentPositionMs(): Long = player.currentPosition.coerceAtLeast(0L)

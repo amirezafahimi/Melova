@@ -4,6 +4,7 @@ import app.melova.audio.pitch.PitchAnalyzer
 import app.melova.audio.pitch.PitchAnalyzer.Companion.centsDifference
 import app.melova.audio.pitch.PitchAnalyzer.Companion.frequencyToNoteName
 import app.melova.audio.playback.ExpectedSegment
+import app.melova.data.model.PlaybackClip
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -28,7 +29,10 @@ class VocalScorer {
         val direction: CorrectionDirection,
         val message: String,
         val referenceStartMs: Long = startMs,
-        val referenceEndMs: Long? = null
+        val referenceEndMs: Long? = null,
+        /** بازه‌ی پخش آهسته‌ی این خطا در صدای هنرجو و استاد (از سرور). */
+        val studentClip: PlaybackClip? = null,
+        val teacherClip: PlaybackClip? = null
     )
 
     enum class CorrectionDirection {

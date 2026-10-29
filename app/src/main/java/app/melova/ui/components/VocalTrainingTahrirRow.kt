@@ -57,6 +57,7 @@ fun VocalTrainingTahrirRow(
     val kindLabel = when (comparison.kind) {
         TahrirKind.SUSTAINED -> "تحریر کششی"
         TahrirKind.ALTERNATING -> "تحریر چهچهه‌ای"
+        TahrirKind.VIBRATO -> "ویبراتو"
         TahrirKind.UNKNOWN -> "تحریر"
     }
 

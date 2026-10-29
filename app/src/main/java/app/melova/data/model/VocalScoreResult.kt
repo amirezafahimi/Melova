@@ -14,5 +14,12 @@ data class VocalScoreResult(
     /** Glide/eshareh shape feedback; reuses PitchCorrection for snippet playback. */
     val ornamentCorrections: List<VocalScorer.PitchCorrection> = emptyList(),
     val requiresReRecord: Boolean = false,
-    val reRecordReason: ReRecordReason? = null
+    val reRecordReason: ReRecordReason? = null,
+    /** Set when the scorer asks for the teacher on this take; the id makes it a free referral. */
+    val teacherReferral: TeacherReferral? = null
+)
+
+data class TeacherReferral(
+    val reasons: List<String>,
+    val referralId: String?
 )

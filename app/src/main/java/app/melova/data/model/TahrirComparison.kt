@@ -12,7 +12,9 @@ data class TahrirComparison(
     val studentEndMs: Long?,
     val score: Int,
     val vowelCount: Int,
-    val message: String
+    val message: String,
+    val studentClip: PlaybackClip? = null,
+    val teacherClip: PlaybackClip? = null
 ) {
     /** شناسه‌ی پایدار برای تشخیص اینکه کدام ردیف در حال پخش است. */
     val key: Long get() = refStartMs
@@ -24,12 +26,14 @@ data class TahrirComparison(
 enum class TahrirKind {
     SUSTAINED,
     ALTERNATING,
+    VIBRATO,
     UNKNOWN;
 
     companion object {
         fun fromRaw(raw: String): TahrirKind = when (raw.trim().lowercase()) {
             "sustained" -> SUSTAINED
             "alternating" -> ALTERNATING
+            "vibrato" -> VIBRATO
             else -> UNKNOWN
         }
     }

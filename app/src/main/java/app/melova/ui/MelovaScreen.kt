@@ -481,7 +481,7 @@ private fun ScoreResultCard(
 
             if (result.corrections.isNotEmpty()) {
                 Text(
-                    text = "تصحیح‌های پیشنهادی",
+                    text = "خطاهای دقت نت",
                     style = MaterialTheme.typography.titleMedium,
                     color = MelovaText,
                     textAlign = TextAlign.Start

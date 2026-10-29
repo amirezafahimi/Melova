@@ -12,5 +12,7 @@ data class TahrirComparisonDto(
     @SerializedName("score") val score: Int = 0,
     @SerializedName("rhythm_error_ratio") val rhythmErrorRatio: Float? = null,
     @SerializedName("vowel_count") val vowelCount: Int = 0,
-    @SerializedName("message") val message: String = ""
+    @SerializedName("message") val message: String = "",
+    @SerializedName("student_clip") val studentClip: PlaybackClipDto? = null,
+    @SerializedName("teacher_clip") val teacherClip: PlaybackClipDto? = null
 )
