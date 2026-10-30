@@ -149,7 +149,12 @@
       isPlaying: () => !audio.paused && !audio.ended,
       hasEnded: () => ended,
       isReady: () => audio.readyState >= 2,
-      setSpeed: (speed) => { audio.playbackRate = speed; },
+      // The app ramps the speed every 20 ms around a slowed clip. Each new rate restarts the
+      // browser's pitch-keeping stretcher, which cuts the sound, so move only in 0.1 steps.
+      setSpeed: (speed) => {
+        const rate = Math.round(speed * 10) / 10;
+        if (Math.abs(audio.playbackRate - rate) > 0.001) audio.playbackRate = rate;
+      },
       setLoop: (loop) => { audio.loop = loop; },
       stop: () => { onEnded = null; onReady = null; audio.pause(); audio.removeAttribute('src'); audio.load(); unload(); ended = false; },
     };
