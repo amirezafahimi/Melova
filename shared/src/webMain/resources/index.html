@@ -17,7 +17,9 @@
         html, body { margin: 0; height: 100%; overflow: hidden; background: #1B1230; }
         #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
                    padding: 24px; box-sizing: border-box; text-align: center; line-height: 1.9;
-                   color: #ddd; font-family: sans-serif; }
+                   color: #ddd; font-family: sans-serif;
+                   /* Covers the app until main.kt removes it, once the fonts are in. */
+                   z-index: 10; background: #1B1230; }
     </style>
     <script>
         // melova.js picks the wasm build, or the JS build on browsers without WasmGC
@@ -38,7 +40,7 @@
     <script type="application/javascript" src="melova.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js'); });
+            window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
         }
     </script>
 </head>
