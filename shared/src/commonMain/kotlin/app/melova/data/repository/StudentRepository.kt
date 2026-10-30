@@ -1,6 +1,8 @@
 package app.melova.data.repository
 
 import app.melova.data.local.StudentSession
+import app.melova.data.model.LoginCodeSent
+import app.melova.data.model.LoginMethods
 import app.melova.data.model.Review
 import app.melova.data.model.ReviewAnalysis
 import app.melova.data.model.ReviewStatus
@@ -17,9 +19,13 @@ import app.melova.data.remote.writeAtomically
 import app.melova.platform.LocalFile
 import app.melova.platform.PlatformContext
 import app.melova.platform.filesDir
+import app.melova.platform.supportsGoogleSignIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.io.IOException
+
+/** How a sign-in code reaches the student; [apiKind] is what the server calls it. */
+enum class LoginChannel(val apiKind: String) { PHONE("phone"), EMAIL("email") }
 
 /** The student's own account, the takes they send the teacher, and the teacher's replies. */
 class StudentRepository(
@@ -54,6 +60,67 @@ class StudentRepository(
 
     suspend fun setName(name: String): StudentAccount =
         apiCall { api.updateMe(mapOf("name" to name.trim())) }.toDomain()
+
+    /** The server crops it to a square; read now, as the picked file is only temporary. */
+    suspend fun setPhoto(photo: LocalFile): StudentAccount {
+        val part = FilePart("photo", "photo", "application/octet-stream", photo.readBytes())
+        return apiCall { api.setPhoto(part) }.toDomain()
+    }
+
+    suspend fun removePhoto(): StudentAccount = apiCall { api.deletePhoto() }.toDomain()
+
+    /** The student's photo, downloaded once per version and kept. */
+    suspend fun photo(account: StudentAccount): ByteArray? {
+        val version = account.photoVersion ?: return null
+        return apiCall {
+            val dir = LocalFile(filesDir(context), "profile_photo").apply { mkdirs() }
+            val target = LocalFile(dir, "${account.id}-$version.jpg")
+            if (!target.exists() || target.length() == 0L) {
+                dir.listFiles()?.forEach { it.delete() }
+                api.photo().writeAtomically(target)
+            }
+            target.readBytes()
+        }
+    }
+
+    suspend fun loginMethods(): LoginMethods {
+        val methods = apiCall { api.loginMethods() }
+        return LoginMethods(
+            phone = methods.phone == true,
+            email = methods.email == true,
+            googleClientId = methods.googleClientId?.takeIf { it.isNotBlank() && supportsGoogleSignIn }
+        )
+    }
+
+    suspend fun requestLoginCode(channel: LoginChannel, address: String): LoginCodeSent {
+        val sent = apiCall { api.requestLoginCode(mapOf("kind" to channel.apiKind, "value" to address.trim())) }
+        return LoginCodeSent(sent.sentTo ?: address.trim(), sent.resendAfter ?: 60)
+    }
+
+    suspend fun verifyLoginCode(channel: LoginChannel, address: String, code: String): StudentAccount =
+        signedIn(apiCall {
+            api.verifyLoginCode(mapOf("kind" to channel.apiKind, "value" to address.trim(), "code" to code))
+        })
+
+    suspend fun signInWithGoogle(idToken: String): StudentAccount = signedIn(apiCall { api.signInWithGoogle(idToken) })
+
+    /** The server moved this install's guest data to the account; from now on this token opens it. */
+    private fun signedIn(account: StudentMeDto): StudentAccount {
+        val id = account.studentId ?: throw IOException("ورود ممکن نشد.")
+        val token = account.token ?: throw IOException("ورود ممکن نشد.")
+        session.save(id, token)
+        restoreSession()
+        return account.toDomain()
+    }
+
+    /** Back to being a guest, with a new guest account. */
+    suspend fun signOut() {
+        // Forgetting the token is what signs this install out, so a failed call changes nothing.
+        runCatching { apiCall { api.logout() } }
+        session.clear()
+        restoreSession()
+        ensureAccount()
+    }
 
     suspend fun claimFreeLesson(lessonId: String): StudentAccount =
         apiCall { api.claimFreeLesson(lessonId) }.toDomain()
@@ -111,6 +178,9 @@ class StudentRepository(
 internal fun StudentMeDto.toDomain() = StudentAccount(
     id = studentId.orEmpty(),
     name = name.orEmpty(),
+    signedIn = signedIn == true,
+    signedInAs = signedInAs?.takeIf { it.isNotBlank() },
+    photoVersion = photoVersion,
     ownedLessons = ownedLessons.orEmpty().toSet(),
     reviewCredits = reviewCredits.orEmpty()
 )

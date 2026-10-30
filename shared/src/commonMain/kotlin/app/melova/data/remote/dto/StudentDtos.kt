@@ -14,10 +14,32 @@ data class CreatedStudentDto(
 data class StudentMeDto(
     @SerialName("student_id") val studentId: String?,
     @SerialName("name") val name: String?,
+    @SerialName("signed_in") val signedIn: Boolean? = null,
+    /** The phone or email they signed in with. */
+    @SerialName("signed_in_as") val signedInAs: String? = null,
+    /** Changes with the photo; null when there is none. */
+    @SerialName("photo_version") val photoVersion: Long? = null,
     @SerialName("owned_lessons") val ownedLessons: List<String>?,
     /** Review credits left, by teacher id. */
     @SerialName("review_credits") val reviewCredits: Map<String, Int>?,
-    @SerialName("review") val review: ReviewDto? = null
+    @SerialName("review") val review: ReviewDto? = null,
+    /** Sign-in calls only: the token that replaces this install's old one. */
+    @SerialName("token") val token: String? = null
+)
+
+/** Which ways of signing in this server has turned on. */
+@Serializable
+data class LoginMethodsDto(
+    @SerialName("phone") val phone: Boolean?,
+    @SerialName("email") val email: Boolean?,
+    @SerialName("google_client_id") val googleClientId: String?
+)
+
+@Serializable
+data class LoginCodeSentDto(
+    /** The address as the student should see it. */
+    @SerialName("sent_to") val sentTo: String?,
+    @SerialName("resend_after") val resendAfter: Int?
 )
 
 @Serializable

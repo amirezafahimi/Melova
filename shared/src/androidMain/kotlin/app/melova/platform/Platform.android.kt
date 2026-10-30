@@ -17,6 +17,8 @@ actual val appVersionName: String
 
 actual val smoothSpeedChanges: Boolean = true
 
+actual val supportsGoogleSignIn: Boolean = true
+
 actual val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
 actual fun currentTimeMillis(): Long = System.currentTimeMillis()

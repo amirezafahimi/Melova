@@ -26,6 +26,11 @@ external interface PickedFileJs : JsAny {
     val bytes: Int8Array
 }
 
+external interface GoogleAnswerJs : JsAny {
+    val credential: String?
+    val cancelled: Boolean
+}
+
 external interface JsPlayer : JsAny {
     fun load(bytes: Int8Array, name: String, finished: () -> Unit, ready: () -> Unit)
     fun play()
@@ -48,7 +53,8 @@ private external object MelovaAudioGlobal : JsAny {
     fun startCompressed(): Promise<JsAny?>
     fun compressedExtension(): String
     fun createPlayer(): JsPlayer
-    fun pickAudioFile(): Promise<JsAny?>
+    fun pickFile(accept: String): Promise<JsAny?>
+    fun googleSignIn(clientId: String): Promise<JsAny?>
     fun apiBaseUrl(): String
 }
 
@@ -65,7 +71,10 @@ object MelovaAudioJs {
     fun createPlayer(): JsPlayer = MelovaAudioGlobal.createPlayer()
 
     /** Resolves to a [PickedFileJs], or null when cancelled. */
-    fun pickAudioFile(): Promise<JsAny?> = MelovaAudioGlobal.pickAudioFile()
+    fun pickFile(accept: String): Promise<JsAny?> = MelovaAudioGlobal.pickFile(accept)
+
+    /** Resolves to a [GoogleAnswerJs]; rejects when Google's script can't load. */
+    fun googleSignIn(clientId: String): Promise<JsAny?> = MelovaAudioGlobal.googleSignIn(clientId)
 
     /** MELOVA_API_BASE_URL from the page, or empty. */
     fun apiBaseUrl(): String = MelovaAudioGlobal.apiBaseUrl()

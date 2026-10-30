@@ -130,9 +130,6 @@ data class CatalogUiState(
     val totalPracticed: Int
         get() = followedLessons.sumOf { practicedSections(it) }
 
-    val bestScoreOverall: Int?
-        get() = bestScores.values.maxOrNull()
-
     /**
      * The one lesson to offer first: the one the student last sang in while it is
      * unfinished, else the first unfinished lesson of a followed teacher.

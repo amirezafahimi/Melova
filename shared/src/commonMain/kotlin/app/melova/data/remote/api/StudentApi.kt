@@ -6,6 +6,8 @@ import app.melova.data.remote.MelovaNetwork.decode
 import app.melova.data.remote.MelovaNetwork.jsonBody
 import app.melova.data.remote.MelovaNetwork.segment
 import app.melova.data.remote.dto.CreatedStudentDto
+import app.melova.data.remote.dto.LoginCodeSentDto
+import app.melova.data.remote.dto.LoginMethodsDto
 import app.melova.data.remote.dto.ReviewsDto
 import app.melova.data.remote.dto.StudentMeDto
 import app.melova.data.remote.multipartBody
@@ -25,6 +27,29 @@ class StudentApi(private val client: HttpClient) {
 
     suspend fun updateMe(body: Map<String, String>): StudentMeDto =
         client.call(HttpMethod.Put, "api/v1/me") { jsonBody(body.toJson()) }.decode()
+
+    suspend fun setPhoto(photo: FilePart): StudentMeDto =
+        client.call(HttpMethod.Put, "api/v1/me/photo") { setBody(multipartBody(emptyMap(), listOf(photo))) }.decode()
+
+    suspend fun deletePhoto(): StudentMeDto = client.call(HttpMethod.Delete, "api/v1/me/photo").decode()
+
+    suspend fun photo(): ByteArray = client.call(HttpMethod.Get, "api/v1/me/photo").bodyAsBytes()
+
+    suspend fun loginMethods(): LoginMethodsDto = client.call(HttpMethod.Get, "api/v1/auth/methods").decode()
+
+    /** [body] holds the kind ("phone" or "email") and the value the student typed. */
+    suspend fun requestLoginCode(body: Map<String, String>): LoginCodeSentDto =
+        client.call(HttpMethod.Post, "api/v1/auth/code") { jsonBody(body.toJson()) }.decode()
+
+    suspend fun verifyLoginCode(body: Map<String, String>): StudentMeDto =
+        client.call(HttpMethod.Post, "api/v1/auth/verify") { jsonBody(body.toJson()) }.decode()
+
+    suspend fun signInWithGoogle(idToken: String): StudentMeDto =
+        client.call(HttpMethod.Post, "api/v1/auth/google") { jsonBody(mapOf("id_token" to idToken).toJson()) }.decode()
+
+    suspend fun logout() {
+        client.call(HttpMethod.Post, "api/v1/auth/logout")
+    }
 
     /** Start a free lesson: it comes with its included teacher reviews. */
     suspend fun claimFreeLesson(lessonId: String): StudentMeDto =

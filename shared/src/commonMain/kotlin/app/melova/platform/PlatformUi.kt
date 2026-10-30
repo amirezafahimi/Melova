@@ -17,3 +17,17 @@ expect fun rememberMicPermission(onResult: (granted: Boolean) -> Unit): MicPermi
  */
 @Composable
 expect fun rememberAudioPicker(onPicked: (LocalFile?) -> Unit): () -> Unit
+
+/** Like [rememberAudioPicker], for a photo. */
+@Composable
+expect fun rememberImagePicker(onPicked: (LocalFile?) -> Unit): () -> Unit
+
+sealed interface GoogleSignInResult {
+    data class Token(val idToken: String) : GoogleSignInResult
+    data object Cancelled : GoogleSignInResult
+    data class Failed(val message: String) : GoogleSignInResult
+}
+
+/** Asks Google for an ID token for this client id; the server checks it and signs the student in. */
+@Composable
+expect fun rememberGoogleSignIn(onResult: (GoogleSignInResult) -> Unit): (clientId: String) -> Unit

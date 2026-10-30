@@ -68,7 +68,7 @@ fun MelovaApp(
     LaunchedEffect(teacherState.revision) {
         if (teacherState.revision > 0) catalogViewModel.refresh(silent = true)
     }
-    // A new student account: reload so the catalog says which lessons are theirs.
+    // A new student account or a sign-in: reload so the catalog says which lessons are theirs.
     LaunchedEffect(studentState.accountRevision) {
         if (studentState.accountRevision > 0) catalogViewModel.refresh(silent = true)
     }
@@ -157,15 +157,40 @@ fun MelovaApp(
                     teacherState = teacherState,
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
-                    onFollowChange = catalogViewModel::setFollowed,
-                    onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
                     onTeacherSignIn = teacherViewModel::signIn,
-                    onTeacherSignOut = teacherViewModel::signOut,
                     onOpenTeacherPanel = { navController.navigate(AppScreen.TEACHER_PANEL) },
                     studentState = studentState,
-                    onStudentNameChange = studentViewModel::setName,
+                    onLogin = { navController.navigate(AppScreen.login(LoginReason.PROFILE)) },
+                    onSignOut = studentViewModel::signOut,
+                    onEditProfile = { navController.navigate(AppScreen.EDIT_PROFILE) },
                     onToggleReply = studentViewModel::toggleReply,
                     onStudentAppear = studentViewModel::refresh
+                )
+            }
+
+            composable(AppScreen.EDIT_PROFILE) {
+                EditProfileScreen(
+                    state = studentState,
+                    onSaveName = studentViewModel::setName,
+                    onPhotoPicked = studentViewModel::setPhoto,
+                    onRemovePhoto = studentViewModel::removePhoto,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                AppScreen.LOGIN,
+                arguments = listOf(navArgument(AppScreen.ARG_LOGIN_REASON) { type = NavType.StringType })
+            ) { entry ->
+                val reason = entry.arguments?.read { getStringOrNull(AppScreen.ARG_LOGIN_REASON) }
+                LoginScreen(
+                    reason = LoginReason.entries.firstOrNull { it.name == reason } ?: LoginReason.PROFILE,
+                    methods = studentState.loginMethods,
+                    onBack = { navController.popBackStack() },
+                    onSignedIn = { account ->
+                        studentViewModel.onSignedIn(account)
+                        navController.popBackStack()
+                    }
                 )
             }
 
@@ -183,7 +208,9 @@ fun MelovaApp(
                     onResume = catalogViewModel::refreshProgress,
                     isOwnTeacher = teacherState.isSignedIn &&
                         teacherState.profile?.id == catalogState.lesson(lessonId)?.teacherId,
-                    studentId = studentState.studentId
+                    studentId = studentState.studentId,
+                    loginRequired = studentState.needsLogin,
+                    onLogin = { navController.navigate(AppScreen.login(LoginReason.PURCHASE)) }
                 )
             }
 
@@ -200,7 +227,9 @@ fun MelovaApp(
                     onBack = { navController.popBackStack() },
                     onOpenTeacherDetails = {
                         navController.navigate(AppScreen.teacherPerformance(lessonId, sectionId))
-                    }
+                    },
+                    loginRequired = studentState.needsLogin,
+                    onLogin = { navController.navigate(AppScreen.login(LoginReason.TEACHER)) }
                 )
             }
 
@@ -241,6 +270,10 @@ fun MelovaApp(
                     onFollowSelfChange = { followed -> ownId?.let { catalogViewModel.setFollowed(it, followed) } },
                     onOpenLesson = { navController.navigate(AppScreen.lessonEditor(it)) },
                     onBack = { navController.popBackStack() },
+                    onSignOut = {
+                        teacherViewModel.signOut()
+                        navController.popBackStack()
+                    },
                     onOpenReviews = { navController.navigate(AppScreen.TEACHER_REVIEWS) },
                     onOpenStudents = { navController.navigate(AppScreen.TEACHER_STUDENTS) },
                     onOpenReport = { navController.navigate(AppScreen.TEACHER_REPORT) }

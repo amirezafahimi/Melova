@@ -92,6 +92,9 @@ fun LessonScreen(
     /** Signed in as this lesson's teacher: a paid lesson is open to them. */
     isOwnTeacher: Boolean = false,
     studentId: String? = null,
+    /** Buying a lesson takes a signed-in account. */
+    loginRequired: Boolean = false,
+    onLogin: () -> Unit = {},
     introViewModel: LessonIntroViewModel = viewModel { LessonIntroViewModel(createSavedStateHandle()) }
 ) {
     val introState by introViewModel.uiState.collectAsStateWithLifecycle()
@@ -132,7 +135,7 @@ fun LessonScreen(
 
                 item { LessonHero(lesson) }
                 val locked = !lesson.isOpen && !isOwnTeacher
-                if (locked) item { LockedLessonCard(lesson, studentId) }
+                if (locked) item { LockedLessonCard(lesson, studentId, loginRequired, onLogin) }
                 item {
                     IntroPlayerCard(
                         state = introState,

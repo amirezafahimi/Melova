@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -54,7 +56,10 @@ fun MelovaTextField(
     modifier: Modifier = Modifier,
     singleLine: Boolean = true,
     minLines: Int = 1,
-    isSecret: Boolean = false
+    isSecret: Boolean = false,
+    keyboardType: KeyboardType = if (isSecret) KeyboardType.Password else KeyboardType.Text,
+    /** For phone numbers and email addresses, which read left to right in RTL too. */
+    leftToRight: Boolean = false
 ) {
     OutlinedTextField(
         value = value,
@@ -63,9 +68,11 @@ fun MelovaTextField(
         singleLine = singleLine,
         minLines = minLines,
         shape = RoundedCornerShape(16.dp),
-        textStyle = MaterialTheme.typography.bodyLarge,
+        textStyle = MaterialTheme.typography.bodyLarge.let {
+            if (leftToRight) it.copy(textDirection = TextDirection.Ltr, textAlign = TextAlign.Left) else it
+        },
         visualTransformation = if (isSecret) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
-        keyboardOptions = if (isSecret) KeyboardOptions(keyboardType = KeyboardType.Password) else KeyboardOptions.Default,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MelovaAccent,
             unfocusedBorderColor = MelovaOutline,

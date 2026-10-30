@@ -97,6 +97,9 @@ import app.melova.platform.pad2
 fun VocalTrainingScreen(
     onBack: () -> Unit,
     onOpenTeacherDetails: () -> Unit,
+    /** Sending a take to the teacher takes a signed-in account. */
+    loginRequired: Boolean = false,
+    onLogin: () -> Unit = {},
     viewModel: VocalTrainingViewModel = viewModel { VocalTrainingViewModel(createSavedStateHandle()) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -221,7 +224,9 @@ fun VocalTrainingScreen(
                         AskTeacherCard(
                             state = uiState.teacherAsk,
                             referralReasons = result.teacherReferral?.reasons.orEmpty(),
-                            onSend = viewModel::sendToTeacher
+                            onSend = viewModel::sendToTeacher,
+                            loginRequired = loginRequired,
+                            onLogin = onLogin
                         )
                     }
                 }

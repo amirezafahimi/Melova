@@ -78,6 +78,9 @@ kotlin {
             implementation(libs.androidx.core.ktx)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.media3.exoplayer)
+            implementation(libs.androidx.credentials)
+            implementation(libs.androidx.credentials.play.services.auth)
+            implementation(libs.google.identity.googleid)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.ktor.client.android)
         }

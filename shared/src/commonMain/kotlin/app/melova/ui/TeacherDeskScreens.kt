@@ -410,7 +410,7 @@ fun TeacherStudentsScreen(
     TeacherScaffold(title = "هنرجوها و پرداخت‌ها", subtitle = null, onBack = onBack, busyLabel = state.busyLabel) {
         item {
             Text(
-                text = "هنرجو کد هنرجویی‌اش را از صفحه‌ی «من» به شما می‌دهد. پس از دریافت مبلغ، اینجا پیدایش کنید و پرداخت را ثبت کنید تا درس یا بازبینی‌ها برایش باز شود.",
+                text = "هنرجو کد هنرجویی‌اش را از صفحه‌ی «پروفایل» به شما می‌دهد. پس از دریافت مبلغ، اینجا پیدایش کنید و پرداخت را ثبت کنید تا درس یا بازبینی‌ها برایش باز شود.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MelovaTextMuted
             )

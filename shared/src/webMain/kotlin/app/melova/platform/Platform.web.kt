@@ -23,6 +23,8 @@ actual val appVersionName: String = "وب"
 
 actual val smoothSpeedChanges: Boolean = false
 
+actual val supportsGoogleSignIn: Boolean = !Regex("""\d+\.\d+\.\d+\.\d+""").matches(window.location.hostname)
+
 actual val ioDispatcher: CoroutineDispatcher = Dispatchers.Default
 
 @OptIn(ExperimentalTime::class)

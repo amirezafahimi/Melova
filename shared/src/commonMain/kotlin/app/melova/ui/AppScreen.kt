@@ -14,6 +14,10 @@ object AppScreen {
     const val EXPLORE = "explore"
     const val PROFILE = "profile"
 
+    const val ARG_LOGIN_REASON = "reason"
+    const val LOGIN = "login/{$ARG_LOGIN_REASON}"
+    const val EDIT_PROFILE = "profile/edit"
+
     const val SOLFEGE = "solfege"
     const val LESSON = "lesson/{${LessonIntroViewModel.ARG_LESSON_ID}}"
     const val PRACTICE =
@@ -46,6 +50,8 @@ object AppScreen {
         PROFILE -> MainTab.PROFILE
         else -> null
     }
+
+    fun login(reason: LoginReason) = "login/${reason.name}"
 
     fun lesson(lessonId: String) = "lesson/${lessonId.encodeURLPathPart()}"
 

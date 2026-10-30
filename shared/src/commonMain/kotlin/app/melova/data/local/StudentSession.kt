@@ -5,8 +5,9 @@ import app.melova.platform.PlatformContext
 
 
 /**
- * The student account this install created on first launch. The token is its only key:
- * the server keeps just its hash, so losing it (clearing app data) loses the purchases.
+ * The account this install is using: a guest one it created on first launch, or the
+ * student's own after signing in. The token is the key to it: the server keeps just its
+ * hash, so a guest who loses it (clearing app data) loses the purchases.
  */
 class StudentSession(context: PlatformContext) {
     private val prefs = KeyValueStore(context, "melova_student")
@@ -21,6 +22,8 @@ class StudentSession(context: PlatformContext) {
         prefs.putString(KEY_ID, studentId)
         prefs.putString(KEY_TOKEN, token)
     }
+
+    fun clear() = save("", "")
 
     private companion object {
         const val KEY_ID = "id"

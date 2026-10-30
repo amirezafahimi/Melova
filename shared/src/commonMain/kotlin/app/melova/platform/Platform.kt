@@ -28,6 +28,9 @@ expect val appVersionName: String
  */
 expect val smoothSpeedChanges: Boolean
 
+/** Google won't sign in on a page served from a bare IP address, only from a real domain. */
+expect val supportsGoogleSignIn: Boolean
+
 /** Blocking file and network work; the browser has one thread, so there it is the default. */
 expect val ioDispatcher: CoroutineDispatcher
 

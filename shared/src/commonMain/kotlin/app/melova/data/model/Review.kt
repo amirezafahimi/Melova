@@ -4,12 +4,31 @@ package app.melova.data.model
 data class StudentAccount(
     val id: String,
     val name: String,
+    /** False for a guest: the account this install made for itself on first launch. */
+    val signedIn: Boolean,
+    /** The phone or email they signed in with. */
+    val signedInAs: String?,
+    /** Changes with the photo; null when there is none. */
+    val photoVersion: Long?,
     val ownedLessons: Set<String>,
     /** Review credits left, by teacher id. */
     val reviewCredits: Map<String, Int>
 ) {
     fun credits(teacherId: String): Int = reviewCredits[teacherId] ?: 0
 }
+
+/** Which ways of signing in the server offers, narrowed to what this platform can do. */
+data class LoginMethods(
+    val phone: Boolean,
+    val email: Boolean,
+    val googleClientId: String?
+) {
+    val any: Boolean
+        get() = phone || email || googleClientId != null
+}
+
+/** A sign-in code on its way. */
+data class LoginCodeSent(val sentTo: String, val resendAfterSeconds: Int)
 
 enum class ReviewStatus {
     /** Waiting for the teacher. */

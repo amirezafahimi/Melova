@@ -25,3 +25,6 @@
 -keep class * extends androidx.lifecycle.AndroidViewModel { *; }
 # kotlinx.serialization keeps its generated serializers through @Serializable; Ktor uses OkHttp.
 -dontwarn org.slf4j.**
+# Credential Manager finds its Play Services provider by reflection.
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** { *; }

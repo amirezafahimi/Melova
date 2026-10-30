@@ -41,6 +41,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -96,17 +97,21 @@ fun TeacherPanelScreen(
     onFollowSelfChange: (Boolean) -> Unit,
     onOpenLesson: (String) -> Unit,
     onBack: () -> Unit,
+    onSignOut: () -> Unit = {},
     onOpenReviews: () -> Unit = {},
     onOpenStudents: () -> Unit = {},
     onOpenReport: () -> Unit = {}
 ) {
     var editingProfile by rememberSaveable { mutableStateOf(false) }
     var creatingLesson by rememberSaveable { mutableStateOf(false) }
+    var confirmingSignOut by rememberSaveable { mutableStateOf(false) }
     val profile = state.profile
 
     TeacherScaffold(title = "پنل استاد", subtitle = profile?.name, onBack = onBack, busyLabel = state.busyLabel) {
         if (profile == null) {
             item { LoadingOrRetry(state, onRetry = viewModel::refresh) }
+            // A panel that can't load is still a way out.
+            item { ExitTeacherModeButton(onClick = { confirmingSignOut = true }) }
             return@TeacherScaffold
         }
         item {
@@ -158,8 +163,21 @@ fun TeacherPanelScreen(
         itemsIndexed(profile.lessons, key = { _, lesson -> lesson.id }) { index, lesson ->
             TeacherLessonRow(number = index + 1, lesson = lesson, onClick = { onOpenLesson(lesson.id) })
         }
+        item { ExitTeacherModeButton(onClick = { confirmingSignOut = true }) }
     }
 
+    if (confirmingSignOut) {
+        ConfirmDialog(
+            title = "خروج از حالت استاد",
+            message = "درس‌هایتان سر جایشان می‌مانند. برای برگشتن به پنل، دوباره به کد استاد نیاز دارید.",
+            confirmLabel = "خروج",
+            onConfirm = {
+                confirmingSignOut = false
+                onSignOut()
+            },
+            onDismiss = { confirmingSignOut = false }
+        )
+    }
     if (editingProfile && profile != null) {
         var name by rememberSaveable { mutableStateOf(profile.name) }
         var bio by rememberSaveable { mutableStateOf(profile.bio) }
@@ -189,6 +207,13 @@ fun TeacherPanelScreen(
             },
             onDismiss = { creatingLesson = false }
         )
+    }
+}
+
+@Composable
+private fun ExitTeacherModeButton(onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text("خروج از حالت استاد", color = MelovaTextMuted, style = MaterialTheme.typography.labelLarge)
     }
 }
 

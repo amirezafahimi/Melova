@@ -163,11 +163,11 @@
     };
   }
 
-  function pickAudioFile() {
+  function pickFile(accept) {
     return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'audio/*';
+      input.accept = accept;
       input.onchange = async () => {
         const file = input.files && input.files[0];
         if (!file) { resolve(null); return; }
@@ -178,6 +178,46 @@
     });
   }
 
-  globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickAudioFile,
-    apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || '') };
+  let googleScript;
+
+  function loadGoogleScript() {
+    googleScript = googleScript || new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.onload = resolve;
+      script.onerror = () => { googleScript = null; reject(new Error('Google sign-in did not load')); };
+      document.head.appendChild(script);
+    });
+    return googleScript;
+  }
+
+  // Google only lets its own button start a sign-in, and the app is one canvas, so the button
+  // sits in a small dialog over it.
+  async function googleSignIn(clientId) {
+    await loadGoogleScript();
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)';
+      const box = document.createElement('div');
+      box.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:16px;padding:24px;border-radius:24px;background:#fff;font-family:sans-serif';
+      const button = document.createElement('div');
+      const cancel = document.createElement('button');
+      cancel.textContent = 'انصراف';
+      cancel.style.cssText = 'border:0;background:none;color:#666;font:inherit;padding:8px 16px;cursor:pointer';
+      const finish = (answer) => { overlay.remove(); resolve(answer); };
+      cancel.onclick = () => finish({ credential: null, cancelled: true });
+      box.append(button, cancel);
+      overlay.append(box);
+      document.body.append(overlay);
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: (response) => finish({ credential: response.credential, cancelled: false }),
+      });
+      google.accounts.id.renderButton(button, { theme: 'outline', size: 'large', text: 'continue_with', locale: 'fa' });
+    });
+  }
+
+  // pickAudioFile is for the JS app, which a quick web build keeps from the last --legacy build.
+  globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickFile, googleSignIn,
+    pickAudioFile: () => pickFile('audio/*'), apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || '') };
 })();

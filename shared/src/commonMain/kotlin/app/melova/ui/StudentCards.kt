@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -25,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,11 +65,22 @@ internal fun formatToman(amount: Long): String =
 internal fun AskTeacherCard(
     state: TeacherAskState,
     referralReasons: List<String>,
-    onSend: (note: String) -> Unit
+    onSend: (note: String) -> Unit,
+    /** A guest signs in first; the take waits here and they carry on when they come back. */
+    loginRequired: Boolean = false,
+    onLogin: () -> Unit = {}
 ) {
     var composing by rememberSaveable { mutableStateOf(false) }
+    var composeAfterLogin by rememberSaveable { mutableStateOf(false) }
     var note by rememberSaveable { mutableStateOf("") }
     val isReferral = referralReasons.isNotEmpty()
+
+    LaunchedEffect(loginRequired) {
+        if (!loginRequired && composeAfterLogin) {
+            composeAfterLogin = false
+            composing = true
+        }
+    }
 
     MelovaSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -96,7 +107,7 @@ internal fun AskTeacherCard(
                     )
                     Text(
                         text = when {
-                            state.isSent -> "پاسخ استاد در صفحه‌ی «من» می‌آید." +
+                            state.isSent -> "پاسخ استاد در صفحه‌ی «پروفایل» می‌آید." +
                                 (state.creditsLeft?.let { " بازبینی باقی‌مانده: $it" } ?: "")
                             isReferral -> "تحلیل خودکار درباره‌ی این اجرا مطمئن نیست؛ ارسالش برای استاد رایگان است."
                             else -> "همین اجرا را برای استاد بفرستید تا خودش گوش دهد و پاسخ بدهد. یک بازبینی از اعتبار شما کم می‌شود."
@@ -124,7 +135,14 @@ internal fun AskTeacherCard(
             }
             if (!state.isSent) {
                 Button(
-                    onClick = { composing = true },
+                    onClick = {
+                        if (loginRequired) {
+                            composeAfterLogin = true
+                            onLogin()
+                        } else {
+                            composing = true
+                        }
+                    },
                     enabled = !state.isSending,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (isReferral) MelovaGold else MelovaAccent),
@@ -193,7 +211,7 @@ internal fun StudentCodeRow(studentId: String) {
 
 /** A paid lesson this student hasn't bought yet. */
 @Composable
-internal fun LockedLessonCard(lesson: Lesson, studentId: String?) {
+internal fun LockedLessonCard(lesson: Lesson, studentId: String?, loginRequired: Boolean = false, onLogin: () -> Unit = {}) {
     MelovaSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -214,14 +232,23 @@ internal fun LockedLessonCard(lesson: Lesson, studentId: String?) {
                 }
             }
             Text(
-                text = "فعلاً خرید از طریق خود استاد انجام می‌شود: مبلغ را به استاد پرداخت کنید و کد هنرجویی‌تان را بدهید تا درس برایتان باز شود.",
+                text = if (loginRequired) {
+                    "برای خرید اول وارد حساب خود شوید تا درس روی حسابتان بماند؛ بعد کد هنرجویی‌تان را همین‌جا می‌بینید."
+                } else {
+                    "فعلاً خرید از طریق خود استاد انجام می‌شود: مبلغ را به استاد پرداخت کنید و کد هنرجویی‌تان را بدهید تا درس برایتان باز شود."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MelovaTextMuted
             )
-            if (studentId != null) {
-                StudentCodeRow(studentId)
-            } else {
-                Text("در حال ساخت کد هنرجویی… اتصال اینترنت را بررسی کنید.", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
+            when {
+                loginRequired -> Button(
+                    onClick = onLogin,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
+                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                ) { Text("ورود برای خرید درس") }
+                studentId != null -> StudentCodeRow(studentId)
+                else -> Text("در حال ساخت کد هنرجویی… اتصال اینترنت را بررسی کنید.", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
             }
         }
     }
@@ -280,44 +307,34 @@ internal fun ReviewReplyCard(
     }
 }
 
-/** The student's code, name and review credits, in the profile tab. */
+/** Review credits, and the code to give the teacher when paying, in the profile tab. */
 @Composable
-internal fun StudentAccountCard(state: StudentUiState, onEditName: () -> Unit) {
+internal fun StudentAccountCard(state: StudentUiState) {
     MelovaSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("حساب هنرجو", style = MaterialTheme.typography.titleMedium, color = MelovaText)
-                    Text(
-                        text = state.account?.name?.takeIf { it.isNotBlank() } ?: "نامی ثبت نشده",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MelovaTextMuted
-                    )
-                }
-                IconButton(onClick = onEditName, enabled = state.account != null) {
-                    Icon(Icons.Outlined.Edit, contentDescription = "ویرایش نام", tint = MelovaTextMuted)
-                }
-            }
-            val credits = state.account?.reviewCredits?.values?.sum() ?: 0
+            val credits = state.reviewCredits
             Text(
                 text = if (credits > 0) "بازبینی‌های باقی‌مانده: $credits" else "اعتبار بازبینی ندارید.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (credits > 0) MelovaSuccess else MelovaTextMuted
             )
-            when {
-                state.studentId != null -> StudentCodeRow(state.studentId)
-                state.isLoading -> Text("در حال ساخت حساب…", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-                else -> Text(
-                    text = state.loadError ?: "حساب هنوز ساخته نشده؛ اتصال اینترنت را بررسی کنید.",
+            // A guest buys nothing, so they get the code once they have signed in.
+            if (!state.needsLogin) {
+                when {
+                    state.studentId != null -> StudentCodeRow(state.studentId)
+                    state.isLoading -> Text("در حال ساخت حساب…", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
+                    else -> Text(
+                        text = state.loadError ?: "حساب هنوز ساخته نشده؛ اتصال اینترنت را بررسی کنید.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MelovaTextMuted
+                    )
+                }
+                Text(
+                    text = "این کد را هنگام پرداخت به استاد بدهید تا درس یا بازبینی برایتان ثبت شود.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MelovaTextMuted
                 )
             }
-            Text(
-                text = "این کد را هنگام پرداخت به استاد بدهید تا درس یا بازبینی برایتان ثبت شود.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MelovaTextMuted
-            )
         }
     }
 }

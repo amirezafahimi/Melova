@@ -17,6 +17,16 @@ fun formatFixed(value: Double, decimals: Int): String {
 
 fun formatFixed(value: Float, decimals: Int): String = formatFixed(value.toDouble(), decimals)
 
+/** Only the digits of [text], with Persian and Arabic ones turned into 0-9. */
+fun digitsOnly(text: String): String = text.mapNotNull { ch ->
+    when (ch) {
+        in '0'..'9' -> ch
+        in '۰'..'۹' -> '0' + (ch - '۰')
+        in '٠'..'٩' -> '0' + (ch - '٠')
+        else -> null
+    }
+}.joinToString("")
+
 /** Two digits, like "%02d". */
 fun Number.pad2(): String = toLong().toString().padStart(2, '0')
 
