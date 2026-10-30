@@ -4,3 +4,5 @@ import io.ktor.client.engine.HttpClientEngineFactory
 import io.ktor.client.engine.js.Js
 
 internal actual fun httpEngine(): HttpClientEngineFactory<*> = Js
+
+internal actual fun socketEngine(): HttpClientEngineFactory<*> = Js

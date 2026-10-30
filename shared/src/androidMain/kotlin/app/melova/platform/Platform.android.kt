@@ -23,6 +23,8 @@ actual val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
 actual fun currentTimeMillis(): Long = System.currentTimeMillis()
 
+actual fun utcOffsetMinutes(timeMs: Long): Int = java.util.TimeZone.getDefault().getOffset(timeMs) / 60_000
+
 actual fun nanoTime(): Long = System.nanoTime()
 
 actual fun filesDir(context: PlatformContext): LocalFile = LocalFile(context.filesDir.absolutePath)

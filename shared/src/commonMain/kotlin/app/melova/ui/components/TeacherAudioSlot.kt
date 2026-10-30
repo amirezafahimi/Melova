@@ -108,7 +108,10 @@ enum class TakeKind(val maxMs: Long, val countInSeconds: Int, val minMs: Long) {
     SECTION(maxMs = 3 * 60_000L, countInSeconds = 3, minMs = 1_000L),
 
     /** The teacher talking about the whole lesson: compressed so long takes stay small. */
-    INTRO(maxMs = 20 * 60_000L, countInSeconds = 0, minMs = 2_000L)
+    INTRO(maxMs = 20 * 60_000L, countInSeconds = 0, minMs = 2_000L),
+
+    /** A voice message in a chat. */
+    VOICE(maxMs = 5 * 60_000L, countInSeconds = 0, minMs = 1_000L)
 }
 
 enum class TakePhase { EMPTY, COUNT_IN, RECORDING, PAUSED, PROCESSING, READY }

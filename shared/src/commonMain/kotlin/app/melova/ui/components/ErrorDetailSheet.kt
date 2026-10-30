@@ -55,6 +55,8 @@ import app.melova.presentation.PlaybackTarget
 import app.melova.ui.layout.LtrContent
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
+import app.melova.ui.theme.MelovaAccentSoft
+import app.melova.ui.theme.MelovaAccentTint
 import app.melova.ui.theme.MelovaCard
 import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaInfo
@@ -250,8 +252,8 @@ private fun DetailLaneCard(
                 Surface(
                     onClick = onPlay,
                     shape = RoundedCornerShape(50),
-                    color = laneColor.copy(alpha = if (isPlaying) 0.9f else 0.3f),
-                    contentColor = MelovaText
+                    color = laneColor.copy(alpha = if (isPlaying) 0.9f else 0.2f),
+                    contentColor = if (isPlaying) Color.White else MelovaAccentSoft
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -464,8 +466,8 @@ fun ShowDetailsButton(onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50),
-        color = MelovaText.copy(alpha = 0.08f),
-        contentColor = MelovaText
+        color = MelovaAccentTint,
+        contentColor = MelovaAccentSoft
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),

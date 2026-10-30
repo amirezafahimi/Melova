@@ -9,7 +9,6 @@ import app.melova.data.remote.dto.CreatedStudentDto
 import app.melova.data.remote.dto.FollowsDto
 import app.melova.data.remote.dto.LoginCodeSentDto
 import app.melova.data.remote.dto.LoginMethodsDto
-import app.melova.data.remote.dto.ReviewsDto
 import app.melova.data.remote.dto.StudentMeDto
 import app.melova.data.remote.multipartBody
 import io.ktor.client.HttpClient
@@ -96,10 +95,6 @@ class StudentApi(private val client: HttpClient) {
         )
     }.decode()
 
-    suspend fun reviews(): ReviewsDto = client.call(HttpMethod.Get, "api/v1/me/reviews").decode()
-
-    suspend fun replyAudio(reviewId: String): ByteArray =
-        client.call(HttpMethod.Get, "api/v1/me/reviews/${segment(reviewId)}/reply-audio").bodyAsBytes()
 }
 
 internal fun Map<String, String>.toJson() = JsonObject(mapValues { JsonPrimitive(it.value) })

@@ -56,6 +56,8 @@ import app.melova.ui.layout.LtrContent
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.LocalMelovaPalette
 import app.melova.ui.theme.MelovaAccent
+import app.melova.ui.theme.MelovaAccentSoft
+import app.melova.ui.theme.MelovaAccentTint
 import app.melova.ui.theme.MelovaCard
 import app.melova.ui.theme.MelovaSecondary
 import app.melova.ui.theme.MelovaText
@@ -134,8 +136,8 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
                 enabled = uiState.zoom > 1,
                 icon = Icons.Default.ZoomOut,
                 contentDescription = "کوچک‌نمایی موج",
-                containerColor = MelovaText.copy(alpha = 0.12f),
-                contentColor = MelovaText,
+                containerColor = MelovaAccentTint,
+                contentColor = MelovaAccentSoft,
                 buttonSize = 36.dp,
                 iconSize = 20.dp
             )
@@ -144,8 +146,8 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
                 enabled = uiState.zoom < TeacherPerformanceViewModel.MAX_ZOOM,
                 icon = Icons.Default.ZoomIn,
                 contentDescription = "بزرگ‌نمایی موج",
-                containerColor = MelovaText.copy(alpha = 0.12f),
-                contentColor = MelovaText,
+                containerColor = MelovaAccentTint,
+                contentColor = MelovaAccentSoft,
                 buttonSize = 36.dp,
                 iconSize = 20.dp
             )
@@ -358,7 +360,7 @@ private fun ChoicePill(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) MelovaAccent else MelovaText.copy(alpha = 0.08f))
+            .background(if (selected) MelovaAccent else MelovaAccentTint)
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp, horizontal = 8.dp),
         horizontalArrangement = Arrangement.Center,
@@ -368,7 +370,7 @@ private fun ChoicePill(
             Icon(
                 imageVector = Icons.Default.Repeat,
                 contentDescription = null,
-                tint = if (selected) Color.White else MelovaText,
+                tint = if (selected) Color.White else MelovaAccentSoft,
                 modifier = Modifier.size(18.dp).padding(end = 4.dp)
             )
         }
@@ -376,7 +378,7 @@ private fun ChoicePill(
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelLarge,
-                color = if (selected) Color.White else MelovaText
+                color = if (selected) Color.White else MelovaAccentSoft
             )
         }
     }

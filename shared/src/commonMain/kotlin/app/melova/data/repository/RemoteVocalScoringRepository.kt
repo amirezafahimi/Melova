@@ -3,8 +3,10 @@ package app.melova.data.repository
 import app.melova.audio.playback.ExpectedSegment
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.remote.FilePart
+import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.datasource.MelovaRemoteDataSource
 import app.melova.data.remote.datasource.MelovaRemoteDataSourceImpl
+import app.melova.data.remote.dto.ScoringResponseDto
 import app.melova.data.remote.mapper.toDomain
 import app.melova.data.remote.mapper.toRequestJson
 import app.melova.data.remote.multipartBody
@@ -46,7 +48,10 @@ class RemoteVocalScoringRepository(
         )
 
         return try {
-            remoteDataSource.scorePerformance(body).toDomain()
+            val response = remoteDataSource.scorePerformance(body)
+            response.toDomain().copy(
+                sourceJson = MelovaNetwork.json.encodeToString(ScoringResponseDto.serializer(), response)
+            )
         } catch (error: CancellationException) {
             throw error
         } catch (error: ResponseException) {

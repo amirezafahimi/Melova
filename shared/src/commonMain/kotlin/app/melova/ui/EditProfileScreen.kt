@@ -52,7 +52,7 @@ import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
 
-private const val MAX_NAME_LENGTH = 60
+internal const val MAX_NAME_LENGTH = 60
 
 /** The student's name and photo. Once the server offers sign-in, the profile asks for that first. */
 @Composable

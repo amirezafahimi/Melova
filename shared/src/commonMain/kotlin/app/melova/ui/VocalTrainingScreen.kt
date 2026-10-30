@@ -100,6 +100,7 @@ fun VocalTrainingScreen(
     /** Sending a take to the teacher takes a signed-in account. */
     loginRequired: Boolean = false,
     onLogin: () -> Unit = {},
+    onOpenChat: (chatId: String) -> Unit = {},
     viewModel: VocalTrainingViewModel = viewModel { VocalTrainingViewModel(createSavedStateHandle()) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -125,7 +126,7 @@ fun VocalTrainingScreen(
                 RtlContent {
                     MelovaTopBar(
                         title = uiState.lessonTitle.ifBlank { "تمرین" },
-                        subtitle = uiState.courseTitle,
+                        subtitle = uiState.sharedTakeStudent?.let { "اجرای $it" } ?: uiState.courseTitle,
                         onBack = onBack
                     )
 
@@ -157,7 +158,9 @@ fun VocalTrainingScreen(
                         )
                     }
 
-                    if (uiState.isLessonReady) {
+                    // A shared take doesn't wait for the teacher's sample, and it may outlive the lesson.
+                    val showTake = uiState.mode == VocalTrainingMode.RESULT || !uiState.lessonLoadFailed
+                    if (if (uiState.isSharedTake) showTake else uiState.isLessonReady) {
                         StudentRecordingPanel(
                             uiState = uiState,
                             scoreResult = uiState.scoreResult,
@@ -171,7 +174,7 @@ fun VocalTrainingScreen(
                         )
                     }
 
-                    HeadphoneHintBanner()
+                    if (!uiState.isSharedTake) HeadphoneHintBanner()
 
                     AnimatedVisibility(
                         visible = uiState.scoreResult != null,
@@ -193,7 +196,8 @@ fun VocalTrainingScreen(
                                 onShowCorrectionDetail = viewModel::showCorrectionDetail,
                                 onShowTahrirDetail = viewModel::showTahrirDetail,
                                 onRetryRecording = viewModel::retryRecording,
-                                onDismiss = viewModel::dismissResults
+                                onDismiss = viewModel::dismissResults,
+                                isReadOnly = uiState.isSharedTake
                             )
                         }
                     }
@@ -220,13 +224,14 @@ fun VocalTrainingScreen(
                         )
                     }
 
-                    uiState.scoreResult?.let { result ->
+                    uiState.scoreResult?.takeUnless { uiState.isSharedTake }?.let { result ->
                         AskTeacherCard(
                             state = uiState.teacherAsk,
                             referralReasons = result.teacherReferral?.reasons.orEmpty(),
                             onSend = viewModel::sendToTeacher,
                             loginRequired = loginRequired,
-                            onLogin = onLogin
+                            onLogin = onLogin,
+                            onOpenChat = onOpenChat
                         )
                     }
                 }
@@ -492,7 +497,8 @@ private fun StudentRecordingPanel(
 ) {
     val isRecording = uiState.mode == VocalTrainingMode.RECORDING
     val isAnalyzing = uiState.mode == VocalTrainingMode.ANALYZING
-    val showResultRecording = uiState.mode == VocalTrainingMode.RESULT && scoreResult != null
+    val showResultRecording = uiState.mode == VocalTrainingMode.RESULT &&
+        (scoreResult != null || uiState.isSharedTake)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -597,7 +603,7 @@ private fun StudentRecordingPanel(
                             0f
                         },
                         waveformPeaks = uiState.waveformPeaks,
-                        corrections = scoreResult!!.corrections,
+                        corrections = scoreResult?.corrections.orEmpty(),
                         selectedCorrectionStartMs = uiState.selectedCorrectionStartMs,
                         isPlaybackActive = uiState.playbackTarget == PlaybackTarget.USER,
                         isPlaying = uiState.isPlayingUserRecording,
@@ -606,17 +612,38 @@ private fun StudentRecordingPanel(
                         onPlayAtMs = onPlayUserRecordingAt,
                         onPlayCorrectionFromMarker = onPlayCorrectionFromMarker
                     )
-                    Button(
-                        onClick = onRetryRecording,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+                    if (!uiState.isSharedTake) {
+                        Button(
+                            onClick = onRetryRecording,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+                        ) {
+                            Icon(Icons.Default.Mic, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ضبط مجدد")
+                        }
+                    }
+                }
+
+                uiState.isSharedTake -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(Icons.Default.Mic, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("ضبط مجدد")
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MelovaAccent,
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            text = "در حال باز کردن اجرا…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MelovaText,
+                            textAlign = TextAlign.Start
+                        )
                     }
                 }
 
@@ -757,7 +784,8 @@ private fun HolisticScoreResultCard(
     onShowCorrectionDetail: (app.melova.audio.scoring.VocalScorer.PitchCorrection) -> Unit,
     onShowTahrirDetail: (TahrirComparison) -> Unit,
     onRetryRecording: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isReadOnly: Boolean = false
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -793,24 +821,26 @@ private fun HolisticScoreResultCard(
                     color = MelovaText.copy(alpha = 0.65f),
                     textAlign = TextAlign.Start
                 )
-                Button(
-                    onClick = onRetryRecording,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
-                ) {
-                    Icon(Icons.Default.Mic, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("ضبط مجدد")
-                }
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text("بستن", color = MelovaText)
+                if (!isReadOnly) {
+                    Button(
+                        onClick = onRetryRecording,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("ضبط مجدد")
+                    }
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("بستن", color = MelovaText)
+                    }
                 }
                 return@Column
             }
@@ -884,12 +914,6 @@ private fun HolisticScoreResultCard(
                     color = MelovaText,
                     textAlign = TextAlign.Start
                 )
-                Text(
-                    text = "هر خطا: ۲ ثانیه پخش (۱ ثانیه قبل و ۱ ثانیه بعد) — اجرای شما یا نمونه استاد.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MelovaText.copy(alpha = 0.55f),
-                    textAlign = TextAlign.Start
-                )
                 result.corrections.forEach { correction ->
                     VocalTrainingCorrectionRow(
                         correction = correction,
@@ -912,12 +936,6 @@ private fun HolisticScoreResultCard(
                     text = "مقایسه تحریر و ویبراتو",
                     style = MaterialTheme.typography.titleMedium,
                     color = MelovaText,
-                    textAlign = TextAlign.Start
-                )
-                Text(
-                    text = "تحریر و ویبراتوی استاد و همان بخش از اجرای شما را جداگانه بشنوید و مقایسه کنید.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MelovaText.copy(alpha = 0.55f),
                     textAlign = TextAlign.Start
                 )
                 result.tahrirComparisons.forEach { comparison ->
@@ -953,12 +971,14 @@ private fun HolisticScoreResultCard(
                 }
             }
 
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Text("بستن نتیجه", color = MelovaText)
+            if (!isReadOnly) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("بستن نتیجه", color = MelovaText)
+                }
             }
         }
     }

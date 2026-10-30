@@ -13,15 +13,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.HourglassTop
-import androidx.compose.material.icons.outlined.Pause
-import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -40,11 +37,8 @@ import androidx.compose.ui.unit.dp
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonPayment
 import app.melova.data.model.LessonPurchaseStatus
-import app.melova.data.model.Review
-import app.melova.data.model.ReviewStatus
 import app.melova.presentation.TeacherAskState
 import app.melova.ui.components.FormDialog
-import app.melova.ui.components.MelovaChip
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTextField
 import app.melova.ui.layout.LtrContent
@@ -72,7 +66,8 @@ internal fun AskTeacherCard(
     onSend: (note: String) -> Unit,
     /** A guest signs in first; the take waits here and they carry on when they come back. */
     loginRequired: Boolean = false,
-    onLogin: () -> Unit = {}
+    onLogin: () -> Unit = {},
+    onOpenChat: (chatId: String) -> Unit = {}
 ) {
     var composing by rememberSaveable { mutableStateOf(false) }
     var composeAfterLogin by rememberSaveable { mutableStateOf(false) }
@@ -111,7 +106,7 @@ internal fun AskTeacherCard(
                     )
                     Text(
                         text = when {
-                            state.isSent -> "پاسخ استاد در صفحه‌ی «پروفایل» می‌آید."
+                            state.isSent -> "این اجرا و پاسخ استاد در گفتگوی شما با استاد است."
                             isReferral -> "تحلیل خودکار درباره‌ی این اجرا مطمئن نیست."
                             else -> "همین اجرا را برای استاد بفرستید تا خودش گوش دهد و پاسخ بدهد."
                         },
@@ -127,6 +122,15 @@ internal fun AskTeacherCard(
             }
             state.error?.let { error ->
                 Text(error, style = MaterialTheme.typography.bodySmall, color = MelovaError)
+            }
+            if (state.isSent && state.chatId != null) {
+                OutlinedButton(
+                    onClick = { onOpenChat(state.chatId) },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                ) {
+                    Text("رفتن به گفتگو", color = MelovaText)
+                }
             }
             if (!state.isSent) {
                 Button(
@@ -339,56 +343,6 @@ internal fun FreeLessonCard(isBusy: Boolean, onAdd: () -> Unit) {
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
             ) { Text("افزودن به درس‌های من") }
-        }
-    }
-}
-
-/** One take the student sent, with the teacher's reply once it came. */
-@Composable
-internal fun ReviewReplyCard(
-    review: Review,
-    lessonTitle: String?,
-    isPlaying: Boolean,
-    isLoading: Boolean,
-    onTogglePlay: () -> Unit
-) {
-    MelovaSurfaceCard {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = lessonTitle ?: "درس",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MelovaText,
-                    modifier = Modifier.weight(1f)
-                )
-                when (review.status) {
-                    ReviewStatus.OPEN -> MelovaChip("در انتظار استاد", color = MelovaGold)
-                    ReviewStatus.ANSWERED -> MelovaChip("پاسخ داده شد", color = MelovaSuccess)
-                    ReviewStatus.REFUNDED -> MelovaChip("بسته شد", color = MelovaTextMuted)
-                }
-            }
-            if (review.note.isNotBlank()) {
-                Text("سؤال شما: ${review.note}", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-            }
-            if (review.replyText.isNotBlank()) {
-                Text(review.replyText, style = MaterialTheme.typography.bodyMedium, color = MelovaText)
-            }
-            if (review.hasReplyAudio) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onTogglePlay, enabled = !isLoading) {
-                        if (isLoading) {
-                            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-                        } else {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                                contentDescription = if (isPlaying) "توقف" else "پخش",
-                                tint = MelovaAccent
-                            )
-                        }
-                    }
-                    Text("پاسخ صوتی استاد", style = MaterialTheme.typography.bodyMedium, color = MelovaText)
-                }
-            }
         }
     }
 }

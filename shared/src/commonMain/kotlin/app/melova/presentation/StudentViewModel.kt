@@ -3,9 +3,7 @@ package app.melova.presentation
 import androidx.lifecycle.ViewModel
 import app.melova.platform.appContext
 import androidx.lifecycle.viewModelScope
-import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.data.model.LoginMethods
-import app.melova.data.model.Review
 import app.melova.data.model.StudentAccount
 import app.melova.data.repository.StudentRepository
 import app.melova.platform.LocalFile
@@ -16,13 +14,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The student's account and the teacher's replies. Activity-scoped: the account is created
+ * The student's account. Activity-scoped: the account is created
  * here on the first launch, and [StudentUiState.accountRevision] changes when it is or when
  * signing in or out swaps it, so the catalog can reload with the lessons this student owns.
  */
 class StudentViewModel : ViewModel() {
     private val repository = StudentRepository(appContext)
-    private val player = ReferenceAudioPlayer(appContext)
 
     private val _uiState = MutableStateFlow(StudentUiState())
     val uiState: StateFlow<StudentUiState> = _uiState.asStateFlow()
@@ -34,7 +31,7 @@ class StudentViewModel : ViewModel() {
         refresh()
     }
 
-    /** Account and replies; creates the account the first time. */
+    /** Creates the account the first time. */
     fun refresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
@@ -44,14 +41,13 @@ class StudentViewModel : ViewModel() {
             }
             runCatching {
                 val created = repository.ensureAccount()
-                Triple(created, repository.account(), repository.reviews())
-            }.onSuccess { (created, account, reviews) ->
+                created to repository.account()
+            }.onSuccess { (created, account) ->
                 loadPhoto(account)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         account = account,
-                        reviews = reviews,
                         accountRevision = if (created) it.accountRevision + 1 else it.accountRevision
                     )
                 }
@@ -137,7 +133,6 @@ class StudentViewModel : ViewModel() {
     }
 
     fun signOut() {
-        stopReply()
         viewModelScope.launch {
             // Offline the new guest account waits for the next refresh.
             runCatching { repository.signOut() }
@@ -146,7 +141,6 @@ class StudentViewModel : ViewModel() {
                 it.copy(
                     account = null,
                     photo = null,
-                    reviews = emptyList(),
                     accountRevision = it.accountRevision + 1
                 )
             }
@@ -154,40 +148,10 @@ class StudentViewModel : ViewModel() {
         }
     }
 
-    fun toggleReply(review: Review) {
-        if (_uiState.value.playingReviewId == review.id) {
-            player.pause()
-            _uiState.update { it.copy(playingReviewId = null) }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(loadingReviewId = review.id) }
-            runCatching { repository.replyAudio(review) }
-                .onSuccess { file ->
-                    player.stop()
-                    player.prepare(file, onFinished = { _uiState.update { it.copy(playingReviewId = null) } })
-                    player.play()
-                    _uiState.update { it.copy(loadingReviewId = null, playingReviewId = review.id) }
-                }
-                .onFailure { error ->
-                    _uiState.update { it.copy(loadingReviewId = null, message = error.message ?: "پخش ممکن نشد.") }
-                }
-        }
-    }
-
-    fun stopReply() {
-        player.pause()
-        _uiState.update { it.copy(playingReviewId = null) }
-    }
-
     fun consumeMessage() {
         _uiState.update { it.copy(message = null) }
     }
 
-    override fun onCleared() {
-        player.release()
-        super.onCleared()
-    }
 }
 
 data class StudentUiState(
@@ -196,21 +160,18 @@ data class StudentUiState(
     val photo: ByteArray? = null,
     /** Null until the server has said, or when it can't. */
     val loginMethods: LoginMethods? = null,
-    val reviews: List<Review> = emptyList(),
     val isLoading: Boolean = false,
     val isSavingProfile: Boolean = false,
     val isChangingLessons: Boolean = false,
     val loadError: String? = null,
-    val playingReviewId: String? = null,
-    val loadingReviewId: String? = null,
     val message: String? = null,
     val accountRevision: Int = 0
 ) {
-    /** Answers the student hasn't necessarily seen: the newest few answered reviews. */
-    val answeredCount: Int
-        get() = reviews.count { it.status != app.melova.data.model.ReviewStatus.OPEN }
-
     /** Buying and sending to a teacher take a real account, once the server offers a way in. */
     val needsLogin: Boolean
         get() = account?.signedIn == false && loginMethods?.any == true
+
+    /** Teachers know a student by name, so a signed-in account has to have one. */
+    val needsName: Boolean
+        get() = account?.signedIn == true && account.name.isBlank()
 }

@@ -32,6 +32,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.melova.ui.theme.MelovaAccent
+import app.melova.ui.theme.MelovaAccentSoft
+import app.melova.ui.theme.MelovaAccentTint
 import app.melova.ui.theme.MelovaBackgroundEnd
 import app.melova.ui.theme.MelovaBackgroundStart
 import app.melova.ui.theme.MelovaCard
@@ -103,14 +105,14 @@ fun MelovaTopBar(
         Surface(
             onClick = onBack,
             shape = CircleShape,
-            color = MelovaText.copy(alpha = 0.08f),
+            color = MelovaAccentTint,
             modifier = Modifier.size(42.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "بازگشت",
-                    tint = MelovaText
+                    tint = MelovaAccentSoft
                 )
             }
         }

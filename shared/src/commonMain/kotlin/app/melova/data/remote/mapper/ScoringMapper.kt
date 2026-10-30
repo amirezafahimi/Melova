@@ -57,7 +57,7 @@ private fun List<ScoreMetricDto>.toDomainMetrics(pitchAccuracyFallback: Int): Li
             id = "pitch_accuracy",
             label = "دقت نت",
             value = pitchAccuracyFallback,
-            hint = "اختلاف کمتر از نصف ربع‌پرده عالی"
+            hint = null
         )
     )
 }

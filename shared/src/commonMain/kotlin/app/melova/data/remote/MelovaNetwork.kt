@@ -1,5 +1,6 @@
 package app.melova.data.remote
 
+import app.melova.data.remote.api.ChatApi
 import app.melova.data.remote.api.MelovaApi
 import app.melova.data.remote.api.StudentApi
 import app.melova.data.remote.api.TeacherApi
@@ -10,6 +11,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.request.request
@@ -52,8 +54,13 @@ object MelovaNetwork {
 
     val teacherDeskApi: TeacherDeskApi by lazy { TeacherDeskApi(teacherUploadClient) }
 
+    val chatApi: ChatApi by lazy { ChatApi(teacherUploadClient, socketClient) }
+
     /** Takes and voice replies go up and down through these; give them time. */
     private val teacherUploadClient: HttpClient by lazy { client(requestTimeoutSeconds = 300) }
+
+    /** Stays open for as long as the app is on screen, so it has no timeouts. */
+    private val socketClient: HttpClient by lazy { HttpClient(socketEngine()) { install(WebSockets) } }
 
     private const val STUDENT_HEADER = "X-Student-Token"
 

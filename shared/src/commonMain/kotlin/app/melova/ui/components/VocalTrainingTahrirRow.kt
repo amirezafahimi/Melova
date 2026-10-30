@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.TahrirKind
 import app.melova.ui.theme.MelovaAccent
+import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaSecondary
 import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaWarning
@@ -113,8 +114,8 @@ fun VocalTrainingTahrirRow(
                 icon = Icons.Outlined.Mic,
                 isPlaying = isStudentSnippetPlaying,
                 enabled = comparison.hasStudentRegion,
-                containerColor = MelovaSecondary.copy(alpha = 0.38f),
-                contentColor = MelovaText,
+                containerColor = MelovaSecondary.copy(alpha = 0.22f),
+                contentColor = MelovaAccentSoft,
                 onClick = onPlayStudentSnippet,
                 modifier = Modifier.weight(1f)
             )
@@ -124,7 +125,7 @@ fun VocalTrainingTahrirRow(
                 isPlaying = isTeacherSnippetPlaying,
                 enabled = true,
                 containerColor = MelovaAccent.copy(alpha = 0.28f),
-                contentColor = MelovaText,
+                contentColor = MelovaAccentSoft,
                 onClick = onPlayTeacherSnippet,
                 modifier = Modifier.weight(1f)
             )
@@ -148,7 +149,11 @@ private fun TahrirSnippetButton(
     } else {
         MelovaText.copy(alpha = 0.06f)
     }
-    val effectiveContent = if (enabled) contentColor else contentColor.copy(alpha = 0.4f)
+    val effectiveContent = when {
+        !enabled -> contentColor.copy(alpha = 0.4f)
+        isPlaying -> Color.White
+        else -> contentColor
+    }
 
     Surface(
         onClick = { if (enabled) onClick() },

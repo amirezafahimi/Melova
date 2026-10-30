@@ -30,6 +30,13 @@ actual val ioDispatcher: CoroutineDispatcher = Dispatchers.Default
 @OptIn(ExperimentalTime::class)
 actual fun currentTimeMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
+@JsName("Date")
+private external class JsDate(timeMs: Double) : JsAny {
+    fun getTimezoneOffset(): Double
+}
+
+actual fun utcOffsetMinutes(timeMs: Long): Int = -JsDate(timeMs.toDouble()).getTimezoneOffset().toInt()
+
 private val startMark = TimeSource.Monotonic.markNow()
 
 actual fun nanoTime(): Long = startMark.elapsedNow().inWholeNanoseconds

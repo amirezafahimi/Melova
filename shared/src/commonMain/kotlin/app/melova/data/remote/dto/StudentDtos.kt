@@ -21,7 +21,8 @@ data class StudentMeDto(
     @SerialName("photo_version") val photoVersion: Long? = null,
     @SerialName("is_teacher") val isTeacher: Boolean? = null,
     @SerialName("owned_lessons") val ownedLessons: List<String>?,
-    @SerialName("review") val review: ReviewDto? = null,
+    /** After sending a take: the chat it went into. */
+    @SerialName("chat_id") val chatId: String? = null,
     /** Sign-in calls only: the token that replaces this install's old one. */
     @SerialName("token") val token: String? = null
 )
@@ -43,44 +44,9 @@ data class LoginCodeSentDto(
 )
 
 @Serializable
-data class ReviewsDto(
-    @SerialName("reviews") val reviews: List<ReviewDto>?
-)
-
-@Serializable
-data class ReviewDto(
-    @SerialName("id") val id: String?,
-    @SerialName("lesson_id") val lessonId: String?,
-    @SerialName("section_id") val sectionId: String?,
-    @SerialName("reason") val reason: String?,
-    @SerialName("auto_reasons") val autoReasons: List<String>?,
-    @SerialName("note") val note: String?,
-    @SerialName("status") val status: String?,
-    @SerialName("created_at") val createdAt: Double?,
-    @SerialName("answered_at") val answeredAt: Double?,
-    @SerialName("reply_text") val replyText: String?,
-    @SerialName("has_reply_audio") val hasReplyAudio: Boolean?,
-    // Teacher's view only.
-    @SerialName("student_id") val studentId: String? = null,
-    @SerialName("student_name") val studentName: String? = null,
-    @SerialName("teacher_minutes") val teacherMinutes: Double? = null,
-    /** The detail call only: the score summary the app sent with the take. */
-    @SerialName("analysis") val analysis: ReviewAnalysisDto? = null
-)
-
-/** What the app sends with a take for the teacher to read beside it. */
-@Serializable
-data class ReviewAnalysisDto(
-    @SerialName("overall") val overall: Int?,
-    @SerialName("summary") val summary: String?,
-    @SerialName("weak_points") val weakPoints: List<String>?
-)
-
-@Serializable
 data class StudentCardDto(
     @SerialName("id") val id: String?,
     @SerialName("name") val name: String?,
-    @SerialName("signed_in_as") val signedInAs: String? = null,
     @SerialName("created_at") val createdAt: Double?,
     @SerialName("owned_lessons") val ownedLessons: List<String>?
 )
@@ -97,7 +63,6 @@ data class LessonRequestDto(
     @SerialName("price_toman") val priceToman: Long?,
     @SerialName("payer") val payer: String?,
     @SerialName("student_name") val studentName: String?,
-    @SerialName("signed_in_as") val signedInAs: String? = null,
     @SerialName("created_at") val createdAt: Double?
 )
 

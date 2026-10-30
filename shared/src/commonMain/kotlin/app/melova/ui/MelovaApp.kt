@@ -34,6 +34,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.savedstate.read
 import app.melova.presentation.CatalogViewModel
+import app.melova.presentation.ChatViewModel
 import app.melova.presentation.LessonIntroViewModel
 import app.melova.presentation.StudentViewModel
 import app.melova.presentation.TeacherDeskViewModel
@@ -47,6 +48,8 @@ import app.melova.ui.theme.MelovaCardElevated
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.ThemeMode
 
+private const val CHAT_LIST_REFRESH_MS = 20_000L
+
 @Composable
 fun MelovaApp(
     themeMode: ThemeMode,
@@ -58,11 +61,14 @@ fun MelovaApp(
     val teacherViewModel: TeacherViewModel = viewModel { TeacherViewModel() }
     val studentViewModel: StudentViewModel = viewModel { StudentViewModel() }
     val teacherDeskViewModel: TeacherDeskViewModel = viewModel { TeacherDeskViewModel() }
+    val chatViewModel: ChatViewModel = viewModel { ChatViewModel() }
+    val chatState by chatViewModel.uiState.collectAsStateWithLifecycle()
     val deskState by teacherDeskViewModel.uiState.collectAsStateWithLifecycle()
     val studentState by studentViewModel.uiState.collectAsStateWithLifecycle()
     val catalogState by catalogViewModel.uiState.collectAsStateWithLifecycle()
     val teacherState by teacherViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val canChat = (studentState.account != null && !studentState.needsLogin) || teacherState.isSignedIn
 
     // Teacher edits, sign-in and sign-out change which lessons the student side sees.
     LaunchedEffect(teacherState.revision) {
@@ -75,6 +81,14 @@ fun MelovaApp(
     // A teacher is an ordinary account, so the panel opens and closes with it.
     LaunchedEffect(studentState.account?.id, studentState.account?.isTeacher) {
         teacherViewModel.onAccountChanged()
+    }
+    LaunchedEffect(studentState.account?.id, canChat) { chatViewModel.clear() }
+    if (canChat) StayConnected(studentState.account?.id to teacherState.isSignedIn, chatViewModel)
+    LaunchedEffect(chatState.message) {
+        chatState.message?.let {
+            snackbarHostState.showSnackbar(it)
+            chatViewModel.consumeMessage()
+        }
     }
     LaunchedEffect(studentState.message) {
         studentState.message?.let {
@@ -146,7 +160,13 @@ fun MelovaApp(
                     },
                     onLessonClick = { navController.navigate(AppScreen.lesson(it)) },
                     onSolfegeClick = { navController.navigate(AppScreen.SOLFEGE) },
-                    onExploreClick = { selectTab(MainTab.EXPLORE) }
+                    onExploreClick = { selectTab(MainTab.EXPLORE) },
+                    unreadChats = chatState.unread,
+                    onChatsClick = if (canChat) {
+                        { navController.navigate(AppScreen.CHATS) }
+                    } else {
+                        null
+                    }
                 )
             }
 
@@ -184,10 +204,21 @@ fun MelovaApp(
                     onLogin = { navController.navigate(AppScreen.login(LoginReason.PROFILE)) },
                     onSignOut = studentViewModel::signOut,
                     onEditProfile = { navController.navigate(AppScreen.EDIT_PROFILE) },
-                    onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
-                    onExploreClick = { selectTab(MainTab.EXPLORE) },
-                    onToggleReply = studentViewModel::toggleReply,
+                    onOpenFollowedTeachers = { navController.navigate(AppScreen.FOLLOWED_TEACHERS) },
+                    canChat = canChat,
+                    unreadChats = chatState.unread,
+                    onOpenChats = { navController.navigate(AppScreen.CHATS) },
                     onStudentAppear = studentViewModel::refresh
+                )
+            }
+
+            composable(AppScreen.FOLLOWED_TEACHERS) {
+                FollowedTeachersScreen(
+                    state = catalogState,
+                    onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
+                    onFollowChange = catalogViewModel::setFollowed,
+                    onExploreClick = { selectTab(MainTab.EXPLORE) },
+                    onBack = { navController.popBackStack() }
                 )
             }
 
@@ -255,7 +286,50 @@ fun MelovaApp(
                         navController.navigate(AppScreen.teacherPerformance(lessonId, sectionId))
                     },
                     loginRequired = studentState.needsLogin,
-                    onLogin = { navController.navigate(AppScreen.login(LoginReason.TEACHER)) }
+                    onLogin = { navController.navigate(AppScreen.login(LoginReason.TEACHER)) },
+                    onOpenChat = { navController.navigate(AppScreen.chat(it)) }
+                )
+            }
+
+            composable(
+                AppScreen.PRACTICE_RESULT,
+                arguments = listOf(
+                    navArgument(VocalTrainingViewModel.ARG_LESSON_ID) { type = NavType.StringType },
+                    navArgument(VocalTrainingViewModel.ARG_SECTION_ID) { type = NavType.StringType },
+                    navArgument(VocalTrainingViewModel.ARG_REVIEW_ID) { type = NavType.StringType }
+                )
+            ) { entry ->
+                val lessonId = entry.arguments?.read { getStringOrNull(VocalTrainingViewModel.ARG_LESSON_ID) }.orEmpty()
+                val sectionId = entry.arguments?.read { getStringOrNull(VocalTrainingViewModel.ARG_SECTION_ID) }.orEmpty()
+                VocalTrainingScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTeacherDetails = {
+                        navController.navigate(AppScreen.teacherPerformance(lessonId, sectionId))
+                    }
+                )
+            }
+
+            composable(AppScreen.CHATS) {
+                ChatListScreen(
+                    state = chatState,
+                    onAppear = chatViewModel::refreshChats,
+                    onChatClick = { navController.navigate(AppScreen.chat(it)) },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                AppScreen.CHAT,
+                arguments = listOf(navArgument(AppScreen.ARG_CHAT_ID) { type = NavType.StringType })
+            ) { entry ->
+                ChatScreen(
+                    chatId = entry.arguments?.read { getStringOrNull(AppScreen.ARG_CHAT_ID) }.orEmpty(),
+                    state = chatState,
+                    viewModel = chatViewModel,
+                    onOpenPractice = {
+                        navController.navigate(AppScreen.practiceResult(it.lessonId, it.sectionId, it.reviewId))
+                    },
+                    onBack = { navController.popBackStack() }
                 )
             }
 
@@ -283,6 +357,17 @@ fun MelovaApp(
                     state = catalogState,
                     onFollowChange = { catalogViewModel.setFollowed(teacherId, it) },
                     onLessonClick = { navController.navigate(AppScreen.lesson(it)) },
+                    isOpeningChat = chatState.isStartingChat,
+                    // A teacher has nothing to say to their own page.
+                    onMessage = if (teacherState.profile?.id == teacherId) null else {
+                        {
+                            if (studentState.needsLogin) {
+                                navController.navigate(AppScreen.login(LoginReason.MESSAGE))
+                            } else {
+                                chatViewModel.startChat(teacherId) { navController.navigate(AppScreen.chat(it)) }
+                            }
+                        }
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -302,33 +387,10 @@ fun MelovaApp(
                             navController.popBackStack()
                         }
                     },
-                    onOpenReviews = { navController.navigate(AppScreen.TEACHER_REVIEWS) },
+                    unreadChats = chatState.unread,
+                    onOpenChats = { navController.navigate(AppScreen.CHATS) },
                     onOpenStudents = { navController.navigate(AppScreen.TEACHER_STUDENTS) },
                     onOpenReport = { navController.navigate(AppScreen.TEACHER_REPORT) }
-                )
-            }
-
-            composable(AppScreen.TEACHER_REVIEWS) {
-                TeacherReviewsScreen(
-                    state = deskState,
-                    viewModel = teacherDeskViewModel,
-                    lessonTitle = { teacherState.lesson(it)?.title },
-                    onOpenReview = { navController.navigate(AppScreen.teacherReview(it)) },
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
-            composable(
-                AppScreen.TEACHER_REVIEW,
-                arguments = listOf(navArgument(AppScreen.ARG_REVIEW_ID) { type = NavType.StringType })
-            ) { entry ->
-                TeacherReviewScreen(
-                    reviewId = entry.arguments?.read { getStringOrNull(AppScreen.ARG_REVIEW_ID) }.orEmpty(),
-                    state = deskState,
-                    viewModel = teacherDeskViewModel,
-                    lessonTitle = { teacherState.lesson(it)?.title },
-                    sectionTitle = { lessonId, sectionId -> teacherState.lesson(lessonId)?.section(sectionId)?.title },
-                    onBack = { navController.popBackStack() }
                 )
             }
 
@@ -373,6 +435,15 @@ fun MelovaApp(
             MelovaBottomBar(
                 selected = currentTab ?: MainTab.PRACTICE,
                 onSelect = { tab -> if (tab != currentTab) selectTab(tab) }
+            )
+        }
+
+        // Over everything, wherever sign-in left off: an account goes nowhere until it has a name.
+        if (studentState.needsName && backStackEntry?.destination?.route != AppScreen.SPLASH) {
+            ChooseNameScreen(
+                isSaving = studentState.isSavingProfile,
+                onSave = studentViewModel::setName,
+                onSignOut = studentViewModel::signOut
             )
         }
 

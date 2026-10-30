@@ -36,6 +36,9 @@ expect val ioDispatcher: CoroutineDispatcher
 
 expect fun currentTimeMillis(): Long
 
+/** How far this device's clock is ahead of UTC at [timeMs]. */
+expect fun utcOffsetMinutes(timeMs: Long): Int
+
 expect fun nanoTime(): Long
 
 /** App-private storage that survives restarts (Android filesDir). */

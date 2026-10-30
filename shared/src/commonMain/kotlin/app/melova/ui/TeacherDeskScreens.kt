@@ -1,6 +1,5 @@
 package app.melova.ui
 
-import app.melova.platform.PlatformBackHandler as BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,21 +12,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Insights
-import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PeopleOutline
-import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,30 +31,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonPurchaseRequest
-import app.melova.data.model.Review
-import app.melova.data.model.ReviewStatus
 import app.melova.data.model.StudentCard
 import app.melova.data.model.TeacherReport
 import app.melova.presentation.TeacherDeskUiState
 import app.melova.presentation.TeacherDeskViewModel
-import app.melova.ui.components.ConfirmDialog
 import app.melova.ui.components.FormDialog
 import app.melova.ui.components.MelovaChip
 import app.melova.ui.components.MelovaSegmentedControl
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTextField
 import app.melova.ui.components.SectionHeader
-import app.melova.ui.components.TakeKind
-import app.melova.ui.components.TeacherAudioSlot
-import app.melova.ui.components.rememberTakeController
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaError
-import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
@@ -95,13 +82,19 @@ private fun parseMinutes(text: String): Double? =
 @Composable
 internal fun TeacherDeskEntryCard(
     pendingPurchases: Int,
-    onOpenReviews: () -> Unit,
+    unreadChats: Int,
+    onOpenChats: () -> Unit,
     onOpenStudents: () -> Unit,
     onOpenReport: () -> Unit
 ) {
     MelovaSurfaceCard(contentPadding = 6.dp) {
         Column {
-            DeskEntryRow(Icons.Outlined.Inbox, "درخواست‌های هنرجوها", "اجراهایی که برای شما فرستاده‌اند", onOpenReviews)
+            DeskEntryRow(
+                Icons.Outlined.ChatBubbleOutline,
+                "گفتگو با هنرجوها",
+                if (unreadChats > 0) "$unreadChats پیام تازه" else "پیام‌ها و نتیجه‌ی تمرین هنرجوها",
+                onOpenChats
+            )
             DeskEntryRow(
                 Icons.Outlined.PeopleOutline,
                 "هنرجوها و پرداخت‌ها",
@@ -132,272 +125,6 @@ private fun DeskEntryRow(
     }
 }
 
-// ------------------------------------------------------------------ review queue
-
-private val reviewFilters = listOf(ReviewStatus.OPEN, ReviewStatus.ANSWERED, null)
-
-@Composable
-fun TeacherReviewsScreen(
-    state: TeacherDeskUiState,
-    viewModel: TeacherDeskViewModel,
-    lessonTitle: (String) -> String?,
-    onOpenReview: (String) -> Unit,
-    onBack: () -> Unit
-) {
-    LaunchedEffect(Unit) { viewModel.loadReviews() }
-
-    TeacherScaffold(title = "درخواست‌های هنرجوها", subtitle = null, onBack = onBack, busyLabel = state.busyLabel) {
-        item {
-            MelovaSegmentedControl(
-                options = listOf("در انتظار", "پاسخ‌داده", "همه"),
-                selectedIndex = reviewFilters.indexOf(state.filter).coerceAtLeast(0),
-                onSelect = { viewModel.loadReviews(reviewFilters[it]) }
-            )
-        }
-        if (state.isLoadingReviews && state.reviews.isEmpty()) {
-            item { CenteredProgress() }
-        } else if (state.reviews.isEmpty()) {
-            item {
-                EmptyHint(
-                    Icons.Outlined.Inbox,
-                    if (state.filter == ReviewStatus.OPEN) "درخواستی در انتظار نیست." else "چیزی برای نمایش نیست."
-                )
-            }
-        }
-        items(state.reviews, key = { it.id }) { review ->
-            ReviewQueueRow(review, lessonTitle(review.lessonId), onClick = { onOpenReview(review.id) })
-        }
-    }
-}
-
-@Composable
-private fun ReviewQueueRow(review: Review, lessonTitle: String?, onClick: () -> Unit) {
-    MelovaSurfaceCard(onClick = onClick, contentPadding = 14.dp) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = review.studentName.ifBlank { review.studentId },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MelovaText,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                ReviewStatusChip(review)
-            }
-            Text(
-                text = lessonTitle ?: review.lessonId,
-                style = MaterialTheme.typography.bodySmall,
-                color = MelovaTextMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (review.note.isNotBlank()) {
-                Text(review.note, style = MaterialTheme.typography.bodySmall, color = MelovaText, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReviewStatusChip(review: Review) {
-    when {
-        review.status == ReviewStatus.ANSWERED -> MelovaChip("پاسخ‌داده", color = MelovaSuccess)
-        review.status == ReviewStatus.REFUNDED -> MelovaChip("بسته‌شده", color = MelovaTextMuted)
-        review.isReferral -> MelovaChip("ارجاع سیستم", color = MelovaGold)
-        else -> MelovaChip("درخواست هنرجو", color = MelovaAccent)
-    }
-}
-
-// ------------------------------------------------------------------ one review
-
-@Composable
-fun TeacherReviewScreen(
-    reviewId: String,
-    state: TeacherDeskUiState,
-    viewModel: TeacherDeskViewModel,
-    lessonTitle: (String) -> String?,
-    sectionTitle: (lessonId: String, sectionId: String) -> String?,
-    onBack: () -> Unit
-) {
-    LaunchedEffect(reviewId) { viewModel.openReview(reviewId) }
-    DisposableEffect(Unit) { onDispose { viewModel.stopTake() } }
-
-    val review = state.current?.takeIf { it.id == reviewId }
-    var replyText by rememberSaveable { mutableStateOf("") }
-    var minutesText by rememberSaveable { mutableStateOf("") }
-    var confirmDecline by rememberSaveable { mutableStateOf(false) }
-    val voice = rememberTakeController(TakeKind.INTRO)
-    var pendingLeave by remember { mutableStateOf(false) }
-    val hasDraft = replyText.isNotBlank() || voice.hasUnsavedWork
-    BackHandler(enabled = hasDraft && review?.status == ReviewStatus.OPEN) { pendingLeave = true }
-
-    TeacherScaffold(
-        title = review?.studentName?.ifBlank { null } ?: "درخواست هنرجو",
-        subtitle = review?.let { lessonTitle(it.lessonId) },
-        onBack = { if (hasDraft && review?.status == ReviewStatus.OPEN) pendingLeave = true else onBack() },
-        busyLabel = state.busyLabel
-    ) {
-        if (review == null) {
-            item { CenteredProgress() }
-            return@TeacherScaffold
-        }
-        item {
-            MelovaSurfaceCard {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = sectionTitle(review.lessonId, review.sectionId) ?: "بخش",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MelovaText,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ReviewStatusChip(review)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = viewModel::toggleTake, enabled = !state.isLoadingTake) {
-                            if (state.isLoadingTake) {
-                                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
-                            } else {
-                                Icon(
-                                    imageVector = if (state.isPlayingTake) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                                    contentDescription = if (state.isPlayingTake) "توقف" else "پخش اجرای هنرجو",
-                                    tint = MelovaAccent
-                                )
-                            }
-                        }
-                        Text("اجرای هنرجو", style = MaterialTheme.typography.bodyMedium, color = MelovaText)
-                    }
-                    if (review.note.isNotBlank()) {
-                        Text("یادداشت هنرجو: ${review.note}", style = MaterialTheme.typography.bodyMedium, color = MelovaText)
-                    }
-                    if (review.isReferral && review.referralReasons.isNotEmpty()) {
-                        Text("سیستم مطمئن نبود چون:", style = MaterialTheme.typography.bodySmall, color = MelovaGold)
-                        review.referralReasons.forEach {
-                            Text("• $it", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-                        }
-                    }
-                }
-            }
-        }
-        review.analysis?.let { analysis ->
-            item {
-                MelovaSurfaceCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "آنچه سیستم به هنرجو گفت" + if (analysis.overall > 0) " (نمره ${analysis.overall})" else "",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MelovaText
-                        )
-                        if (analysis.summary.isNotBlank()) {
-                            Text(analysis.summary, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-                        }
-                        analysis.weakPoints.forEach {
-                            Text("• $it", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-                        }
-                    }
-                }
-            }
-        }
-
-        if (review.status == ReviewStatus.OPEN) {
-            item { SectionHeader(title = "پاسخ شما") }
-            item {
-                MelovaSurfaceCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        MelovaTextField(
-                            value = replyText,
-                            onValueChange = { replyText = it.take(4000) },
-                            label = "پاسخ نوشتاری",
-                            singleLine = false,
-                            minLines = 3
-                        )
-                        Text("پاسخ صوتی (اختیاری)", style = MaterialTheme.typography.titleSmall, color = MelovaText)
-                        TeacherAudioSlot(controller = voice, enabled = state.busyLabel == null)
-                        MelovaTextField(
-                            value = minutesText,
-                            onValueChange = { minutesText = it.take(6) },
-                            label = "چند دقیقه وقت گذاشتید؟ (خالی = خودکار)"
-                        )
-                        val canSend = (replyText.isNotBlank() || voice.canUpload) && !voice.isRecording
-                        Button(
-                            onClick = {
-                                voice.pauseAll()
-                                viewModel.reply(
-                                    text = replyText,
-                                    voice = voice.audio?.takeIf { voice.canUpload },
-                                    minutes = parseMinutes(minutesText),
-                                    onDone = {
-                                        replyText = ""
-                                        minutesText = ""
-                                        voice.clear()
-                                        onBack()
-                                    }
-                                )
-                            },
-                            enabled = canSend && state.busyLabel == null,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                            modifier = Modifier.fillMaxWidth().height(48.dp)
-                        ) { Text("ارسال پاسخ") }
-                        OutlinedButton(
-                            onClick = { confirmDecline = true },
-                            enabled = state.busyLabel == null,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth().height(44.dp)
-                        ) { Text("بستن بدون بازبینی", color = MelovaError) }
-                    }
-                }
-            }
-        } else {
-            item {
-                MelovaSurfaceCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("پاسخ شما", style = MaterialTheme.typography.titleSmall, color = MelovaText)
-                        Text(
-                            text = review.replyText.ifBlank { if (review.hasReplyAudio) "فقط پاسخ صوتی" else "—" },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MelovaText
-                        )
-                        review.teacherMinutes?.let {
-                            Text("زمان ثبت‌شده: ${formatFixed(it, 1)} دقیقه", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (confirmDecline) {
-        ConfirmDialog(
-            title = "بستن بدون بازبینی؟",
-            message = "این اجرا بدون بازبینی بسته می‌شود. اگر متنی در کادر پاسخ نوشته‌اید، به‌عنوان توضیح برای هنرجو فرستاده می‌شود.",
-            confirmLabel = "بستن",
-            onConfirm = {
-                confirmDecline = false
-                viewModel.decline(replyText, onDone = {
-                    replyText = ""
-                    onBack()
-                })
-            },
-            onDismiss = { confirmDecline = false }
-        )
-    }
-    if (pendingLeave) {
-        ConfirmDialog(
-            title = "پاسخ فرستاده نشده",
-            message = "پاسخی که نوشته یا ضبط کرده‌اید از بین می‌رود.",
-            confirmLabel = "خروج",
-            onConfirm = {
-                pendingLeave = false
-                voice.clear()
-                onBack()
-            },
-            onDismiss = { pendingLeave = false }
-        )
-    }
-}
-
 // ------------------------------------------------------------------ students
 
 @Composable
@@ -413,10 +140,7 @@ fun TeacherStudentsScreen(
     }
     var paying by remember { mutableStateOf<StudentCard?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
-    val shown = state.students.filter {
-        query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) ||
-            it.signedInAs?.contains(query.trim(), ignoreCase = true) == true
-    }
+    val shown = state.students.filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
 
     TeacherScaffold(title = "هنرجوها و پرداخت‌ها", subtitle = null, onBack = onBack, busyLabel = state.busyLabel) {
         if (state.purchaseRequests.isNotEmpty()) {
@@ -438,7 +162,7 @@ fun TeacherStudentsScreen(
                 color = MelovaTextMuted
             )
         }
-        item { MelovaTextField(value = query, onValueChange = { query = it }, label = "جستجو با نام، شماره یا ایمیل") }
+        item { MelovaTextField(value = query, onValueChange = { query = it }, label = "جستجو با نام") }
         if (state.isLoadingStudents && state.students.isEmpty()) {
             item { CenteredProgress() }
         } else if (shown.isEmpty()) {
@@ -449,9 +173,6 @@ fun TeacherStudentsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(student.name.ifBlank { "بی‌نام" }, style = MaterialTheme.typography.titleMedium, color = MelovaText)
-                        student.signedInAs?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-                        }
                         Text(
                             text = "${lessons.count { it.id in student.ownedLessons && !it.isFree }} درس پولی",
                             style = MaterialTheme.typography.bodySmall,
@@ -488,7 +209,7 @@ private fun PurchaseRequestCard(
     MelovaSurfaceCard(contentPadding = 14.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text = request.studentName.ifBlank { request.signedInAs ?: "هنرجو" },
+                text = request.studentName.ifBlank { "هنرجو" },
                 style = MaterialTheme.typography.titleMedium,
                 color = MelovaText
             )
@@ -498,9 +219,6 @@ private fun PurchaseRequestCard(
                 color = MelovaAccentSoft
             )
             Text("نام واریزکننده: ${request.payer}", style = MaterialTheme.typography.bodySmall, color = MelovaText)
-            request.signedInAs?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-            }
             Row(
                 modifier = Modifier.padding(top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -537,7 +255,7 @@ private fun PaymentDialog(
     val price = parseWhole(priceText)
 
     FormDialog(
-        title = "ثبت پرداخت برای ${student.name.ifBlank { student.signedInAs ?: "هنرجو" }}",
+        title = "ثبت پرداخت برای ${student.name.ifBlank { "هنرجو" }}",
         confirmLabel = "ثبت",
         confirmEnabled = lesson != null && price != null && !busy,
         busy = busy,

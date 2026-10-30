@@ -2,28 +2,22 @@ package app.melova.data.repository
 
 import app.melova.data.local.TeacherSession
 import app.melova.data.model.LessonPurchaseRequest
-import app.melova.data.model.Review
-import app.melova.data.model.ReviewStatus
 import app.melova.data.model.StudentCard
 import app.melova.data.model.TeacherReport
-import app.melova.data.remote.FilePart
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.api.TeacherDeskApi
 import app.melova.data.remote.apiCall
 import app.melova.data.remote.dto.LessonRequestDto
 import app.melova.data.remote.dto.StudentCardDto
-import app.melova.data.remote.writeAtomically
 import app.melova.platform.KeyValueStore
-import app.melova.platform.LocalFile
 import app.melova.platform.PlatformContext
-import app.melova.platform.cacheDir
 import kotlinx.io.IOException
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** The review queue, students and their payments, and the hours report. */
+/** Students and their payments, and the hours report. */
 class TeacherDeskRepository(
-    private val context: PlatformContext,
+    context: PlatformContext,
     private val api: TeacherDeskApi = MelovaNetwork.teacherDeskApi
 ) {
     private val session = TeacherSession(context)
@@ -35,43 +29,6 @@ class TeacherDeskRepository(
         set(value) {
             if (value == null || value <= 0L) prefs.remove(KEY_RATE) else prefs.putLong(KEY_RATE, value)
         }
-
-    /** [status] null for every review. */
-    suspend fun reviews(status: ReviewStatus?): List<Review> = apiCall {
-        api.reviews(token(), status?.name?.lowercase().orEmpty())
-    }.reviews.orEmpty().mapNotNull { it.toDomain() }
-
-    suspend fun review(reviewId: String): Review =
-        apiCall { api.review(token(), reviewId) }.toDomain() ?: throw IOException("این درخواست پیدا نشد.")
-
-    /** The student's take, downloaded once. */
-    suspend fun reviewAudio(reviewId: String): LocalFile = apiCall {
-        val dir = LocalFile(cacheDir(context), "review_takes").apply { mkdirs() }
-        val target = LocalFile(dir, "${reviewId.replace(Regex("[^A-Za-z0-9_-]"), "_")}.wav")
-        if (!target.exists() || target.length() == 0L) {
-            api.reviewAudio(token(), reviewId).writeAtomically(target)
-        }
-        target
-    }
-
-    /** [minutes] null lets the server count the time since the review was opened. */
-    suspend fun reply(reviewId: String, text: String, voice: LocalFile?, minutes: Double?): Review = apiCall {
-        api.reply(
-            token = token(),
-            reviewId = reviewId,
-            text = text.trim(),
-            minutes = minutes?.toString(),
-            audio = voice?.let {
-                if (!it.exists()) throw IOException("فایل پاسخ باز نشد.")
-                FilePart("audio", it.name, mediaTypeFor(it.name), it.readBytes())
-            }
-        )
-    }.toDomain() ?: throw IOException("پاسخ ثبت نشد.")
-
-    /** Close a take without reviewing it. */
-    suspend fun decline(reviewId: String, text: String): Review =
-        apiCall { api.decline(token(), reviewId, buildJsonObject { put("text", text.trim()) }) }.toDomain()
-            ?: throw IOException("درخواست بسته نشد.")
 
     suspend fun students(): List<StudentCard> =
         apiCall { api.students(token()) }.students.orEmpty().mapNotNull { it.toDomain() }
@@ -137,7 +94,6 @@ private fun StudentCardDto.toDomain(): StudentCard? {
     return StudentCard(
         id = studentId,
         name = name.orEmpty(),
-        signedInAs = signedInAs?.takeIf { it.isNotBlank() },
         createdAtMs = ((createdAt ?: 0.0) * 1000).toLong(),
         ownedLessons = ownedLessons.orEmpty().toSet()
     )
@@ -151,7 +107,6 @@ private fun LessonRequestDto.toDomain(): LessonPurchaseRequest? {
         priceToman = priceToman ?: 0L,
         payer = payer.orEmpty(),
         studentName = studentName.orEmpty(),
-        signedInAs = signedInAs?.takeIf { it.isNotBlank() },
         createdAtMs = ((createdAt ?: 0.0) * 1000).toLong()
     )
 }

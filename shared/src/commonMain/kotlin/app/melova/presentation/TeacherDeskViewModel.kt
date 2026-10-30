@@ -2,12 +2,8 @@ package app.melova.presentation
 
 import androidx.lifecycle.ViewModel
 import app.melova.platform.appContext
-import app.melova.platform.LocalFile
 import androidx.lifecycle.viewModelScope
-import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.data.model.LessonPurchaseRequest
-import app.melova.data.model.Review
-import app.melova.data.model.ReviewStatus
 import app.melova.data.model.StudentCard
 import app.melova.data.model.TeacherReport
 import app.melova.data.repository.TeacherDeskRepository
@@ -18,106 +14,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The teacher's desk: takes students sent, the students who pay directly, and whether the
- * hours are worth it. Activity-scoped so the queue and a review share one list.
+ * The teacher's desk: the students who pay directly, and whether the hours are worth it.
+ * Activity-scoped so the panel and the students page share the waiting payments.
  */
 class TeacherDeskViewModel : ViewModel() {
     private val repository = TeacherDeskRepository(appContext)
-    private val player = ReferenceAudioPlayer(appContext)
 
     private val _uiState = MutableStateFlow(
         TeacherDeskUiState(privateHourlyRateToman = repository.privateHourlyRateToman)
     )
     val uiState: StateFlow<TeacherDeskUiState> = _uiState.asStateFlow()
-
-    fun loadReviews(filter: ReviewStatus? = _uiState.value.filter) {
-        _uiState.update { it.copy(filter = filter, isLoadingReviews = true) }
-        viewModelScope.launch {
-            runCatching { repository.reviews(filter) }
-                .onSuccess { reviews -> _uiState.update { it.copy(reviews = reviews, isLoadingReviews = false) } }
-                .onFailure { error ->
-                    _uiState.update { it.copy(isLoadingReviews = false, message = error.message ?: "خطا") }
-                }
-        }
-    }
-
-    /** Opening a review starts its clock on the server; the detail adds the score summary. */
-    fun openReview(reviewId: String) {
-        stopTake()
-        _uiState.update { it.copy(current = it.reviews.firstOrNull { r -> r.id == reviewId }, isLoadingReview = true) }
-        viewModelScope.launch {
-            runCatching { repository.review(reviewId) }
-                .onSuccess { review -> _uiState.update { it.copy(current = review, isLoadingReview = false) } }
-                .onFailure { error ->
-                    _uiState.update { it.copy(isLoadingReview = false, message = error.message ?: "خطا") }
-                }
-        }
-    }
-
-    fun toggleTake() {
-        val review = _uiState.value.current ?: return
-        if (_uiState.value.isPlayingTake) {
-            player.pause()
-            _uiState.update { it.copy(isPlayingTake = false) }
-            return
-        }
-        if (player.canResume) {
-            player.play()
-            _uiState.update { it.copy(isPlayingTake = true) }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingTake = true) }
-            runCatching { repository.reviewAudio(review.id) }
-                .onSuccess { file ->
-                    player.stop()
-                    player.prepare(file, onFinished = { _uiState.update { it.copy(isPlayingTake = false) } })
-                    player.play()
-                    _uiState.update { it.copy(isLoadingTake = false, isPlayingTake = true) }
-                }
-                .onFailure { error ->
-                    _uiState.update { it.copy(isLoadingTake = false, message = error.message ?: "پخش ممکن نشد.") }
-                }
-        }
-    }
-
-    fun stopTake() {
-        player.stop()
-        _uiState.update { it.copy(isPlayingTake = false) }
-    }
-
-    /** [minutes] null lets the server count from when the review was opened. */
-    fun reply(text: String, voice: LocalFile?, minutes: Double?, onDone: () -> Unit) {
-        val review = _uiState.value.current ?: return
-        stopTake()
-        run("در حال ارسال پاسخ…", onDone) {
-            val answered = repository.reply(review.id, text, voice, minutes)
-            _uiState.update { state ->
-                state.copy(
-                    current = answered,
-                    reviews = state.reviews.filterNot { it.id == answered.id && state.filter == ReviewStatus.OPEN }
-                        .map { if (it.id == answered.id) answered else it },
-                    message = "پاسخ برای هنرجو فرستاده شد."
-                )
-            }
-        }
-    }
-
-    fun decline(text: String, onDone: () -> Unit) {
-        val review = _uiState.value.current ?: return
-        stopTake()
-        run("در حال بستن درخواست…", onDone) {
-            val closed = repository.decline(review.id, text)
-            _uiState.update { state ->
-                state.copy(
-                    current = closed,
-                    reviews = state.reviews.filterNot { it.id == closed.id && state.filter == ReviewStatus.OPEN }
-                        .map { if (it.id == closed.id) closed else it },
-                    message = "بسته شد."
-                )
-            }
-        }
-    }
 
     fun loadStudents() {
         _uiState.update { it.copy(isLoadingStudents = true) }
@@ -203,22 +109,9 @@ class TeacherDeskViewModel : ViewModel() {
                 .onFailure { error -> _uiState.update { it.copy(busyLabel = null, message = error.message ?: "خطا") } }
         }
     }
-
-    override fun onCleared() {
-        player.release()
-        super.onCleared()
-    }
 }
 
 data class TeacherDeskUiState(
-    /** Null for every review. */
-    val filter: ReviewStatus? = ReviewStatus.OPEN,
-    val reviews: List<Review> = emptyList(),
-    val isLoadingReviews: Boolean = false,
-    val current: Review? = null,
-    val isLoadingReview: Boolean = false,
-    val isPlayingTake: Boolean = false,
-    val isLoadingTake: Boolean = false,
     val students: List<StudentCard> = emptyList(),
     val isLoadingStudents: Boolean = false,
     val purchaseRequests: List<LessonPurchaseRequest> = emptyList(),

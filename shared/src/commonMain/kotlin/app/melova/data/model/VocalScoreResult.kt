@@ -16,7 +16,9 @@ data class VocalScoreResult(
     val requiresReRecord: Boolean = false,
     val reRecordReason: ReRecordReason? = null,
     /** Set when the scorer asks for the teacher on this take; the id makes it a free referral. */
-    val teacherReferral: TeacherReferral? = null
+    val teacherReferral: TeacherReferral? = null,
+    /** The server's answer as JSON; sent with a take, it opens this same result again. */
+    val sourceJson: String? = null
 )
 
 data class TeacherReferral(

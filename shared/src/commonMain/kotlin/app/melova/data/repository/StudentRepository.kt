@@ -4,17 +4,12 @@ import app.melova.data.local.StudentSession
 import app.melova.data.local.TeacherSession
 import app.melova.data.model.LoginCodeSent
 import app.melova.data.model.LoginMethods
-import app.melova.data.model.Review
-import app.melova.data.model.ReviewAnalysis
-import app.melova.data.model.ReviewStatus
 import app.melova.data.model.StudentAccount
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.remote.FilePart
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.api.StudentApi
 import app.melova.data.remote.apiCall
-import app.melova.data.remote.dto.ReviewAnalysisDto
-import app.melova.data.remote.dto.ReviewDto
 import app.melova.data.remote.dto.StudentMeDto
 import app.melova.data.remote.writeAtomically
 import app.melova.platform.LocalFile
@@ -157,45 +152,29 @@ class StudentRepository(
     suspend fun unfollow(teacherId: String): Set<String> =
         apiCall { api.unfollow(teacherId) }.followedTeachers.orEmpty().toSet()
 
-    /** Sends this take to the teacher; the score's referral id says the scorer itself asked. */
+    /**
+     * Sends this take to the teacher, with its whole result so the chat can open the same page.
+     * The score's referral id says the scorer itself asked. Returns the chat it went into.
+     */
     suspend fun sendForReview(
         lessonId: String,
         sectionId: String,
         take: LocalFile,
         note: String,
         score: VocalScoreResult?
-    ): StudentAccount {
+    ): String? {
         // Read now, so the next recording can't overwrite the file mid-upload.
         val audio = FilePart("audio", "take.wav", "audio/wav", take.readBytes())
-        val summary = score?.let {
-            MelovaNetwork.json.encodeToString(
-                ReviewAnalysisDto.serializer(),
-                ReviewAnalysisDto(it.overall, it.summary, it.weakPoints)
-            )
-        }
         return apiCall {
             api.sendForReview(
                 lessonId = lessonId,
                 sectionId = sectionId,
                 note = note.trim(),
                 referralId = score?.teacherReferral?.referralId,
-                scoreJson = summary,
+                scoreJson = score?.sourceJson,
                 audio = audio
             )
-        }.toDomain()
-    }
-
-    /** Newest first. */
-    suspend fun reviews(): List<Review> = apiCall { api.reviews() }.reviews.orEmpty().mapNotNull { it.toDomain() }
-
-    /** The teacher's voice reply, downloaded once and kept. */
-    suspend fun replyAudio(review: Review): LocalFile = apiCall {
-        val dir = LocalFile(filesDir(context), "review_replies").apply { mkdirs() }
-        val target = LocalFile(dir, "${review.id.replace(Regex("[^A-Za-z0-9_-]"), "_")}.audio")
-        if (!target.exists() || target.length() == 0L) {
-            api.replyAudio(review.id).writeAtomically(target)
-        }
-        target
+        }.chatId
     }
 
     private companion object {
@@ -213,26 +192,3 @@ internal fun StudentMeDto.toDomain() = StudentAccount(
     isTeacher = isTeacher == true,
     ownedLessons = ownedLessons.orEmpty().toSet()
 )
-
-internal fun ReviewDto.toDomain(): Review? {
-    val reviewId = id?.takeIf { it.isNotBlank() } ?: return null
-    return Review(
-        id = reviewId,
-        lessonId = lessonId.orEmpty(),
-        sectionId = sectionId.orEmpty(),
-        isReferral = reason == "auto",
-        referralReasons = autoReasons.orEmpty(),
-        note = note.orEmpty(),
-        status = ReviewStatus.fromRaw(status),
-        createdAtMs = ((createdAt ?: 0.0) * 1000).toLong(),
-        answeredAtMs = answeredAt?.let { (it * 1000).toLong() },
-        replyText = replyText.orEmpty(),
-        hasReplyAudio = hasReplyAudio == true,
-        studentId = studentId.orEmpty(),
-        studentName = studentName.orEmpty(),
-        teacherMinutes = teacherMinutes,
-        analysis = analysis?.let {
-            ReviewAnalysis(it.overall ?: 0, it.summary.orEmpty(), it.weakPoints.orEmpty())
-        }
-    )
-}

@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.melova.audio.scoring.VocalScorer
 import app.melova.ui.theme.MelovaAccent
+import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaSecondary
 import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaWarning
@@ -94,8 +95,8 @@ fun VocalTrainingCorrectionRow(
                 label = "اجرای شما",
                 icon = Icons.Outlined.Mic,
                 isPlaying = isStudentSnippetPlaying,
-                containerColor = MelovaSecondary.copy(alpha = 0.38f),
-                contentColor = MelovaText,
+                containerColor = MelovaSecondary.copy(alpha = 0.22f),
+                contentColor = MelovaAccentSoft,
                 onClick = onPlayStudentSnippet,
                 modifier = Modifier.weight(1f)
             )
@@ -104,7 +105,7 @@ fun VocalTrainingCorrectionRow(
                 icon = Icons.Outlined.Hearing,
                 isPlaying = isTeacherSnippetPlaying,
                 containerColor = MelovaAccent.copy(alpha = 0.28f),
-                contentColor = MelovaText,
+                contentColor = MelovaAccentSoft,
                 onClick = onPlayTeacherSnippet,
                 modifier = Modifier.weight(1f)
             )
@@ -127,7 +128,7 @@ private fun CorrectionSnippetButton(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
         color = if (isPlaying) containerColor.copy(alpha = 0.95f) else containerColor,
-        contentColor = contentColor
+        contentColor = if (isPlaying) Color.White else contentColor
     ) {
         Row(
             modifier = Modifier

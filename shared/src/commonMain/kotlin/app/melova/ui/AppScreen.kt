@@ -17,11 +17,16 @@ object AppScreen {
     const val ARG_LOGIN_REASON = "reason"
     const val LOGIN = "login/{$ARG_LOGIN_REASON}"
     const val EDIT_PROFILE = "profile/edit"
+    const val FOLLOWED_TEACHERS = "profile/teachers"
 
     const val SOLFEGE = "solfege"
     const val LESSON = "lesson/{${LessonIntroViewModel.ARG_LESSON_ID}}"
     const val PRACTICE =
         "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}"
+    /** A take sent to a teacher, opened from its chat message: the same page, read-only. */
+    const val PRACTICE_RESULT =
+        "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}" +
+            "/result/{${VocalTrainingViewModel.ARG_REVIEW_ID}}"
     /** The teacher's performance in detail: waveform with tahrir/vibrato spans. */
     const val TEACHER_PERFORMANCE =
         "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}/teacher"
@@ -32,11 +37,12 @@ object AppScreen {
     const val TEACHER_PAGE = "teachers/{$ARG_TEACHER_ID}"
     const val TEACHER_PANEL = "teacher"
     const val LESSON_EDITOR = "teacher/lesson/{$ARG_LESSON_ID}"
-    const val ARG_REVIEW_ID = "reviewId"
-    const val TEACHER_REVIEWS = "teacher/reviews"
-    const val TEACHER_REVIEW = "teacher/reviews/{$ARG_REVIEW_ID}"
     const val TEACHER_STUDENTS = "teacher/students"
     const val TEACHER_REPORT = "teacher/report"
+
+    const val ARG_CHAT_ID = "chatId"
+    const val CHATS = "chats"
+    const val CHAT = "chats/{$ARG_CHAT_ID}"
 
     fun tabRoute(tab: MainTab) = when (tab) {
         MainTab.EXPLORE -> EXPLORE
@@ -58,6 +64,9 @@ object AppScreen {
     fun practice(lessonId: String, sectionId: String) =
         "practice/${lessonId.encodeURLPathPart()}/${sectionId.encodeURLPathPart()}"
 
+    fun practiceResult(lessonId: String, sectionId: String, reviewId: String) =
+        "practice/${lessonId.encodeURLPathPart()}/${sectionId.encodeURLPathPart()}/result/${reviewId.encodeURLPathPart()}"
+
     fun teacherPerformance(lessonId: String, sectionId: String) =
         "practice/${lessonId.encodeURLPathPart()}/${sectionId.encodeURLPathPart()}/teacher"
 
@@ -65,5 +74,5 @@ object AppScreen {
 
     fun lessonEditor(lessonId: String) = "teacher/lesson/${lessonId.encodeURLPathPart()}"
 
-    fun teacherReview(reviewId: String) = "teacher/reviews/${reviewId.encodeURLPathPart()}"
+    fun chat(chatId: String) = "chats/${chatId.encodeURLPathPart()}"
 }

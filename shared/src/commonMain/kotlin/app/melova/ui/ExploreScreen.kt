@@ -1,5 +1,6 @@
 package app.melova.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,6 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -17,11 +20,16 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.PersonSearch
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +53,7 @@ import app.melova.ui.components.TeacherAvatar
 import app.melova.ui.components.TeacherCard
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccentSoft
+import app.melova.ui.theme.MelovaOutline
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
 
@@ -118,17 +127,42 @@ fun ExploreScreen(
     }
 }
 
+@Composable
+private fun MessageTeacherButton(isBusy: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = !isBusy,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MelovaOutline),
+        modifier = Modifier.fillMaxWidth().height(46.dp)
+    ) {
+        if (isBusy) {
+            CircularProgressIndicator(strokeWidth = 2.dp, color = MelovaAccentSoft, modifier = Modifier.size(18.dp))
+        } else {
+            Icon(
+                Icons.Outlined.ChatBubbleOutline,
+                contentDescription = null,
+                tint = MelovaAccentSoft,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(" پیام به استاد", style = MaterialTheme.typography.labelLarge, color = MelovaAccentSoft)
+        }
+    }
+}
+
 private fun LazyGridScope.fullWidth(key: String, content: @Composable () -> Unit) {
     item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
 }
 
-/** A teacher's page: who they are, a follow button and all their lessons. */
+/** A teacher's page: who they are, ways to follow and write to them, and all their lessons. */
 @Composable
 fun TeacherPageScreen(
     teacherId: String,
     state: CatalogUiState,
     onFollowChange: (Boolean) -> Unit,
     onLessonClick: (String) -> Unit,
+    isOpeningChat: Boolean,
+    onMessage: (() -> Unit)?,
     onBack: () -> Unit
 ) {
     val teacher = state.teacher(teacherId)
@@ -180,6 +214,7 @@ fun TeacherPageScreen(
                                 )
                                 FollowButton(isFollowed = state.isFollowed(teacherId), onFollowChange = onFollowChange)
                             }
+                            onMessage?.let { MessageTeacherButton(isBusy = isOpeningChat, onClick = it) }
                         }
                     }
                 }

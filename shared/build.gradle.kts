@@ -83,6 +83,7 @@ kotlin {
             implementation(libs.google.identity.googleid)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.ktor.client.android)
+            implementation(libs.ktor.client.okhttp)
         }
         webMain.dependencies {
             implementation(libs.ktor.client.js)

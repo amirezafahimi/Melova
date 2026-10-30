@@ -14,7 +14,11 @@ data class MelovaPalette(
     val backgroundEnd: Color,
     val card: Color,
     val cardElevated: Color,
+    /** The other side's chat messages, which stand off the page beside the person's own. */
+    val bubbleReceived: Color,
     val outline: Color,
+    /** Edges of what can be used, such as fields and switches, seen on the page and on cards. */
+    val control: Color,
     val accent: Color,
     val accentSoft: Color,
     val secondary: Color,
@@ -35,7 +39,9 @@ val DarkPalette = MelovaPalette(
     backgroundEnd = Color(0xFF1B1230),
     card = Color(0xFF1F1733),
     cardElevated = Color(0xFF2A2042),
+    bubbleReceived = Color(0xFF442E5E),
     outline = Color(0xFF3A2E57),
+    control = Color(0xFF8170B2),
     accent = Color(0xFF9B7BFF),
     accentSoft = Color(0xFFCDBBFF),
     secondary = Color(0xFF5E6CF2),
@@ -55,7 +61,9 @@ val LightPalette = MelovaPalette(
     backgroundEnd = Color(0xFFEDE7FF),
     card = Color(0xFFFFFFFF),
     cardElevated = Color(0xFFF1ECFF),
+    bubbleReceived = Color(0xFFFFFFFF),
     outline = Color(0xFFE2DAF7),
+    control = Color(0xFF9284C9),
     accent = Color(0xFF6B4FE0),
     accentSoft = Color(0xFF5A3FD1),
     secondary = Color(0xFF4A55D6),
@@ -75,8 +83,13 @@ val MelovaBackgroundStart: Color @Composable @ReadOnlyComposable get() = LocalMe
 val MelovaBackgroundEnd: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.backgroundEnd
 val MelovaCard: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.card
 val MelovaCardElevated: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.cardElevated
+val MelovaBubbleReceived: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.bubbleReceived
 val MelovaOutline: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.outline
+val MelovaControl: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.control
 val MelovaAccent: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.accent
+
+/** A light fill for a button; what sits on it is [MelovaAccentSoft]. On a solid accent it is white. */
+val MelovaAccentTint: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.accent.copy(alpha = 0.14f)
 val MelovaAccentSoft: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.accentSoft
 val MelovaSecondary: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.secondary
 val MelovaGold: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.gold

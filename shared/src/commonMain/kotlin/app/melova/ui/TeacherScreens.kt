@@ -81,6 +81,7 @@ import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaCardElevated
+import app.melova.ui.theme.MelovaControl
 import app.melova.ui.theme.MelovaError
 import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaSecondary
@@ -100,7 +101,8 @@ fun TeacherPanelScreen(
     onBack: () -> Unit,
     /** Null when the panel belongs to an account, which can't stop being a teacher. */
     onSignOut: (() -> Unit)? = null,
-    onOpenReviews: () -> Unit = {},
+    unreadChats: Int = 0,
+    onOpenChats: () -> Unit = {},
     onOpenStudents: () -> Unit = {},
     onOpenReport: () -> Unit = {}
 ) {
@@ -136,7 +138,15 @@ fun TeacherPanelScreen(
                 }
             }
         }
-        item { TeacherDeskEntryCard(pendingPurchases, onOpenReviews, onOpenStudents, onOpenReport) }
+        item {
+            TeacherDeskEntryCard(
+                pendingPurchases = pendingPurchases,
+                unreadChats = unreadChats,
+                onOpenChats = onOpenChats,
+                onOpenStudents = onOpenStudents,
+                onOpenReport = onOpenReport
+            )
+        }
         item {
             HeaderWithAction(
                 title = "درس‌های شما",
@@ -730,7 +740,13 @@ private fun MelovaSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, e
         checked = checked,
         onCheckedChange = onCheckedChange,
         enabled = enabled,
-        colors = SwitchDefaults.colors(checkedTrackColor = MelovaAccent, checkedThumbColor = Color.White)
+        colors = SwitchDefaults.colors(
+            checkedTrackColor = MelovaAccent,
+            checkedThumbColor = Color.White,
+            uncheckedTrackColor = MelovaAccent.copy(alpha = 0.22f),
+            uncheckedThumbColor = MelovaControl,
+            uncheckedBorderColor = MelovaControl
+        )
     )
 }
 

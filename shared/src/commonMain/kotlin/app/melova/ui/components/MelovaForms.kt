@@ -44,7 +44,7 @@ import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaCard
 import app.melova.ui.theme.MelovaError
-import app.melova.ui.theme.MelovaOutline
+import app.melova.ui.theme.MelovaControl
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
 
@@ -75,7 +75,7 @@ fun MelovaTextField(
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MelovaAccent,
-            unfocusedBorderColor = MelovaOutline,
+            unfocusedBorderColor = MelovaControl,
             focusedLabelColor = MelovaAccent,
             unfocusedLabelColor = MelovaTextMuted,
             cursorColor = MelovaAccent,

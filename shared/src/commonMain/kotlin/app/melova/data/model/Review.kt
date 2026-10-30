@@ -47,40 +47,10 @@ enum class ReviewStatus {
     }
 }
 
-/** A take a student sent the teacher, with the teacher's answer once there is one. */
-data class Review(
-    val id: String,
-    val lessonId: String,
-    val sectionId: String,
-    /** True when the scorer itself asked for the teacher. */
-    val isReferral: Boolean,
-    val referralReasons: List<String>,
-    val note: String,
-    val status: ReviewStatus,
-    val createdAtMs: Long,
-    val answeredAtMs: Long?,
-    val replyText: String,
-    val hasReplyAudio: Boolean,
-    // Teacher's view only.
-    val studentId: String = "",
-    val studentName: String = "",
-    val teacherMinutes: Double? = null,
-    val analysis: ReviewAnalysis? = null
-)
-
-/** The score summary sent with a take, so the teacher sees what the student was told. */
-data class ReviewAnalysis(
-    val overall: Int,
-    val summary: String,
-    val weakPoints: List<String>
-)
-
 /** A student as the teacher sees them, to find who paid. */
 data class StudentCard(
     val id: String,
     val name: String,
-    /** The phone or email they signed in with. */
-    val signedInAs: String?,
     val createdAtMs: Long,
     val ownedLessons: Set<String>
 )
@@ -93,7 +63,6 @@ data class LessonPurchaseRequest(
     /** The name on the payment. */
     val payer: String,
     val studentName: String,
-    val signedInAs: String?,
     val createdAtMs: Long
 )
 

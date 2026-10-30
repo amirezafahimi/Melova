@@ -84,7 +84,10 @@ fun HomeScreen(
     onAppear: () -> Unit,
     onLessonClick: (String) -> Unit,
     onSolfegeClick: () -> Unit,
-    onExploreClick: () -> Unit
+    onExploreClick: () -> Unit,
+    unreadChats: Int = 0,
+    /** Null until the person has someone to talk to, that is before they sign in. */
+    onChatsClick: (() -> Unit)? = null
 ) {
     // Catch up with changes made in the teacher panel or by another device.
     LaunchedEffect(Unit) { onAppear() }
@@ -112,7 +115,7 @@ fun HomeScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    item { HomeHeader() }
+                    item { HomeHeader(unreadChats, onChatsClick) }
 
                     val myLessons = state.myLessons
                     if (state.totalSections > 0) {
@@ -166,7 +169,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader() {
+private fun HomeHeader(unreadChats: Int, onChatsClick: (() -> Unit)?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -187,6 +190,7 @@ private fun HomeHeader() {
                 color = MelovaTextMuted
             )
         }
+        onChatsClick?.let { ChatsIconButton(unread = unreadChats, onClick = it) }
     }
 }
 
