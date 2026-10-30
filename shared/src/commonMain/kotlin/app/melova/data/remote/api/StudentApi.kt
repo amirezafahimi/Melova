@@ -33,8 +33,6 @@ class StudentApi(private val client: HttpClient) {
     suspend fun sayITeach(code: String): StudentMeDto =
         client.call(HttpMethod.Put, "api/v1/me/teacher") { jsonBody(mapOf("code" to code).toJson()) }.decode()
 
-    suspend fun sayIDontTeach(): StudentMeDto = client.call(HttpMethod.Delete, "api/v1/me/teacher").decode()
-
     suspend fun setPhoto(photo: FilePart): StudentMeDto =
         client.call(HttpMethod.Put, "api/v1/me/photo") { setBody(multipartBody(emptyMap(), listOf(photo))) }.decode()
 

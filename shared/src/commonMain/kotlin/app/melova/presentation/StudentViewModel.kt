@@ -70,8 +70,6 @@ class StudentViewModel : ViewModel() {
 
     fun sayITeach(code: String) = saveProfile { repository.sayITeach(code) }
 
-    fun sayIDontTeach() = saveProfile { repository.sayIDontTeach() }
-
     private fun saveProfile(save: suspend () -> StudentAccount) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSavingProfile = true) }

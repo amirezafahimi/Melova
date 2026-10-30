@@ -295,13 +295,12 @@ fun MelovaApp(
                     pendingPurchases = deskState.purchaseRequests.size,
                     onOpenLesson = { navController.navigate(AppScreen.lessonEditor(it)) },
                     onBack = { navController.popBackStack() },
-                    onSignOut = {
-                        if (studentState.account?.signedIn == true) {
-                            studentViewModel.sayIDontTeach()
-                        } else {
+                    // An account stays a teacher for good; only a bare teacher code can leave.
+                    onSignOut = if (studentState.account?.signedIn == true) null else {
+                        {
                             teacherViewModel.signOut()
+                            navController.popBackStack()
                         }
-                        navController.popBackStack()
                     },
                     onOpenReviews = { navController.navigate(AppScreen.TEACHER_REVIEWS) },
                     onOpenStudents = { navController.navigate(AppScreen.TEACHER_STUDENTS) },

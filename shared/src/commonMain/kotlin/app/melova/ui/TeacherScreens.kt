@@ -98,7 +98,8 @@ fun TeacherPanelScreen(
     pendingPurchases: Int,
     onOpenLesson: (String) -> Unit,
     onBack: () -> Unit,
-    onSignOut: () -> Unit = {},
+    /** Null when the panel belongs to an account, which can't stop being a teacher. */
+    onSignOut: (() -> Unit)? = null,
     onOpenReviews: () -> Unit = {},
     onOpenStudents: () -> Unit = {},
     onOpenReport: () -> Unit = {}
@@ -112,7 +113,7 @@ fun TeacherPanelScreen(
         if (profile == null) {
             item { LoadingOrRetry(state, onRetry = viewModel::refresh) }
             // A panel that can't load is still a way out.
-            item { ExitTeacherModeButton(onClick = { confirmingSignOut = true }) }
+            if (onSignOut != null) item { ExitTeacherModeButton(onClick = { confirmingSignOut = true }) }
             return@TeacherScaffold
         }
         item {
@@ -154,7 +155,7 @@ fun TeacherPanelScreen(
         itemsIndexed(profile.lessons, key = { _, lesson -> lesson.id }) { index, lesson ->
             TeacherLessonRow(number = index + 1, lesson = lesson, onClick = { onOpenLesson(lesson.id) })
         }
-        item { ExitTeacherModeButton(onClick = { confirmingSignOut = true }) }
+        if (onSignOut != null) item { ExitTeacherModeButton(onClick = { confirmingSignOut = true }) }
     }
 
     if (confirmingSignOut) {
@@ -164,7 +165,7 @@ fun TeacherPanelScreen(
             confirmLabel = "خروج",
             onConfirm = {
                 confirmingSignOut = false
-                onSignOut()
+                onSignOut?.invoke()
             },
             onDismiss = { confirmingSignOut = false }
         )

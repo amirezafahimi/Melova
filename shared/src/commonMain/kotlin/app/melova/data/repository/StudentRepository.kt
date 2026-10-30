@@ -57,11 +57,9 @@ class StudentRepository(
 
     suspend fun account(): StudentAccount = followTeacherRole(apiCall { api.me() }.toDomain())
 
-    /** The signed-in student says they teach; [code] proves it. */
+    /** The signed-in student says they teach, which [code] proves. The account stays a teacher for good. */
     suspend fun sayITeach(code: String): StudentAccount =
         followTeacherRole(apiCall { api.sayITeach(code.trim()) }.toDomain())
-
-    suspend fun sayIDontTeach(): StudentAccount = followTeacherRole(apiCall { api.sayIDontTeach() }.toDomain())
 
     /** A signed-in account decides whether this install has the teacher panel. */
     private fun followTeacherRole(account: StudentAccount): StudentAccount {

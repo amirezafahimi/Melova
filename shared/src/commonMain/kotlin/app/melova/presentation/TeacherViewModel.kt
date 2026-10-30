@@ -39,7 +39,7 @@ class TeacherViewModel : ViewModel() {
         _uiState.update { TeacherUiState(revision = it.revision + 1) }
     }
 
-    /** Signing in or out, or saying they teach or don't, can open or close the panel. */
+    /** Signing in or out, or saying they teach, can open or close the panel. */
     fun onAccountChanged() {
         val isOpen = _uiState.value.isSignedIn
         when {
