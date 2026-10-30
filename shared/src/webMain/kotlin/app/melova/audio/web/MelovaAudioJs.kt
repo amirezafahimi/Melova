@@ -56,6 +56,9 @@ private external object MelovaAudioGlobal : JsAny {
     fun pickFile(accept: String): Promise<JsAny?>
     fun googleSignIn(clientId: String): Promise<JsAny?>
     fun apiBaseUrl(): String
+    fun canInstall(): Boolean
+    fun watchInstall(changed: () -> Unit)
+    fun install()
 }
 
 object MelovaAudioJs {
@@ -78,4 +81,12 @@ object MelovaAudioJs {
 
     /** MELOVA_API_BASE_URL from the page, or empty. */
     fun apiBaseUrl(): String = MelovaAudioGlobal.apiBaseUrl()
+
+    /** Whether the browser is offering to install the app right now. */
+    fun canInstall(): Boolean = MelovaAudioGlobal.canInstall()
+
+    /** Calls [changed] whenever [canInstall] may have changed. */
+    fun watchInstall(changed: () -> Unit) = MelovaAudioGlobal.watchInstall(changed)
+
+    fun install() = MelovaAudioGlobal.install()
 }

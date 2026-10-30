@@ -1,7 +1,11 @@
 package app.melova.platform
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import app.melova.audio.web.GoogleAnswerJs
 import app.melova.audio.web.MelovaAudioJs
 import app.melova.audio.web.PickedFileJs
@@ -60,3 +64,13 @@ actual fun rememberGoogleSignIn(onResult: (GoogleSignInResult) -> Unit): (client
             }
         }
     }
+
+@Composable
+actual fun rememberInstallOffer(): (() -> Unit)? {
+    var isOffered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isOffered = MelovaAudioJs.canInstall()
+        MelovaAudioJs.watchInstall { isOffered = MelovaAudioJs.canInstall() }
+    }
+    return if (isOffered) MelovaAudioJs::install else null
+}

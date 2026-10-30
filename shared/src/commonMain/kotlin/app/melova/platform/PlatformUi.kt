@@ -31,3 +31,7 @@ sealed interface GoogleSignInResult {
 /** Asks Google for an ID token for this client id; the server checks it and signs the student in. */
 @Composable
 expect fun rememberGoogleSignIn(onResult: (GoogleSignInResult) -> Unit): (clientId: String) -> Unit
+
+/** Installs the web app, while the browser offers that; null otherwise, as in the Android app. */
+@Composable
+expect fun rememberInstallOffer(): (() -> Unit)?

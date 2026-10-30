@@ -217,7 +217,28 @@
     });
   }
 
+  // Android shows a Chrome tab with Chrome's logo in the recent apps, whatever the page does; only
+  // an installed app gets its own. Chrome offers that through this event alone, and it can come
+  // before the app is up.
+  let installOffer = null, onInstallChange = null;
+
+  function setInstallOffer(offer) {
+    installOffer = offer;
+    if (onInstallChange) onInstallChange();
+  }
+
+  window.addEventListener('beforeinstallprompt', setInstallOffer);
+  window.addEventListener('appinstalled', () => setInstallOffer(null));
+
+  // An offer works once; Chrome makes a new one if this one is turned down.
+  function install() {
+    const offer = installOffer;
+    setInstallOffer(null);
+    if (offer) offer.prompt();
+  }
+
   // pickAudioFile is for the JS app, which a quick web build keeps from the last --legacy build.
   globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickFile, googleSignIn,
-    pickAudioFile: () => pickFile('audio/*'), apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || '') };
+    pickAudioFile: () => pickFile('audio/*'), apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || ''),
+    canInstall: () => installOffer !== null, watchInstall: (changed) => { onInstallChange = changed; }, install };
 })();

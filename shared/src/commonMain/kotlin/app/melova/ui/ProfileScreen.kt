@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.CoPresent
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.InstallMobile
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.melova.platform.appVersionName
 import app.melova.platform.formatPersianInteger
+import app.melova.platform.rememberInstallOffer
 import app.melova.presentation.CatalogUiState
 import app.melova.presentation.StudentUiState
 import app.melova.presentation.TeacherUiState
@@ -84,6 +86,7 @@ fun ProfileScreen(
 ) {
     var showTeacherSignIn by rememberSaveable { mutableStateOf(false) }
     var confirmingSignOut by rememberSaveable { mutableStateOf(false) }
+    val install = rememberInstallOffer()
 
     // The account may have changed on another device since the last visit.
     LaunchedEffect(Unit) { onStudentAppear() }
@@ -125,6 +128,9 @@ fun ProfileScreen(
 
                 item { SectionHeader(title = "تنظیمات") }
                 item { ThemePicker(themeMode = themeMode, onThemeModeChange = onThemeModeChange) }
+                if (install != null) {
+                    item { InstallRow(onClick = install) }
+                }
                 if (studentState.account?.signedIn == true) {
                     item { SignOutRow(onClick = { confirmingSignOut = true }) }
                 }
@@ -334,6 +340,27 @@ fun FollowedTeachersScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun InstallRow(onClick: () -> Unit) {
+    MelovaSurfaceCard(onClick = onClick, contentPadding = 14.dp) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(Icons.Outlined.InstallMobile, contentDescription = null, tint = MelovaAccentSoft)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("نصب ملووا", style = MaterialTheme.typography.titleSmall, color = MelovaText)
+                Text(
+                    "مثل یک اپ، با لوگوی خودش باز می‌شود",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MelovaTextMuted
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
         }
     }
 }

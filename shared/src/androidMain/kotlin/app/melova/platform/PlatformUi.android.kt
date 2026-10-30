@@ -92,3 +92,6 @@ private fun copyPicked(context: Context, uri: Uri, fallbackName: String = "audio
     } ?: error("picked file could not be opened")
     return target.toLocalFile()
 }
+
+@Composable
+actual fun rememberInstallOffer(): (() -> Unit)? = null
