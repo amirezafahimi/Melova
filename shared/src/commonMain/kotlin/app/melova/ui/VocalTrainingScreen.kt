@@ -73,6 +73,7 @@ import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.scoreColor
 import app.melova.ui.components.MelovaProgressBar
 import app.melova.ui.components.ScoreMetricsList
+import app.melova.ui.components.ErrorDetailSheet
 import app.melova.ui.components.StudentRecordingWaveform
 import app.melova.ui.components.VocalTrainingCorrectionRow
 import app.melova.ui.components.VocalTrainingTahrirRow
@@ -186,10 +187,34 @@ fun VocalTrainingScreen(
                                 onPlayCorrectionTeacherSnippet = viewModel::playCorrectionTeacherSnippet,
                                 onPlayTahrirStudentSnippet = viewModel::playTahrirStudentSnippet,
                                 onPlayTahrirTeacherSnippet = viewModel::playTahrirTeacherSnippet,
+                                onShowCorrectionDetail = viewModel::showCorrectionDetail,
+                                onShowTahrirDetail = viewModel::showTahrirDetail,
                                 onRetryRecording = viewModel::retryRecording,
                                 onDismiss = viewModel::dismissResults
                             )
                         }
+                    }
+
+                    uiState.errorDetail?.let { detail ->
+                        val correction = detail.correction
+                        val comparison = detail.comparison
+                        ErrorDetailSheet(
+                            detail = detail,
+                            playingTarget = uiState.playingSnippetTarget.takeIf {
+                                uiState.playingSnippetStartMs == detail.key && uiState.isPlaying
+                            },
+                            teacherPositionMs = uiState.teacherPlaybackPositionMs,
+                            studentPositionMs = uiState.userPlaybackPositionMs,
+                            onPlayTeacher = {
+                                if (correction != null) viewModel.playCorrectionTeacherSnippet(correction)
+                                else if (comparison != null) viewModel.playTahrirTeacherSnippet(comparison)
+                            },
+                            onPlayStudent = {
+                                if (correction != null) viewModel.playCorrectionSnippet(correction)
+                                else if (comparison != null) viewModel.playTahrirStudentSnippet(comparison)
+                            },
+                            onDismiss = viewModel::hideErrorDetail
+                        )
                     }
 
                     uiState.scoreResult?.let { result ->
@@ -724,6 +749,8 @@ private fun HolisticScoreResultCard(
     onPlayCorrectionTeacherSnippet: (app.melova.audio.scoring.VocalScorer.PitchCorrection) -> Unit,
     onPlayTahrirStudentSnippet: (TahrirComparison) -> Unit,
     onPlayTahrirTeacherSnippet: (TahrirComparison) -> Unit,
+    onShowCorrectionDetail: (app.melova.audio.scoring.VocalScorer.PitchCorrection) -> Unit,
+    onShowTahrirDetail: (TahrirComparison) -> Unit,
     onRetryRecording: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -869,7 +896,8 @@ private fun HolisticScoreResultCard(
                             playingSnippetTarget == PlaybackTarget.TEACHER &&
                             isPlayingTeacherSample,
                         onPlayStudentSnippet = { onPlayCorrectionStudentSnippet(correction) },
-                        onPlayTeacherSnippet = { onPlayCorrectionTeacherSnippet(correction) }
+                        onPlayTeacherSnippet = { onPlayCorrectionTeacherSnippet(correction) },
+                        onShowDetails = { onShowCorrectionDetail(correction) }
                     )
                 }
             }
@@ -897,7 +925,8 @@ private fun HolisticScoreResultCard(
                             playingSnippetTarget == PlaybackTarget.TEACHER &&
                             isPlayingTeacherSample,
                         onPlayStudentSnippet = { onPlayTahrirStudentSnippet(comparison) },
-                        onPlayTeacherSnippet = { onPlayTahrirTeacherSnippet(comparison) }
+                        onPlayTeacherSnippet = { onPlayTahrirTeacherSnippet(comparison) },
+                        onShowDetails = { onShowTahrirDetail(comparison) }
                     )
                 }
             }

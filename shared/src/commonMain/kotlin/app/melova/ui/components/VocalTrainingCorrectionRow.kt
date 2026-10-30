@@ -42,6 +42,7 @@ fun VocalTrainingCorrectionRow(
     isTeacherSnippetPlaying: Boolean,
     onPlayStudentSnippet: () -> Unit,
     onPlayTeacherSnippet: () -> Unit,
+    onShowDetails: (() -> Unit)? = null,
     header: String = "زمان \u200E${correction.timeLabel}\u200F • نت هدف: ${correction.expectedNote}",
     accentColor: Color? = null
 ) {
@@ -65,12 +66,19 @@ fun VocalTrainingCorrectionRow(
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = header,
-            style = MaterialTheme.typography.labelMedium,
-            color = MelovaText.copy(alpha = 0.7f),
-            textAlign = TextAlign.Start
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = header,
+                style = MaterialTheme.typography.labelMedium,
+                color = MelovaText.copy(alpha = 0.7f),
+                textAlign = TextAlign.Start,
+                modifier = Modifier.weight(1f)
+            )
+            onShowDetails?.let { ShowDetailsButton(onClick = it) }
+        }
         Text(
             text = correction.message,
             style = MaterialTheme.typography.bodyMedium,

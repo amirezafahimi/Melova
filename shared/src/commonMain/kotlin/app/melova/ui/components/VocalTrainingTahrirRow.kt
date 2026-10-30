@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,7 +44,8 @@ fun VocalTrainingTahrirRow(
     isStudentSnippetPlaying: Boolean,
     isTeacherSnippetPlaying: Boolean,
     onPlayStudentSnippet: () -> Unit,
-    onPlayTeacherSnippet: () -> Unit
+    onPlayTeacherSnippet: () -> Unit,
+    onShowDetails: (() -> Unit)? = null
 ) {
     val scoreColor = when {
         comparison.score >= 80 -> MelovaSuccess
@@ -79,7 +82,8 @@ fun VocalTrainingTahrirRow(
                 text = "$kindLabel • زمان ‎${formatTahrirClock(comparison.refStartMs)}‏",
                 style = MaterialTheme.typography.labelMedium,
                 color = MelovaText.copy(alpha = 0.7f),
-                textAlign = TextAlign.Start
+                textAlign = TextAlign.Start,
+                modifier = Modifier.weight(1f)
             )
             Text(
                 text = "تطابق ${comparison.score}٪",
@@ -88,6 +92,10 @@ fun VocalTrainingTahrirRow(
                 color = scoreColor,
                 textAlign = TextAlign.End
             )
+            onShowDetails?.let {
+                Spacer(Modifier.width(8.dp))
+                ShowDetailsButton(onClick = it)
+            }
         }
         Text(
             text = comparison.message,

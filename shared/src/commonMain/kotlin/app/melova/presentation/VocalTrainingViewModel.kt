@@ -8,6 +8,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import app.melova.audio.io.WaveformPeaksExtractor
 import app.melova.audio.scoring.VocalScorer
+import app.melova.data.model.ErrorDetail
+import app.melova.data.model.ErrorDetailLane
+import app.melova.data.model.ErrorMarkKind
 import app.melova.data.model.PlaybackClip
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.VocalScoreResult
@@ -63,6 +66,13 @@ class VocalTrainingViewModel(
     @Volatile
     private var lastRecordingDurationMs: Long = 0L
 
+    /** Loudness envelopes for «دیدن جزییات», read once per lesson / take. */
+    @Volatile
+    private var teacherEnvelope: FloatArray? = null
+
+    @Volatile
+    private var studentEnvelope: FloatArray? = null
+
     private val _uiState = MutableStateFlow(
         VocalTrainingUiState(bestScore = progressStore.bestScore(lessonId, sectionId))
     )
@@ -108,6 +118,7 @@ class VocalTrainingViewModel(
                 })
             }.onSuccess { (courseTitle, prepared, teacherPeaks) ->
                 lesson = prepared
+                teacherEnvelope = null
                 _uiState.update {
                     it.copy(
                         courseTitle = courseTitle,
@@ -458,6 +469,7 @@ class VocalTrainingViewModel(
             it.copy(
                 mode = VocalTrainingMode.IDLE,
                 scoreResult = null,
+                errorDetail = null,
                 teacherAsk = TeacherAskState(),
                 progress = 0f,
                 isPlaying = false,
@@ -547,6 +559,102 @@ class VocalTrainingViewModel(
         }
     }
 
+    fun showCorrectionDetail(correction: VocalScorer.PitchCorrection) {
+        val teacherMs = correction.teacherClip?.focusCentreMs ?: correction.referenceStartMs
+        val studentMs = correction.studentClip?.focusCentreMs ?: correction.startMs
+        showErrorDetail(
+            ErrorDetail(
+                key = correction.startMs,
+                markKind = ErrorMarkKind.MOMENT,
+                teacher = null,
+                student = null,
+                correction = correction
+            ),
+            teacherMark = teacherMs..teacherMs,
+            teacherClip = correction.teacherClip,
+            studentMark = studentMs..studentMs,
+            studentClip = correction.studentClip
+        )
+    }
+
+    fun showTahrirDetail(comparison: TahrirComparison) {
+        val studentStart = comparison.studentStartMs
+        val studentEnd = comparison.studentEndMs
+        showErrorDetail(
+            ErrorDetail(
+                key = comparison.key,
+                markKind = ErrorMarkKind.SPAN,
+                teacher = null,
+                student = null,
+                comparison = comparison
+            ),
+            teacherMark = comparison.refStartMs..comparison.refEndMs,
+            teacherClip = comparison.teacherClip,
+            studentMark = if (comparison.hasStudentRegion && studentStart != null && studentEnd != null) {
+                studentStart..studentEnd
+            } else {
+                null
+            },
+            studentClip = comparison.studentClip
+        )
+    }
+
+    fun hideErrorDetail() {
+        _uiState.update { it.copy(errorDetail = null) }
+    }
+
+    private fun showErrorDetail(
+        detail: ErrorDetail,
+        teacherMark: LongRange,
+        teacherClip: PlaybackClip?,
+        studentMark: LongRange?,
+        studentClip: PlaybackClip?
+    ) {
+        if (_uiState.value.scoreResult == null) return
+        viewModelScope.launch {
+            val lanes = withContext(ioDispatcher) {
+                runCatching {
+                    detailLane(loadTeacherEnvelope(), teacherMark, teacherClip) to
+                        studentMark?.let { detailLane(loadStudentEnvelope(), it, studentClip) }
+                }.getOrNull()
+            }
+            _uiState.update {
+                if (it.scoreResult == null) it
+                else it.copy(errorDetail = detail.copy(teacher = lanes?.first, student = lanes?.second))
+            }
+        }
+    }
+
+    private fun loadTeacherEnvelope(): FloatArray? {
+        teacherEnvelope?.let { return it }
+        val file = lesson?.referenceFile?.takeIf { it.exists() } ?: return null
+        return WaveformPeaksExtractor.envelope(file).also { teacherEnvelope = it }
+    }
+
+    private fun loadStudentEnvelope(): FloatArray? {
+        studentEnvelope?.let { return it }
+        if (!userRecordingFile.exists() || userRecordingFile.length() <= 44L) return null
+        return WaveformPeaksExtractor.envelope(userRecordingFile).also { studentEnvelope = it }
+    }
+
+    /** The clip the student hears around the error, or a second each side of it. */
+    private fun detailLane(envelope: FloatArray?, mark: LongRange, clip: PlaybackClip?): ErrorDetailLane? {
+        if (envelope == null || envelope.isEmpty()) return null
+        val totalMs = envelope.size.toLong() * WaveformPeaksExtractor.ENVELOPE_BIN_MS
+        val startMs = (clip?.startMs ?: (mark.first - DETAIL_CONTEXT_MS)).coerceIn(0L, totalMs)
+        val endMs = (clip?.endMs ?: (mark.last + DETAIL_CONTEXT_MS)).coerceIn(startMs + 1L, totalMs.coerceAtLeast(startMs + 1L))
+        return ErrorDetailLane(
+            startMs = startMs,
+            endMs = endMs,
+            peaks = WaveformPeaksExtractor.window(envelope, startMs, endMs, DETAIL_BAR_COUNT),
+            markStartMs = mark.first,
+            markEndMs = mark.last
+        )
+    }
+
+    private val PlaybackClip.focusCentreMs: Long
+        get() = (slowStartMs + slowEndMs) / 2
+
     fun dismissResults() {
         sessionJob?.cancel()
         stopActivePlayback()
@@ -554,6 +662,7 @@ class VocalTrainingViewModel(
             it.copy(
                 mode = VocalTrainingMode.IDLE,
                 scoreResult = null,
+                errorDetail = null,
                 teacherAsk = TeacherAskState(),
                 progress = 0f,
                 isPlaying = false,
@@ -754,6 +863,7 @@ class VocalTrainingViewModel(
                 mode = VocalTrainingMode.ANALYZING,
                 progress = 0f,
                 scoreResult = null,
+                errorDetail = null,
                 teacherAsk = TeacherAskState(),
                 statusMessage = "تحلیل اجرا روی سرور..."
             )
@@ -777,6 +887,7 @@ class VocalTrainingViewModel(
             val peaks = withContext(ioDispatcher) {
                 WaveformPeaksExtractor.fromWavFile(recordingFile)
             }
+            studentEnvelope = null
 
             stopProgressPolling()
             val recordingSeconds = ((lastRecordingDurationMs + 999) / 1000).toInt().coerceAtLeast(1)
@@ -793,6 +904,7 @@ class VocalTrainingViewModel(
                     playingSnippetStartMs = null,
                     playingSnippetTarget = null,
                     scoreResult = score,
+                    errorDetail = null,
                     teacherAsk = TeacherAskState(),
                     isNewBest = isNewBest,
                     bestScore = progressStore.bestScore(lessonId, sectionId),
@@ -808,6 +920,7 @@ class VocalTrainingViewModel(
                     mode = VocalTrainingMode.IDLE,
                     progress = 0f,
                     scoreResult = null,
+                    errorDetail = null,
                     teacherAsk = TeacherAskState(),
                     statusMessage = "خطا در ارتباط با سرور: ${e.message ?: "نامشخص"}"
                 )
@@ -895,6 +1008,8 @@ class VocalTrainingViewModel(
         private const val CORRECTION_CLIP_PADDING_MS = 1_000L
         /** هر چند میلی‌ثانیه سرعت پخش به‌روز شود تا کم و زیاد شدنش نرم باشد. */
         private const val SPEED_TICK_MS = 20L
+        private const val DETAIL_CONTEXT_MS = 1_000L
+        private const val DETAIL_BAR_COUNT = 140
     }
 }
 
@@ -930,7 +1045,9 @@ data class VocalTrainingUiState(
     /** Best score for this section on this device, including the latest attempt. */
     val bestScore: Int? = null,
     val isNewBest: Boolean = false,
-    val teacherAsk: TeacherAskState = TeacherAskState()
+    val teacherAsk: TeacherAskState = TeacherAskState(),
+    /** The open «دیدن جزییات» sheet. */
+    val errorDetail: ErrorDetail? = null
 ) {
     val isPlayingTeacherSample: Boolean
         get() = playbackTarget == PlaybackTarget.TEACHER && isPlaying
