@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>ملووا</title>
+    <!-- Home-screen app: opens full screen, without the browser's address bar. -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#1B1230">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ملووا">
+    <style>
+        html, body { margin: 0; height: 100%; overflow: hidden; background: #1B1230; }
+        #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+                   padding: 24px; box-sizing: border-box; text-align: center; line-height: 1.9;
+                   color: #ddd; font-family: sans-serif; }
+    </style>
+    <script>
+        // melova.js picks the wasm build, or the JS build on browsers without WasmGC
+        // (iOS before 18.2). If loading fails, say so instead of leaving the loading text up.
+        (function () {
+            function show(text) {
+                var box = document.getElementById('loading');
+                if (box) box.innerHTML = text;
+            }
+            function failed(detail) {
+                show('بارگذاری ملووا ناموفق بود.<br><small dir="ltr">' + String(detail || '') + '</small>');
+            }
+            window.addEventListener('error', function (event) { failed(event.message); });
+            window.addEventListener('unhandledrejection', function (event) { failed(event.reason); });
+        })();
+    </script>
+    <script src="melova-audio.js"></script>
+    <script type="application/javascript" src="melova.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js'); });
+        }
+    </script>
+</head>
+<body>
+<div id="loading">در حال بارگذاری ملووا…</div>
+</body>
+</html>

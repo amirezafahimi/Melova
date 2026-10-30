@@ -170,5 +170,6 @@
     });
   }
 
-  globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickAudioFile };
+  globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickAudioFile,
+    apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || '') };
 })();

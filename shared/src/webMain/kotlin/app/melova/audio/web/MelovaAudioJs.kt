@@ -41,33 +41,32 @@ external interface JsPlayer : JsAny {
     fun stop()
 }
 
-object MelovaAudioJs {
-    /** Resolves to a [JsTake]. */
-    fun startCapture(sampleRate: Int): Promise<JsAny?> = jsStartCapture(sampleRate)
-
-    /** Resolves to a [JsTake]. */
-    fun startCompressed(): Promise<JsAny?> = jsStartCompressed()
-
-    /** What [startCompressed] will write in this browser: m4a, ogg or webm. */
-    fun compressedExtension(): String = jsCompressedExtension()
-
-    fun createPlayer(): JsPlayer = jsCreatePlayer()
-
-    /** Resolves to a [PickedFileJs], or null when cancelled. */
-    fun pickAudioFile(): Promise<JsAny?> = jsPickAudioFile()
+/** globalThis.MelovaAudio, set up by melova-audio.js before the app starts. */
+@JsName("MelovaAudio")
+private external object MelovaAudioGlobal : JsAny {
+    fun startCapture(sampleRate: Int): Promise<JsAny?>
+    fun startCompressed(): Promise<JsAny?>
+    fun compressedExtension(): String
+    fun createPlayer(): JsPlayer
+    fun pickAudioFile(): Promise<JsAny?>
+    fun apiBaseUrl(): String
 }
 
-@JsFun("(rate) => globalThis.MelovaAudio.startCapture(rate)")
-private external fun jsStartCapture(sampleRate: Int): Promise<JsAny?>
+object MelovaAudioJs {
+    /** Resolves to a [JsTake]. */
+    fun startCapture(sampleRate: Int): Promise<JsAny?> = MelovaAudioGlobal.startCapture(sampleRate)
 
-@JsFun("() => globalThis.MelovaAudio.startCompressed()")
-private external fun jsStartCompressed(): Promise<JsAny?>
+    /** Resolves to a [JsTake]. */
+    fun startCompressed(): Promise<JsAny?> = MelovaAudioGlobal.startCompressed()
 
-@JsFun("() => globalThis.MelovaAudio.createPlayer()")
-private external fun jsCreatePlayer(): JsPlayer
+    /** What [startCompressed] will write in this browser: m4a, ogg or webm. */
+    fun compressedExtension(): String = MelovaAudioGlobal.compressedExtension()
 
-@JsFun("() => globalThis.MelovaAudio.pickAudioFile()")
-private external fun jsPickAudioFile(): Promise<JsAny?>
+    fun createPlayer(): JsPlayer = MelovaAudioGlobal.createPlayer()
 
-@JsFun("() => globalThis.MelovaAudio.compressedExtension()")
-private external fun jsCompressedExtension(): String
+    /** Resolves to a [PickedFileJs], or null when cancelled. */
+    fun pickAudioFile(): Promise<JsAny?> = MelovaAudioGlobal.pickAudioFile()
+
+    /** MELOVA_API_BASE_URL from the page, or empty. */
+    fun apiBaseUrl(): String = MelovaAudioGlobal.apiBaseUrl()
+}

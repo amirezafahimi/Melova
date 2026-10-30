@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <!-- Same mark as the Android launcher icon (ic_launcher_foreground.xml). -->
+  <rect width="108" height="108" fill="#1B1230"/>
+  <g transform="translate(22 21) scale(0.32)">
+    <path d="M28,150 C38,92 48,52 64,52 S88,120 100,120 S120,52 136,52 S160,98 166,150"
+          fill="none" stroke="#9B7BFF" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M150,150 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0" fill="#F3C969"/>
+  </g>
+</svg>

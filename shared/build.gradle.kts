@@ -42,6 +42,17 @@ kotlin {
         binaries.executable()
     }
 
+    // Fallback for browsers without WasmGC (iOS before 18.2): the same app compiled to JS.
+    js {
+        outputModuleName.set("melova")
+        browser {
+            commonWebpackConfig {
+                outputFileName = "melova.js"
+            }
+        }
+        binaries.executable()
+    }
+
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
     }
@@ -70,7 +81,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.ktor.client.android)
         }
-        wasmJsMain.dependencies {
+        webMain.dependencies {
             implementation(libs.ktor.client.js)
             implementation(libs.kotlinx.browser)
         }

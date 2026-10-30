@@ -1,6 +1,8 @@
 package app.melova.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -17,6 +19,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -29,6 +32,7 @@ import app.melova.data.model.TeacherOrnament
 import app.melova.data.model.TeacherOrnamentKind
 import app.melova.ui.theme.LocalMelovaPalette
 import app.melova.ui.theme.MelovaPalette
+import kotlin.math.abs
 
 /**
  * موج صدای استاد با بازه‌های تحریر (T)، ویبراتو (V) و گذر (G). هر بازه دقیقاً از ابتدای
@@ -80,6 +84,24 @@ fun TeacherOrnamentWaveform(
                 modifier = Modifier
                     .width(contentWidth)
                     .height(170.dp)
+                    .pointerInput(scrollState) {
+                        // horizontalScroll follows touch only; in the web app a mouse drags it too.
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            if (down.type != PointerType.Mouse) return@awaitEachGesture
+                            var moved = 0f
+                            while (true) {
+                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) break
+                                val dx = change.position.x - change.previousPosition.x
+                                moved += abs(dx)
+                                if (moved > viewConfiguration.touchSlop) {
+                                    scrollState.dispatchRawDelta(-dx)
+                                    change.consume()
+                                }
+                            }
+                        }
+                    }
                     .pointerInput(ornaments, durationMs, zoom) {
                         detectTapGestures { offset ->
                             val width = size.width.toFloat().coerceAtLeast(1f)
