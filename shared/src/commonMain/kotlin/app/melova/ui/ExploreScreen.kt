@@ -11,7 +11,11 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
@@ -30,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import app.melova.presentation.CatalogUiState
 import app.melova.ui.components.BottomBarContentPadding
 import app.melova.ui.components.FollowButton
+import app.melova.ui.components.LessonGridTile
 import app.melova.ui.components.LessonRowCard
 import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaSurfaceCard
@@ -43,65 +48,78 @@ import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
 
-/** The explore tab: every teacher with published lessons, followable in one tap. */
+/**
+ * The explore tab, the way to every lesson: a grid of lessons, and one search over lessons and
+ * teachers, since ten teachers may offer a lesson of the same name.
+ */
 @Composable
 fun ExploreScreen(
     state: CatalogUiState,
+    onLessonClick: (String) -> Unit,
     onTeacherClick: (String) -> Unit,
     onFollowChange: (teacherId: String, followed: Boolean) -> Unit,
     onRetry: () -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val teachers = state.teachers.filter { teacher ->
-        state.lessonsOf(teacher.id).isNotEmpty() &&
-            (query.isBlank() || teacher.name.contains(query.trim(), ignoreCase = true))
-    }
+    val searching = query.isNotBlank()
+    val lessons = if (searching) state.searchLessons(query) else state.exploreLessons
+    val teachers = if (searching) state.searchTeachers(query) else emptyList()
     MelovaBackground {
         RtlContent {
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(150.dp),
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.statusBars),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = BottomBarContentPadding),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(text = "اساتید", style = MaterialTheme.typography.headlineSmall, color = MelovaText)
-                        Text(
-                            text = "هر استادی را دنبال کنید، درس‌هایش در تب تمرین می‌آید.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MelovaTextMuted
-                        )
-                    }
+                fullWidth("title") {
+                    Text(text = "جستجو", style = MaterialTheme.typography.headlineSmall, color = MelovaText)
                 }
-                if (state.teachers.size > 4) {
-                    item { MelovaTextField(value = query, onValueChange = { query = it }, label = "جست‌وجوی استاد") }
+                fullWidth("search") {
+                    MelovaTextField(value = query, onValueChange = { query = it }, label = "جستجوی درس یا استاد")
                 }
                 when {
-                    !state.hasContent && state.isLoading -> item { LoadingCard() }
-                    !state.hasContent && state.errorMessage != null -> item {
+                    !state.hasContent && state.isLoading -> fullWidth("loading") { LoadingCard() }
+                    !state.hasContent && state.errorMessage != null -> fullWidth("error") {
                         MessageCard(Icons.Default.CloudOff, state.errorMessage, actionLabel = "تلاش دوباره", onAction = onRetry)
                     }
-                    teachers.isEmpty() -> item {
+                    lessons.isEmpty() && teachers.isEmpty() -> fullWidth("nothing") {
                         MessageCard(
-                            icon = if (query.isBlank()) Icons.Outlined.LibraryMusic else Icons.Outlined.PersonSearch,
-                            message = if (query.isBlank()) "هنوز استادی درس منتشر نکرده است." else "استادی با این نام پیدا نشد."
+                            icon = if (searching) Icons.Outlined.PersonSearch else Icons.Outlined.LibraryMusic,
+                            message = if (searching) "درس یا استادی با این نام پیدا نشد." else "هنوز درسی منتشر نشده است."
                         )
                     }
-                    else -> items(teachers, key = { it.id }) { teacher ->
-                        TeacherCard(
-                            teacher = teacher,
-                            lessonCount = state.lessonsOf(teacher.id).size,
-                            isFollowed = state.isFollowed(teacher.id),
-                            onFollowChange = { onFollowChange(teacher.id, it) },
-                            onClick = { onTeacherClick(teacher.id) }
-                        )
+                    else -> {
+                        if (teachers.isNotEmpty()) {
+                            fullWidth("teachers") { SectionHeader(title = "استادها") }
+                            items(teachers, key = { "teacher-" + it.id }, span = { GridItemSpan(maxLineSpan) }) { teacher ->
+                                TeacherCard(
+                                    teacher = teacher,
+                                    lessonCount = state.lessonsOf(teacher.id).size,
+                                    isFollowed = state.isFollowed(teacher.id),
+                                    onFollowChange = { onFollowChange(teacher.id, it) },
+                                    onClick = { onTeacherClick(teacher.id) }
+                                )
+                            }
+                        }
+                        if (searching && lessons.isNotEmpty()) {
+                            fullWidth("lessons") { SectionHeader(title = "درس‌ها", trailing = "${lessons.size} درس") }
+                        }
+                        items(lessons, key = { "lesson-" + it.id }) { lesson ->
+                            LessonGridTile(lesson = lesson, onClick = { onLessonClick(lesson.id) })
+                        }
                     }
                 }
             }
         }
     }
+}
+
+private fun LazyGridScope.fullWidth(key: String, content: @Composable () -> Unit) {
+    item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
 }
 
 /** A teacher's page: who they are, a follow button and all their lessons. */
@@ -140,7 +158,7 @@ fun TeacherPageScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(teacher.name, style = MaterialTheme.typography.titleLarge, color = MelovaText)
                                     Text(
-                                        text = "${lessons.size} درس • ${state.availableSections(teacherId)} بخش",
+                                        text = "${lessons.size} درس، ${state.availableSections(teacherId)} بخش",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MelovaAccentSoft
                                     )
@@ -151,7 +169,11 @@ fun TeacherPageScreen(
                             }
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = if (state.isFollowed(teacherId)) "درس‌ها در تب تمرین شماست." else "دنبال کنید تا درس‌ها در تب تمرین بیاید.",
+                                    text = if (state.isFollowed(teacherId)) {
+                                        "این استاد در پروفایل شماست و درس‌هایش اول «جستجو» می‌آید."
+                                    } else {
+                                        "دنبال کنید تا این استاد در پروفایل شما بماند."
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MelovaTextMuted,
                                     modifier = Modifier.weight(1f)

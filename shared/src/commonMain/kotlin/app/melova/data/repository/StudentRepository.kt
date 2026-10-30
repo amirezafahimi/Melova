@@ -1,6 +1,7 @@
 package app.melova.data.repository
 
 import app.melova.data.local.StudentSession
+import app.melova.data.local.TeacherSession
 import app.melova.data.model.LoginCodeSent
 import app.melova.data.model.LoginMethods
 import app.melova.data.model.Review
@@ -33,9 +34,7 @@ class StudentRepository(
     private val api: StudentApi = MelovaNetwork.studentApi
 ) {
     private val session = StudentSession(context)
-
-    val studentId: String?
-        get() = session.studentId
+    private val teacherSession = TeacherSession(context)
 
     /** Puts the saved token on every request; call once at start, before any network call. */
     fun restoreSession() {
@@ -56,7 +55,19 @@ class StudentRepository(
         true
     }
 
-    suspend fun account(): StudentAccount = apiCall { api.me() }.toDomain()
+    suspend fun account(): StudentAccount = followTeacherRole(apiCall { api.me() }.toDomain())
+
+    /** The signed-in student says they teach; [code] proves it. */
+    suspend fun sayITeach(code: String): StudentAccount =
+        followTeacherRole(apiCall { api.sayITeach(code.trim()) }.toDomain())
+
+    suspend fun sayIDontTeach(): StudentAccount = followTeacherRole(apiCall { api.sayIDontTeach() }.toDomain())
+
+    /** A signed-in account decides whether this install has the teacher panel. */
+    private fun followTeacherRole(account: StudentAccount): StudentAccount {
+        if (account.signedIn) teacherSession.token = session.token.takeIf { account.isTeacher }
+        return account
+    }
 
     suspend fun setName(name: String): StudentAccount =
         apiCall { api.updateMe(mapOf("name" to name.trim())) }.toDomain()
@@ -88,8 +99,16 @@ class StudentRepository(
         return LoginMethods(
             phone = methods.phone == true,
             email = methods.email == true,
-            googleClientId = methods.googleClientId?.takeIf { it.isNotBlank() && supportsGoogleSignIn }
+            googleClientId = methods.googleClientId?.takeIf { it.isNotBlank() && supportsGoogleSignIn },
+            isMock = methods.mock == true
         )
+    }
+
+    /** True the first time it's asked, and never after signing in. */
+    fun takeLoginOffer(): Boolean {
+        if (session.loginOffered) return false
+        session.loginOffered = true
+        return true
     }
 
     suspend fun requestLoginCode(channel: LoginChannel, address: String): LoginCodeSent {
@@ -109,8 +128,9 @@ class StudentRepository(
         val id = account.studentId ?: throw IOException("ورود ممکن نشد.")
         val token = account.token ?: throw IOException("ورود ممکن نشد.")
         session.save(id, token)
+        session.loginOffered = true
         restoreSession()
-        return account.toDomain()
+        return followTeacherRole(account.toDomain())
     }
 
     /** Back to being a guest, with a new guest account. */
@@ -118,6 +138,7 @@ class StudentRepository(
         // Forgetting the token is what signs this install out, so a failed call changes nothing.
         runCatching { apiCall { api.logout() } }
         session.clear()
+        teacherSession.token = null
         restoreSession()
         ensureAccount()
     }
@@ -125,10 +146,20 @@ class StudentRepository(
     suspend fun claimFreeLesson(lessonId: String): StudentAccount =
         apiCall { api.claimFreeLesson(lessonId) }.toDomain()
 
-    /**
-     * Sends this take to the teacher. With the score's referral id it is a free referral
-     * (the scorer asked); otherwise it costs one review credit.
-     */
+    /** The student paid for a lesson by card, under the name [payer]. */
+    suspend fun requestLesson(lessonId: String, payer: String): StudentAccount =
+        apiCall { api.requestLesson(lessonId, payer.trim()) }.toDomain()
+
+    /** Whom the student follows now. Follows are kept on the account, so a sign-in brings them. */
+    suspend fun follow(teacherIds: Set<String>): Set<String> {
+        ensureAccount()
+        return apiCall { api.follow(teacherIds) }.followedTeachers.orEmpty().toSet()
+    }
+
+    suspend fun unfollow(teacherId: String): Set<String> =
+        apiCall { api.unfollow(teacherId) }.followedTeachers.orEmpty().toSet()
+
+    /** Sends this take to the teacher; the score's referral id says the scorer itself asked. */
     suspend fun sendForReview(
         lessonId: String,
         sectionId: String,
@@ -181,8 +212,8 @@ internal fun StudentMeDto.toDomain() = StudentAccount(
     signedIn = signedIn == true,
     signedInAs = signedInAs?.takeIf { it.isNotBlank() },
     photoVersion = photoVersion,
-    ownedLessons = ownedLessons.orEmpty().toSet(),
-    reviewCredits = reviewCredits.orEmpty()
+    isTeacher = isTeacher == true,
+    ownedLessons = ownedLessons.orEmpty().toSet()
 )
 
 internal fun ReviewDto.toDomain(): Review? {
@@ -193,7 +224,6 @@ internal fun ReviewDto.toDomain(): Review? {
         sectionId = sectionId.orEmpty(),
         isReferral = reason == "auto",
         referralReasons = autoReasons.orEmpty(),
-        charged = charged != false,
         note = note.orEmpty(),
         status = ReviewStatus.fromRaw(status),
         createdAtMs = ((createdAt ?: 0.0) * 1000).toLong(),

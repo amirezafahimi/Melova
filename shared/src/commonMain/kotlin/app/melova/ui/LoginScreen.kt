@@ -79,9 +79,9 @@ import app.melova.ui.theme.MelovaTextMuted
 
 /** Why the student landed on the login screen, in their terms. */
 enum class LoginReason(val message: String) {
-    PROFILE("با ورود، درس‌ها و پاسخ‌های استاد روی هر دستگاهی همراه شماست."),
-    TEACHER("برای فرستادن تمرین برای استاد وارد شوید تا پاسخش به حساب خودتان برسد."),
-    PURCHASE("برای خرید درس وارد شوید تا درس روی حساب خودتان بماند و گم نشود.")
+    PROFILE("با ورود می‌توانید تمرینتان را برای استاد بفرستید و روی هر گوشی‌ای به درس‌هایتان دسترسی داشته باشید."),
+    TEACHER("برای فرستادن تمرین برای استاد وارد شوید تا پاسخ استاد به دست خودتان برسد."),
+    PURCHASE("برای خرید درس وارد شوید تا درس همیشه برایتان بماند و گم نشود.")
 }
 
 @Composable
@@ -117,7 +117,7 @@ fun LoginScreen(
                 Spacer(Modifier.height(12.dp))
                 MelovaMark(size = 72.dp, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Text(
-                    text = "ورود به ملووا",
+                    text = "ورود یا ثبت‌نام",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MelovaText,
                     textAlign = TextAlign.Center,
@@ -139,14 +139,26 @@ fun LoginScreen(
                         onResend = viewModel::requestCode,
                         onChangeAddress = viewModel::backToAddress
                     )
-                    methods?.any == true -> AddressStep(
-                        state = state,
-                        methods = methods,
-                        onGoogle = signInWithGoogle,
-                        onChannelChange = viewModel::setChannel,
-                        onAddressChange = viewModel::setAddress,
-                        onSubmit = viewModel::requestCode
-                    )
+                    methods?.any == true -> {
+                        AddressStep(
+                            state = state,
+                            methods = methods,
+                            onGoogle = signInWithGoogle,
+                            onChannelChange = viewModel::setChannel,
+                            onAddressChange = viewModel::setAddress,
+                            onSubmit = if (methods.isMock) viewModel::signInWithoutCode else viewModel::requestCode
+                        )
+                        Text(
+                            text = "حساب ندارید؟ مشکلی نیست؛ با همین کار برایتان ساخته می‌شود.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MelovaTextMuted,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                            Text("فعلاً نه، بعداً وارد می‌شوم", color = MelovaTextMuted)
+                        }
+                    }
                     else -> Text(
                         text = "ورود الان در دسترس نیست. کمی بعد دوباره امتحان کنید.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -212,7 +224,7 @@ private fun AddressStep(
             if (state.isBusy) {
                 CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
             } else {
-                Text("دریافت کد")
+                Text(if (methods.isMock) "ورود" else "دریافت کد")
             }
         }
     }
@@ -225,8 +237,9 @@ private fun CodeStep(
     onResend: () -> Unit,
     onChangeAddress: () -> Unit
 ) {
+    val sentTo = if (state.channel == LoginChannel.PHONE) "این شماره" else "این ایمیل"
     Text(
-        text = "کد ${formatPersianInteger(LOGIN_CODE_LENGTH.toLong())} رقمی فرستاده‌شده به این نشانی را وارد کنید:",
+        text = "کد ${formatPersianInteger(LOGIN_CODE_LENGTH.toLong())} رقمی را که به $sentTo فرستادیم وارد کنید:",
         style = MaterialTheme.typography.bodyMedium,
         color = MelovaText,
         textAlign = TextAlign.Center,

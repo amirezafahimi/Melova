@@ -23,10 +23,16 @@ class StudentSession(context: PlatformContext) {
         prefs.putString(KEY_TOKEN, token)
     }
 
+    /** Whether this install has met the sign-in screen, which the profile opens on only once. */
+    var loginOffered: Boolean
+        get() = prefs.getInt(KEY_LOGIN_OFFERED) == 1
+        set(value) = prefs.putInt(KEY_LOGIN_OFFERED, if (value) 1 else 0)
+
     fun clear() = save("", "")
 
     private companion object {
         const val KEY_ID = "id"
         const val KEY_TOKEN = "token"
+        const val KEY_LOGIN_OFFERED = "login_offered"
     }
 }

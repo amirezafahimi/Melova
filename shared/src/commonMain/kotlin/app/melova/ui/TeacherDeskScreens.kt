@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.melova.data.model.Lesson
+import app.melova.data.model.LessonPurchaseRequest
 import app.melova.data.model.Review
 import app.melova.data.model.ReviewStatus
 import app.melova.data.model.StudentCard
@@ -93,6 +94,7 @@ private fun parseMinutes(text: String): Double? =
 /** On the teacher panel: the way into reviews, students and the report. */
 @Composable
 internal fun TeacherDeskEntryCard(
+    pendingPurchases: Int,
     onOpenReviews: () -> Unit,
     onOpenStudents: () -> Unit,
     onOpenReport: () -> Unit
@@ -100,7 +102,12 @@ internal fun TeacherDeskEntryCard(
     MelovaSurfaceCard(contentPadding = 6.dp) {
         Column {
             DeskEntryRow(Icons.Outlined.Inbox, "درخواست‌های هنرجوها", "اجراهایی که برای شما فرستاده‌اند", onOpenReviews)
-            DeskEntryRow(Icons.Outlined.PeopleOutline, "هنرجوها و پرداخت‌ها", "ثبت پرداخت کارت‌به‌کارت و باز کردن درس", onOpenStudents)
+            DeskEntryRow(
+                Icons.Outlined.PeopleOutline,
+                "هنرجوها و پرداخت‌ها",
+                if (pendingPurchases > 0) "$pendingPurchases خرید منتظر تأیید شماست" else "تأیید خریدها و باز کردن درس برای هنرجو",
+                onOpenStudents
+            )
             DeskEntryRow(Icons.Outlined.Insights, "گزارش درآمد و زمان", "درآمد هر ساعت وقت شما، در مقایسه با کلاس خصوصی", onOpenReport)
         }
     }
@@ -338,7 +345,7 @@ fun TeacherReviewScreen(
                             enabled = state.busyLabel == null,
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.fillMaxWidth().height(44.dp)
-                        ) { Text("بستن بدون بازبینی (اعتبار برمی‌گردد)", color = MelovaError) }
+                        ) { Text("بستن بدون بازبینی", color = MelovaError) }
                     }
                 }
             }
@@ -364,7 +371,7 @@ fun TeacherReviewScreen(
     if (confirmDecline) {
         ConfirmDialog(
             title = "بستن بدون بازبینی؟",
-            message = "هنرجو اعتبارش را پس می‌گیرد. اگر متنی در کادر پاسخ نوشته‌اید، به‌عنوان توضیح برایش فرستاده می‌شود.",
+            message = "این اجرا بدون بازبینی بسته می‌شود. اگر متنی در کادر پاسخ نوشته‌اید، به‌عنوان توضیح برای هنرجو فرستاده می‌شود.",
             confirmLabel = "بستن",
             onConfirm = {
                 confirmDecline = false
@@ -400,22 +407,38 @@ fun TeacherStudentsScreen(
     lessons: List<Lesson>,
     onBack: () -> Unit
 ) {
-    LaunchedEffect(Unit) { viewModel.loadStudents() }
+    LaunchedEffect(Unit) {
+        viewModel.loadStudents()
+        viewModel.loadPurchaseRequests()
+    }
     var paying by remember { mutableStateOf<StudentCard?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     val shown = state.students.filter {
-        query.isBlank() || it.id.contains(query.trim(), ignoreCase = true) || it.name.contains(query.trim(), ignoreCase = true)
+        query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) ||
+            it.signedInAs?.contains(query.trim(), ignoreCase = true) == true
     }
 
     TeacherScaffold(title = "هنرجوها و پرداخت‌ها", subtitle = null, onBack = onBack, busyLabel = state.busyLabel) {
+        if (state.purchaseRequests.isNotEmpty()) {
+            item { SectionHeader(title = "خریدهای منتظر تأیید", trailing = "${state.purchaseRequests.size} خرید") }
+            items(state.purchaseRequests, key = { "request-" + it.id }) { request ->
+                PurchaseRequestCard(
+                    request = request,
+                    lessonTitle = lessons.firstOrNull { it.id == request.lessonId }?.title,
+                    busy = state.busyLabel != null,
+                    onDecide = { approve -> viewModel.decidePurchase(request.id, approve) }
+                )
+            }
+            item { SectionHeader(title = "هنرجوها") }
+        }
         item {
             Text(
-                text = "هنرجو کد هنرجویی‌اش را از صفحه‌ی «پروفایل» به شما می‌دهد. پس از دریافت مبلغ، اینجا پیدایش کنید و پرداخت را ثبت کنید تا درس یا بازبینی‌ها برایش باز شود.",
+                text = "اگر هنرجویی بیرون از اپ پرداخت کرده، اینجا پیدایش کنید و درس را برایش باز کنید.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MelovaTextMuted
             )
         }
-        item { MelovaTextField(value = query, onValueChange = { query = it }, label = "جستجو با کد یا نام") }
+        item { MelovaTextField(value = query, onValueChange = { query = it }, label = "جستجو با نام، شماره یا ایمیل") }
         if (state.isLoadingStudents && state.students.isEmpty()) {
             item { CenteredProgress() }
         } else if (shown.isEmpty()) {
@@ -426,9 +449,11 @@ fun TeacherStudentsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(student.name.ifBlank { "بی‌نام" }, style = MaterialTheme.typography.titleMedium, color = MelovaText)
-                        Text(student.id, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
+                        student.signedInAs?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
+                        }
                         Text(
-                            text = "${lessons.count { it.id in student.ownedLessons && !it.isFree }} درس پولی • ${student.reviewCredits} بازبینی",
+                            text = "${lessons.count { it.id in student.ownedLessons && !it.isFree }} درس پولی",
                             style = MaterialTheme.typography.bodySmall,
                             color = MelovaAccentSoft
                         )
@@ -444,11 +469,57 @@ fun TeacherStudentsScreen(
             student = student,
             paidLessons = lessons.filter { !it.isFree },
             busy = state.busyLabel != null,
-            onConfirm = { lessonId, reviews, price ->
-                viewModel.recordPayment(student.id, lessonId, reviews, price, onDone = { paying = null })
+            onConfirm = { lessonId, price ->
+                viewModel.recordPayment(student.id, lessonId, price, onDone = { paying = null })
             },
             onDismiss = { paying = null }
         )
+    }
+}
+
+/** A student says they paid by card: the teacher checks their account and answers here. */
+@Composable
+private fun PurchaseRequestCard(
+    request: LessonPurchaseRequest,
+    lessonTitle: String?,
+    busy: Boolean,
+    onDecide: (approve: Boolean) -> Unit
+) {
+    MelovaSurfaceCard(contentPadding = 14.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = request.studentName.ifBlank { request.signedInAs ?: "هنرجو" },
+                style = MaterialTheme.typography.titleMedium,
+                color = MelovaText
+            )
+            Text(
+                text = "${lessonTitle ?: "درس"}، ${formatToman(request.priceToman)}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MelovaAccentSoft
+            )
+            Text("نام واریزکننده: ${request.payer}", style = MaterialTheme.typography.bodySmall, color = MelovaText)
+            request.signedInAs?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
+            }
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = { onDecide(true) },
+                    enabled = !busy,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
+                    modifier = Modifier.weight(1f).height(44.dp)
+                ) { Text("تأیید و باز کردن درس") }
+                OutlinedButton(
+                    onClick = { onDecide(false) },
+                    enabled = !busy,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.height(44.dp)
+                ) { Text("پیدا نشد", color = MelovaError) }
+            }
+        }
     }
 }
 
@@ -457,23 +528,20 @@ private fun PaymentDialog(
     student: StudentCard,
     paidLessons: List<Lesson>,
     busy: Boolean,
-    onConfirm: (lessonId: String?, reviews: Int?, priceToman: Long) -> Unit,
+    onConfirm: (lessonId: String, priceToman: Long) -> Unit,
     onDismiss: () -> Unit
 ) {
     var lessonId by rememberSaveable { mutableStateOf<String?>(null) }
-    var reviewsText by rememberSaveable { mutableStateOf("") }
     var priceText by rememberSaveable { mutableStateOf("") }
     val lesson = paidLessons.firstOrNull { it.id == lessonId }
-    val reviews = parseWhole(reviewsText)?.toInt()
     val price = parseWhole(priceText)
-    val valid = (lesson != null || (reviews ?: 0) > 0) && price != null
 
     FormDialog(
-        title = "ثبت پرداخت برای ${student.name.ifBlank { student.id }}",
+        title = "ثبت پرداخت برای ${student.name.ifBlank { student.signedInAs ?: "هنرجو" }}",
         confirmLabel = "ثبت",
-        confirmEnabled = valid && !busy,
+        confirmEnabled = lesson != null && price != null && !busy,
         busy = busy,
-        onConfirm = { if (price != null) onConfirm(lesson?.id, reviews?.takeIf { it > 0 }, price) },
+        onConfirm = { if (lesson != null && price != null) onConfirm(lesson.id, price) },
         onDismiss = onDismiss
     ) {
         Text("کدام درس را خرید؟", style = MaterialTheme.typography.titleSmall, color = MelovaText)
@@ -501,11 +569,6 @@ private fun PaymentDialog(
                 }
             }
         }
-        MelovaTextField(
-            value = reviewsText,
-            onValueChange = { reviewsText = it.take(3) },
-            label = if (lesson != null) "بازبینی اضافه (خالی = ${lesson.includedReviews} بازبینی درس)" else "تعداد بازبینی"
-        )
         MelovaTextField(value = priceText, onValueChange = { priceText = it.take(12) }, label = "مبلغ دریافتی (تومان) *")
         price?.let { Text(formatToman(it), style = MaterialTheme.typography.bodySmall, color = MelovaAccentSoft) }
     }

@@ -1,6 +1,6 @@
 package app.melova.data.model
 
-/** The student's account: what they own and how many teacher reviews they have left. */
+/** The student's account and the lessons they have. */
 data class StudentAccount(
     val id: String,
     val name: String,
@@ -10,18 +10,18 @@ data class StudentAccount(
     val signedInAs: String?,
     /** Changes with the photo; null when there is none. */
     val photoVersion: Long?,
-    val ownedLessons: Set<String>,
-    /** Review credits left, by teacher id. */
-    val reviewCredits: Map<String, Int>
-) {
-    fun credits(teacherId: String): Int = reviewCredits[teacherId] ?: 0
-}
+    /** A teacher is an ordinary account that also has the teacher panel. */
+    val isTeacher: Boolean,
+    val ownedLessons: Set<String>
+)
 
 /** Which ways of signing in the server offers, narrowed to what this platform can do. */
 data class LoginMethods(
     val phone: Boolean,
     val email: Boolean,
-    val googleClientId: String?
+    val googleClientId: String?,
+    /** The server takes any number or email with no code, until real sign-in is set up. */
+    val isMock: Boolean = false
 ) {
     val any: Boolean
         get() = phone || email || googleClientId != null
@@ -35,7 +35,7 @@ enum class ReviewStatus {
     OPEN,
     ANSWERED,
 
-    /** The teacher closed it without a review; the credit came back. */
+    /** The teacher closed it without a review. */
     REFUNDED;
 
     companion object {
@@ -55,7 +55,6 @@ data class Review(
     /** True when the scorer itself asked for the teacher. */
     val isReferral: Boolean,
     val referralReasons: List<String>,
-    val charged: Boolean,
     val note: String,
     val status: ReviewStatus,
     val createdAtMs: Long,
@@ -80,9 +79,22 @@ data class ReviewAnalysis(
 data class StudentCard(
     val id: String,
     val name: String,
+    /** The phone or email they signed in with. */
+    val signedInAs: String?,
     val createdAtMs: Long,
-    val ownedLessons: Set<String>,
-    val reviewCredits: Int
+    val ownedLessons: Set<String>
+)
+
+/** A student who says they paid for a lesson by card, waiting for the teacher to find it. */
+data class LessonPurchaseRequest(
+    val id: String,
+    val lessonId: String,
+    val priceToman: Long,
+    /** The name on the payment. */
+    val payer: String,
+    val studentName: String,
+    val signedInAs: String?,
+    val createdAtMs: Long
 )
 
 /** Is the app worth the teacher's time? Net income per hour of their work. */

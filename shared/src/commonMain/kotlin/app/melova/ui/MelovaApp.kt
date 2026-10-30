@@ -72,10 +72,20 @@ fun MelovaApp(
     LaunchedEffect(studentState.accountRevision) {
         if (studentState.accountRevision > 0) catalogViewModel.refresh(silent = true)
     }
+    // A teacher is an ordinary account, so the panel opens and closes with it.
+    LaunchedEffect(studentState.account?.id, studentState.account?.isTeacher) {
+        teacherViewModel.onAccountChanged()
+    }
     LaunchedEffect(studentState.message) {
         studentState.message?.let {
             snackbarHostState.showSnackbar(it)
             studentViewModel.consumeMessage()
+        }
+    }
+    LaunchedEffect(catalogState.message) {
+        catalogState.message?.let {
+            snackbarHostState.showSnackbar(it)
+            catalogViewModel.consumeMessage()
         }
     }
     LaunchedEffect(deskState.message) {
@@ -135,9 +145,7 @@ fun MelovaApp(
                         catalogViewModel.refreshProgress()
                     },
                     onLessonClick = { navController.navigate(AppScreen.lesson(it)) },
-                    onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
                     onSolfegeClick = { navController.navigate(AppScreen.SOLFEGE) },
-                    onFollowChange = catalogViewModel::setFollowed,
                     onExploreClick = { selectTab(MainTab.EXPLORE) }
                 )
             }
@@ -145,6 +153,7 @@ fun MelovaApp(
             composable(AppScreen.EXPLORE, enterTransition = { fadeIn() }, exitTransition = { fadeOut() }) {
                 ExploreScreen(
                     state = catalogState,
+                    onLessonClick = { navController.navigate(AppScreen.lesson(it)) },
                     onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
                     onFollowChange = catalogViewModel::setFollowed,
                     onRetry = { catalogViewModel.refresh() }
@@ -152,17 +161,31 @@ fun MelovaApp(
             }
 
             composable(AppScreen.PROFILE, enterTransition = { fadeIn() }, exitTransition = { fadeOut() }) {
+                // Waits on needsLogin as the server's answer may arrive after the tap.
+                LaunchedEffect(studentState.needsLogin) {
+                    if (studentState.needsLogin && studentViewModel.takeLoginOffer()) {
+                        navController.navigate(AppScreen.login(LoginReason.PROFILE))
+                    }
+                }
                 ProfileScreen(
                     catalogState = catalogState,
                     teacherState = teacherState,
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
-                    onTeacherSignIn = teacherViewModel::signIn,
+                    onTeacherSignIn = { code ->
+                        if (studentState.account?.signedIn == true) {
+                            studentViewModel.sayITeach(code)
+                        } else {
+                            teacherViewModel.signIn(code)
+                        }
+                    },
                     onOpenTeacherPanel = { navController.navigate(AppScreen.TEACHER_PANEL) },
                     studentState = studentState,
                     onLogin = { navController.navigate(AppScreen.login(LoginReason.PROFILE)) },
                     onSignOut = studentViewModel::signOut,
                     onEditProfile = { navController.navigate(AppScreen.EDIT_PROFILE) },
+                    onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) },
+                    onExploreClick = { selectTab(MainTab.EXPLORE) },
                     onToggleReply = studentViewModel::toggleReply,
                     onStudentAppear = studentViewModel::refresh
                 )
@@ -208,9 +231,12 @@ fun MelovaApp(
                     onResume = catalogViewModel::refreshProgress,
                     isOwnTeacher = teacherState.isSignedIn &&
                         teacherState.profile?.id == catalogState.lesson(lessonId)?.teacherId,
-                    studentId = studentState.studentId,
                     loginRequired = studentState.needsLogin,
-                    onLogin = { navController.navigate(AppScreen.login(LoginReason.PURCHASE)) }
+                    isChangingLessons = studentState.isChangingLessons,
+                    onLogin = { navController.navigate(AppScreen.login(LoginReason.PURCHASE)) },
+                    onBuy = { payer -> studentViewModel.buyLesson(lessonId, payer) },
+                    onAddFree = { studentViewModel.addLesson(lessonId) },
+                    onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) }
                 )
             }
 
@@ -262,16 +288,19 @@ fun MelovaApp(
             }
 
             composable(AppScreen.TEACHER_PANEL) {
-                val ownId = teacherState.profile?.id
+                LaunchedEffect(Unit) { teacherDeskViewModel.loadPurchaseRequests() }
                 TeacherPanelScreen(
                     state = teacherState,
                     viewModel = teacherViewModel,
-                    isFollowingSelf = ownId != null && catalogState.isFollowed(ownId),
-                    onFollowSelfChange = { followed -> ownId?.let { catalogViewModel.setFollowed(it, followed) } },
+                    pendingPurchases = deskState.purchaseRequests.size,
                     onOpenLesson = { navController.navigate(AppScreen.lessonEditor(it)) },
                     onBack = { navController.popBackStack() },
                     onSignOut = {
-                        teacherViewModel.signOut()
+                        if (studentState.account?.signedIn == true) {
+                            studentViewModel.sayIDontTeach()
+                        } else {
+                            teacherViewModel.signOut()
+                        }
                         navController.popBackStack()
                     },
                     onOpenReviews = { navController.navigate(AppScreen.TEACHER_REVIEWS) },

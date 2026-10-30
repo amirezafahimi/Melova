@@ -39,10 +39,19 @@ class TeacherViewModel : ViewModel() {
         _uiState.update { TeacherUiState(revision = it.revision + 1) }
     }
 
+    /** Signing in or out, or saying they teach or don't, can open or close the panel. */
+    fun onAccountChanged() {
+        val isOpen = _uiState.value.isSignedIn
+        when {
+            repository.isSignedIn && !isOpen -> run(busyLabel = null) { repository.profile() }
+            !repository.isSignedIn && isOpen -> signOut()
+        }
+    }
+
     fun refresh() = run(busyLabel = null, changesCatalog = false) { repository.profile() }
 
-    fun updateProfile(name: String, bio: String) =
-        run("در حال ذخیره…") { repository.updateProfile(name, bio) }
+    fun updateProfile(name: String, bio: String, cardNumber: String, cardHolder: String) =
+        run("در حال ذخیره…") { repository.updateProfile(name, bio, cardNumber, cardHolder) }
 
     /** [onCreated] gets the new lesson's id, so the panel can open it right away. */
     fun createLesson(fields: LessonFields, onCreated: (String) -> Unit = {}) {
@@ -61,8 +70,8 @@ class TeacherViewModel : ViewModel() {
         run("در حال ذخیره…") { repository.updateLesson(lessonId, fields) }
 
     /** [priceToman] 0 makes the lesson free. */
-    fun setLessonSale(lessonId: String, bazaarSku: String, priceToman: Long, includedReviews: Int) =
-        run("در حال ذخیره قیمت…") { repository.setLessonSale(lessonId, bazaarSku, priceToman, includedReviews) }
+    fun setLessonSale(lessonId: String, bazaarSku: String, priceToman: Long) =
+        run("در حال ذخیره قیمت…") { repository.setLessonSale(lessonId, bazaarSku, priceToman) }
 
     fun deleteLesson(lessonId: String) = run("در حال حذف درس…") { repository.deleteLesson(lessonId) }
 

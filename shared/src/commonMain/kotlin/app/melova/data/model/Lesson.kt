@@ -1,6 +1,6 @@
 package app.melova.data.model
 
-/** A teacher as students see them; students follow teachers to get their lessons. */
+/** A teacher as students see them. Lessons are bought one by one; following only keeps a teacher close. */
 data class Teacher(
     val id: String,
     val name: String,
@@ -10,7 +10,9 @@ data class Teacher(
 /** Everything the student side shows: teachers with lessons, and those lessons. */
 data class Catalog(
     val teachers: List<Teacher> = emptyList(),
-    val lessons: List<Lesson> = emptyList()
+    val lessons: List<Lesson> = emptyList(),
+    /** Null when the catalog came without an account, as it can't say then. */
+    val followedTeacherIds: Set<String>? = null
 )
 
 /** A signed-in teacher's own view: their profile and every lesson, drafts included. */
@@ -18,8 +20,30 @@ data class TeacherProfile(
     val id: String,
     val name: String,
     val bio: String,
+    /** Where students pay for this teacher's lessons; empty until they set it. */
+    val cardNumber: String,
+    val cardHolder: String,
     val lessons: List<Lesson>
 )
+
+/** A card payment the student reported for a lesson, until the teacher confirms it. */
+enum class LessonPurchaseStatus {
+    PENDING,
+
+    /** The teacher couldn't find the payment; the student can try again. */
+    REJECTED;
+
+    companion object {
+        fun fromRaw(raw: String?): LessonPurchaseStatus? = when (raw) {
+            "pending" -> PENDING
+            "rejected" -> REJECTED
+            else -> null
+        }
+    }
+}
+
+/** The teacher's card, where a lesson is paid for. */
+data class LessonPayment(val cardNumber: String, val cardHolder: String)
 
 data class Lesson(
     val id: String,
@@ -40,10 +64,11 @@ data class Lesson(
     val priceToman: Long = 0L,
     /** Cafe Bazaar product id; empty for a free lesson. */
     val bazaarSku: String = "",
-    /** Teacher reviews that come with the lesson. */
-    val includedReviews: Int = 0,
-    /** Whether this student bought it; null when the server didn't say (no student account yet). */
-    val isOwned: Boolean? = null
+    /** Whether this student has it; null when the server didn't say (no student account yet). */
+    val isOwned: Boolean? = null,
+    val purchaseStatus: LessonPurchaseStatus? = null,
+    /** Null while the teacher has no card, and for a lesson that needs no paying. */
+    val payment: LessonPayment? = null
 ) {
     val isOpen: Boolean
         get() = isFree || isOwned == true

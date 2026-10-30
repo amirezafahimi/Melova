@@ -1,6 +1,7 @@
 package app.melova.data.repository
 
 import app.melova.data.local.TeacherSession
+import app.melova.data.model.LessonPurchaseRequest
 import app.melova.data.model.Review
 import app.melova.data.model.ReviewStatus
 import app.melova.data.model.StudentCard
@@ -9,6 +10,7 @@ import app.melova.data.remote.FilePart
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.api.TeacherDeskApi
 import app.melova.data.remote.apiCall
+import app.melova.data.remote.dto.LessonRequestDto
 import app.melova.data.remote.dto.StudentCardDto
 import app.melova.data.remote.writeAtomically
 import app.melova.platform.KeyValueStore
@@ -66,7 +68,7 @@ class TeacherDeskRepository(
         )
     }.toDomain() ?: throw IOException("پاسخ ثبت نشد.")
 
-    /** Close a take without reviewing it; the student gets the credit back. */
+    /** Close a take without reviewing it. */
     suspend fun decline(reviewId: String, text: String): Review =
         apiCall { api.decline(token(), reviewId, buildJsonObject { put("text", text.trim()) }) }.toDomain()
             ?: throw IOException("درخواست بسته نشد.")
@@ -74,19 +76,23 @@ class TeacherDeskRepository(
     suspend fun students(): List<StudentCard> =
         apiCall { api.students(token()) }.students.orEmpty().mapNotNull { it.toDomain() }
 
-    /**
-     * A payment taken outside the app. With a [lessonId] and no [reviews], the lesson's own
-     * included reviews are given.
-     */
-    suspend fun recordPayment(studentId: String, lessonId: String?, reviews: Int?, priceToman: Long): StudentCard {
+    /** Gives a student a lesson they paid for outside the app. */
+    suspend fun recordPayment(studentId: String, lessonId: String, priceToman: Long): StudentCard {
         val body = buildJsonObject {
-            if (lessonId != null) put("lesson_id", lessonId)
-            if (reviews != null) put("reviews", reviews)
+            put("lesson_id", lessonId)
             put("price_toman", priceToman)
         }
         return apiCall { api.recordPayment(token(), studentId, body) }.toDomain()
             ?: throw IOException("پرداخت ثبت نشد.")
     }
+
+    suspend fun purchaseRequests(): List<LessonPurchaseRequest> =
+        apiCall { api.purchaseRequests(token()) }.requests.orEmpty().mapNotNull { it.toDomain() }
+
+    /** Confirms or refuses a student's card payment; returns the requests still waiting. */
+    suspend fun decidePurchase(requestId: String, approve: Boolean): List<LessonPurchaseRequest> = apiCall {
+        if (approve) api.approvePurchase(token(), requestId) else api.rejectPurchase(token(), requestId)
+    }.requests.orEmpty().mapNotNull { it.toDomain() }
 
     /** [kind] prep, support or admin: time outside reviews, so the report sees all of it. */
     suspend fun logTime(minutes: Double, kind: String, note: String) = apiCall {
@@ -131,8 +137,21 @@ private fun StudentCardDto.toDomain(): StudentCard? {
     return StudentCard(
         id = studentId,
         name = name.orEmpty(),
+        signedInAs = signedInAs?.takeIf { it.isNotBlank() },
         createdAtMs = ((createdAt ?: 0.0) * 1000).toLong(),
-        ownedLessons = ownedLessons.orEmpty().toSet(),
-        reviewCredits = reviewCredits ?: 0
+        ownedLessons = ownedLessons.orEmpty().toSet()
+    )
+}
+
+private fun LessonRequestDto.toDomain(): LessonPurchaseRequest? {
+    val requestId = id?.takeIf { it.isNotBlank() } ?: return null
+    return LessonPurchaseRequest(
+        id = requestId,
+        lessonId = lessonId.orEmpty(),
+        priceToman = priceToman ?: 0L,
+        payer = payer.orEmpty(),
+        studentName = studentName.orEmpty(),
+        signedInAs = signedInAs?.takeIf { it.isNotBlank() },
+        createdAtMs = ((createdAt ?: 0.0) * 1000).toLong()
     )
 }

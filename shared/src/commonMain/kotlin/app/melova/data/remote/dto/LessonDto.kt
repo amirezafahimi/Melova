@@ -6,7 +6,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CatalogResponseDto(
     @SerialName("teachers") val teachers: List<TeacherDto>?,
-    @SerialName("lessons") val lessons: List<LessonDto>?
+    @SerialName("lessons") val lessons: List<LessonDto>?,
+    @SerialName("followed_teachers") val followedTeachers: List<String>? = null
 )
 
 @Serializable
@@ -21,6 +22,8 @@ data class TeacherProfileDto(
     @SerialName("id") val id: String?,
     @SerialName("name") val name: String?,
     @SerialName("bio") val bio: String?,
+    @SerialName("card_number") val cardNumber: String? = null,
+    @SerialName("card_holder") val cardHolder: String? = null,
     @SerialName("lessons") val lessons: List<LessonDto>?
 )
 
@@ -40,8 +43,15 @@ data class LessonDto(
     @SerialName("is_free") val isFree: Boolean? = null,
     @SerialName("price_toman") val priceToman: Long? = null,
     @SerialName("bazaar_sku") val bazaarSku: String? = null,
-    @SerialName("included_reviews") val includedReviews: Int? = null,
-    @SerialName("is_owned") val isOwned: Boolean? = null
+    @SerialName("is_owned") val isOwned: Boolean? = null,
+    @SerialName("purchase_status") val purchaseStatus: String? = null,
+    @SerialName("payment") val payment: LessonPaymentDto? = null
+)
+
+@Serializable
+data class LessonPaymentDto(
+    @SerialName("card_number") val cardNumber: String?,
+    @SerialName("card_holder") val cardHolder: String?
 )
 
 @Serializable

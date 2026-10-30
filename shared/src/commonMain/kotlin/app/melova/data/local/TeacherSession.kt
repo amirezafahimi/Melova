@@ -4,7 +4,10 @@ import app.melova.platform.KeyValueStore
 import app.melova.platform.PlatformContext
 
 
-/** The teacher code entered in the profile tab; its presence means teacher mode is on. */
+/**
+ * What opens the teacher panel; its presence means teacher mode is on. It's the session of
+ * a signed-in teacher, or the teacher code where students can't sign in yet.
+ */
 class TeacherSession(context: PlatformContext) {
     private val prefs = KeyValueStore(context, "melova_teacher")
 

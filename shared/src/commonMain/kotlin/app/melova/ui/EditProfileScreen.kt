@@ -54,7 +54,7 @@ import app.melova.ui.theme.MelovaTextMuted
 
 private const val MAX_NAME_LENGTH = 60
 
-/** The student's name and photo. A guest can set them too; they carry over on signing in. */
+/** The student's name and photo. Once the server offers sign-in, the profile asks for that first. */
 @Composable
 fun EditProfileScreen(
     state: StudentUiState,

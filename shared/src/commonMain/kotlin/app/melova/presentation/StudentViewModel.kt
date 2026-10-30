@@ -24,7 +24,7 @@ class StudentViewModel : ViewModel() {
     private val repository = StudentRepository(appContext)
     private val player = ReferenceAudioPlayer(appContext)
 
-    private val _uiState = MutableStateFlow(StudentUiState(studentId = repository.studentId))
+    private val _uiState = MutableStateFlow(StudentUiState())
     val uiState: StateFlow<StudentUiState> = _uiState.asStateFlow()
 
     /** The version of the photo in the state, so each one is fetched once. */
@@ -50,7 +50,6 @@ class StudentViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        studentId = account.id,
                         account = account,
                         reviews = reviews,
                         accountRevision = if (created) it.accountRevision + 1 else it.accountRevision
@@ -69,6 +68,10 @@ class StudentViewModel : ViewModel() {
 
     fun removePhoto() = saveProfile { repository.removePhoto() }
 
+    fun sayITeach(code: String) = saveProfile { repository.sayITeach(code) }
+
+    fun sayIDontTeach() = saveProfile { repository.sayIDontTeach() }
+
     private fun saveProfile(save: suspend () -> StudentAccount) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSavingProfile = true) }
@@ -83,6 +86,39 @@ class StudentViewModel : ViewModel() {
         }
     }
 
+    /** Adds a free lesson to the student's lessons. */
+    fun addLesson(lessonId: String) = changeLessons("این درس به درس‌های شما اضافه شد.") {
+        repository.claimFreeLesson(lessonId)
+    }
+
+    /** The student paid for a lesson by card, under the name [payer]. */
+    fun buyLesson(lessonId: String, payer: String) =
+        changeLessons("پرداخت ثبت شد. بعد از تأیید استاد، درس باز می‌شود.") {
+            repository.requestLesson(lessonId, payer)
+        }
+
+    private fun changeLessons(done: String, change: suspend () -> StudentAccount) {
+        if (_uiState.value.isChangingLessons) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isChangingLessons = true) }
+            runCatching {
+                repository.ensureAccount()
+                change()
+            }.onSuccess { account ->
+                _uiState.update {
+                    it.copy(
+                        account = account,
+                        isChangingLessons = false,
+                        message = done,
+                        accountRevision = it.accountRevision + 1
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update { it.copy(isChangingLessons = false, message = error.message ?: "انجام نشد.") }
+            }
+        }
+    }
+
     /** Offline it stays as it was, and the next refresh tries again. */
     private suspend fun loadPhoto(account: StudentAccount) {
         if (account.photoVersion == shownPhotoVersion) return
@@ -91,10 +127,13 @@ class StudentViewModel : ViewModel() {
         _uiState.update { it.copy(photo = photo) }
     }
 
+    /** True once per install: a guest's first visit to the profile opens on sign-in. */
+    fun takeLoginOffer(): Boolean = repository.takeLoginOffer()
+
     /** Sign-in gave this install another account, with its own lessons and replies. */
     fun onSignedIn(account: StudentAccount) {
         _uiState.update {
-            it.copy(studentId = account.id, account = account, accountRevision = it.accountRevision + 1)
+            it.copy(account = account, accountRevision = it.accountRevision + 1)
         }
         refresh()
     }
@@ -107,7 +146,6 @@ class StudentViewModel : ViewModel() {
             shownPhotoVersion = null
             _uiState.update {
                 it.copy(
-                    studentId = null,
                     account = null,
                     photo = null,
                     reviews = emptyList(),
@@ -155,8 +193,6 @@ class StudentViewModel : ViewModel() {
 }
 
 data class StudentUiState(
-    /** Shown to the student so the teacher can find them when they pay directly. */
-    val studentId: String? = null,
     val account: StudentAccount? = null,
     /** The student's photo as an encoded image. */
     val photo: ByteArray? = null,
@@ -165,6 +201,7 @@ data class StudentUiState(
     val reviews: List<Review> = emptyList(),
     val isLoading: Boolean = false,
     val isSavingProfile: Boolean = false,
+    val isChangingLessons: Boolean = false,
     val loadError: String? = null,
     val playingReviewId: String? = null,
     val loadingReviewId: String? = null,
@@ -174,9 +211,6 @@ data class StudentUiState(
     /** Answers the student hasn't necessarily seen: the newest few answered reviews. */
     val answeredCount: Int
         get() = reviews.count { it.status != app.melova.data.model.ReviewStatus.OPEN }
-
-    val reviewCredits: Int
-        get() = account?.reviewCredits?.values?.sum() ?: 0
 
     /** Buying and sending to a teacher take a real account, once the server offers a way in. */
     val needsLogin: Boolean

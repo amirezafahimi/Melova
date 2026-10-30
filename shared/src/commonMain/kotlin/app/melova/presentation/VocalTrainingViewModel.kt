@@ -19,7 +19,6 @@ import app.melova.data.local.PracticeProgressStore
 import app.melova.data.repository.LessonRepository
 import app.melova.data.repository.RemoteLessonRepository
 import app.melova.data.repository.StudentRepository
-import app.melova.data.remote.ApiException
 import app.melova.data.repository.VocalScoringRepository
 import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.playback.TeacherVocalGenerator
@@ -59,9 +58,6 @@ class VocalTrainingViewModel(
 
     private val userRecordingFile =
         LocalFile(cacheDir(appContext), USER_RECORDING_FILE_NAME)
-
-    @Volatile
-    private var lessonTeacherId: String = ""
 
     @Volatile
     private var lastRecordingDurationMs: Long = 0L
@@ -110,8 +106,7 @@ class VocalTrainingViewModel(
                         description = section.description
                     )
                 }
-                lessonTeacherId = remoteLesson.teacherId
-                // A free lesson is claimed once so its reviews are on the student's account.
+                // Singing in a free lesson adds it to the student's lessons.
                 if (remoteLesson.isFree && remoteLesson.isOwned == false) claimFreeLesson()
                 Triple(remoteLesson.title, prepared, withContext(ioDispatcher) {
                     WaveformPeaksExtractor.fromWavFile(prepared.referenceFile)
@@ -503,25 +498,11 @@ class VocalTrainingViewModel(
             runCatching {
                 studentRepository.ensureAccount()
                 studentRepository.sendForReview(lessonId, sectionId, userRecordingFile, note, score)
-            }.onSuccess { account ->
-                _uiState.update {
-                    it.copy(
-                        teacherAsk = TeacherAskState(
-                            isSent = true,
-                            creditsLeft = account.credits(lessonTeacherId),
-                            studentId = account.id
-                        )
-                    )
-                }
+            }.onSuccess {
+                _uiState.update { it.copy(teacherAsk = TeacherAskState(isSent = true)) }
             }.onFailure { error ->
                 _uiState.update {
-                    it.copy(
-                        teacherAsk = TeacherAskState(
-                            error = error.message ?: "ارسال ممکن نشد.",
-                            needsCredit = (error as? ApiException)?.code == 402,
-                            studentId = studentRepository.studentId
-                        )
-                    )
+                    it.copy(teacherAsk = TeacherAskState(error = error.message ?: "ارسال ممکن نشد."))
                 }
             }
         }
@@ -1062,9 +1043,5 @@ data class VocalTrainingUiState(
 data class TeacherAskState(
     val isSending: Boolean = false,
     val isSent: Boolean = false,
-    val error: String? = null,
-    /** The server said no credit or no lesson: the student pays the teacher, who adds it. */
-    val needsCredit: Boolean = false,
-    val creditsLeft: Int? = null,
-    val studentId: String? = null
+    val error: String? = null
 )

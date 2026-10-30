@@ -19,9 +19,8 @@ data class StudentMeDto(
     @SerialName("signed_in_as") val signedInAs: String? = null,
     /** Changes with the photo; null when there is none. */
     @SerialName("photo_version") val photoVersion: Long? = null,
+    @SerialName("is_teacher") val isTeacher: Boolean? = null,
     @SerialName("owned_lessons") val ownedLessons: List<String>?,
-    /** Review credits left, by teacher id. */
-    @SerialName("review_credits") val reviewCredits: Map<String, Int>?,
     @SerialName("review") val review: ReviewDto? = null,
     /** Sign-in calls only: the token that replaces this install's old one. */
     @SerialName("token") val token: String? = null
@@ -32,7 +31,8 @@ data class StudentMeDto(
 data class LoginMethodsDto(
     @SerialName("phone") val phone: Boolean?,
     @SerialName("email") val email: Boolean?,
-    @SerialName("google_client_id") val googleClientId: String?
+    @SerialName("google_client_id") val googleClientId: String?,
+    @SerialName("mock") val mock: Boolean?
 )
 
 @Serializable
@@ -54,7 +54,6 @@ data class ReviewDto(
     @SerialName("section_id") val sectionId: String?,
     @SerialName("reason") val reason: String?,
     @SerialName("auto_reasons") val autoReasons: List<String>?,
-    @SerialName("charged") val charged: Boolean?,
     @SerialName("note") val note: String?,
     @SerialName("status") val status: String?,
     @SerialName("created_at") val createdAt: Double?,
@@ -81,14 +80,35 @@ data class ReviewAnalysisDto(
 data class StudentCardDto(
     @SerialName("id") val id: String?,
     @SerialName("name") val name: String?,
+    @SerialName("signed_in_as") val signedInAs: String? = null,
     @SerialName("created_at") val createdAt: Double?,
-    @SerialName("owned_lessons") val ownedLessons: List<String>?,
-    @SerialName("review_credits") val reviewCredits: Int?
+    @SerialName("owned_lessons") val ownedLessons: List<String>?
 )
 
 @Serializable
 data class StudentsDto(
     @SerialName("students") val students: List<StudentCardDto>?
+)
+
+@Serializable
+data class LessonRequestDto(
+    @SerialName("id") val id: String?,
+    @SerialName("lesson_id") val lessonId: String?,
+    @SerialName("price_toman") val priceToman: Long?,
+    @SerialName("payer") val payer: String?,
+    @SerialName("student_name") val studentName: String?,
+    @SerialName("signed_in_as") val signedInAs: String? = null,
+    @SerialName("created_at") val createdAt: Double?
+)
+
+@Serializable
+data class FollowsDto(
+    @SerialName("followed_teachers") val followedTeachers: List<String>?
+)
+
+@Serializable
+data class LessonRequestsDto(
+    @SerialName("requests") val requests: List<LessonRequestDto>?
 )
 
 @Serializable

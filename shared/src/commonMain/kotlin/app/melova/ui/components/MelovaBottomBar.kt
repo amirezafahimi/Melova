@@ -21,10 +21,9 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -85,8 +84,8 @@ fun MelovaBottomBar(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 SideTab(
-                    label = "اساتید",
-                    icon = if (selected == MainTab.EXPLORE) Icons.Filled.Explore else Icons.Outlined.Explore,
+                    label = "جستجو",
+                    icon = Icons.Filled.Search,
                     selected = selected == MainTab.EXPLORE,
                     onClick = { onSelect(MainTab.EXPLORE) },
                     modifier = Modifier.weight(1f)

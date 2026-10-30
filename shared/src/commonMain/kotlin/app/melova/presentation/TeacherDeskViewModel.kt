@@ -5,6 +5,7 @@ import app.melova.platform.appContext
 import app.melova.platform.LocalFile
 import androidx.lifecycle.viewModelScope
 import app.melova.audio.playback.ReferenceAudioPlayer
+import app.melova.data.model.LessonPurchaseRequest
 import app.melova.data.model.Review
 import app.melova.data.model.ReviewStatus
 import app.melova.data.model.StudentCard
@@ -112,7 +113,7 @@ class TeacherDeskViewModel : ViewModel() {
                     current = closed,
                     reviews = state.reviews.filterNot { it.id == closed.id && state.filter == ReviewStatus.OPEN }
                         .map { if (it.id == closed.id) closed else it },
-                    message = "بسته شد و اعتبار هنرجو برگشت."
+                    message = "بسته شد."
                 )
             }
         }
@@ -129,14 +130,34 @@ class TeacherDeskViewModel : ViewModel() {
         }
     }
 
-    /** A card-to-card payment: opens [lessonId] and/or adds [reviews] for the student. */
-    fun recordPayment(studentId: String, lessonId: String?, reviews: Int?, priceToman: Long, onDone: () -> Unit) =
+    /** Opens [lessonId] for a student who paid outside the app. */
+    fun recordPayment(studentId: String, lessonId: String, priceToman: Long, onDone: () -> Unit) =
         run("در حال ثبت پرداخت…", onDone) {
-            val updated = repository.recordPayment(studentId, lessonId, reviews, priceToman)
+            val updated = repository.recordPayment(studentId, lessonId, priceToman)
             _uiState.update { state ->
                 state.copy(
                     students = state.students.map { if (it.id == updated.id) updated else it },
-                    message = "پرداخت ثبت شد."
+                    message = "درس برای هنرجو باز شد."
+                )
+            }
+            loadPurchaseRequests()
+        }
+
+    fun loadPurchaseRequests() {
+        viewModelScope.launch {
+            runCatching { repository.purchaseRequests() }
+                .onSuccess { requests -> _uiState.update { it.copy(purchaseRequests = requests) } }
+        }
+    }
+
+    /** Confirming opens the lesson for the student; refusing tells them to check their payment. */
+    fun decidePurchase(requestId: String, approve: Boolean) =
+        run(if (approve) "در حال تأیید پرداخت…" else "در حال رد پرداخت…", onDone = ::loadStudents) {
+            val waiting = repository.decidePurchase(requestId, approve)
+            _uiState.update {
+                it.copy(
+                    purchaseRequests = waiting,
+                    message = if (approve) "درس برای هنرجو باز شد." else "به هنرجو گفته شد پرداختش پیدا نشد."
                 )
             }
         }
@@ -200,6 +221,7 @@ data class TeacherDeskUiState(
     val isLoadingTake: Boolean = false,
     val students: List<StudentCard> = emptyList(),
     val isLoadingStudents: Boolean = false,
+    val purchaseRequests: List<LessonPurchaseRequest> = emptyList(),
     val report: TeacherReport? = null,
     val isLoadingReport: Boolean = false,
     val privateHourlyRateToman: Long? = null,

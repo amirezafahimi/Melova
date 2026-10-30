@@ -38,8 +38,12 @@ class TeacherRepository(
 
     suspend fun profile() = call { api.me(token()) }
 
-    suspend fun updateProfile(name: String, bio: String) =
-        call { api.updateMe(token(), mapOf("name" to name, "bio" to bio)) }
+    suspend fun updateProfile(name: String, bio: String, cardNumber: String, cardHolder: String) = call {
+        api.updateMe(
+            token(),
+            mapOf("name" to name, "bio" to bio, "card_number" to cardNumber, "card_holder" to cardHolder)
+        )
+    }
 
     suspend fun createLesson(fields: LessonFields) = call { api.createLesson(token(), fields.toMap()) }
 
@@ -49,8 +53,8 @@ class TeacherRepository(
     suspend fun setLessonPublished(lessonId: String, published: Boolean) =
         call { api.updateLesson(token(), lessonId, buildJsonObject { put("published", published) }) }
 
-    /** An empty [bazaarSku] makes the lesson free; [includedReviews] come with it either way. */
-    suspend fun setLessonSale(lessonId: String, bazaarSku: String, priceToman: Long, includedReviews: Int) =
+    /** With no [bazaarSku] and no [priceToman], the lesson is free. */
+    suspend fun setLessonSale(lessonId: String, bazaarSku: String, priceToman: Long) =
         call {
             api.updateLesson(
                 token(),
@@ -58,7 +62,6 @@ class TeacherRepository(
                 buildJsonObject {
                     put("bazaar_sku", JsonPrimitive(bazaarSku.trim()))
                     put("price_toman", priceToman)
-                    put("included_reviews", includedReviews)
                 }
             )
         }

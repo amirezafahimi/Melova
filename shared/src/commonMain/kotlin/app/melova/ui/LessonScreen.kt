@@ -1,6 +1,7 @@
 package app.melova.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -91,10 +92,14 @@ fun LessonScreen(
     onResume: () -> Unit,
     /** Signed in as this lesson's teacher: a paid lesson is open to them. */
     isOwnTeacher: Boolean = false,
-    studentId: String? = null,
     /** Buying a lesson takes a signed-in account. */
     loginRequired: Boolean = false,
+    /** A purchase or an added lesson is on its way to the server. */
+    isChangingLessons: Boolean = false,
     onLogin: () -> Unit = {},
+    onBuy: (payer: String) -> Unit = {},
+    onAddFree: () -> Unit = {},
+    onTeacherClick: (String) -> Unit = {},
     introViewModel: LessonIntroViewModel = viewModel { LessonIntroViewModel(createSavedStateHandle()) }
 ) {
     val introState by introViewModel.uiState.collectAsStateWithLifecycle()
@@ -133,9 +138,13 @@ fun LessonScreen(
                     return@LazyColumn
                 }
 
-                item { LessonHero(lesson) }
+                item { LessonHero(lesson, onTeacherClick = { onTeacherClick(lesson.teacherId) }) }
                 val locked = !lesson.isOpen && !isOwnTeacher
-                if (locked) item { LockedLessonCard(lesson, studentId, loginRequired, onLogin) }
+                if (locked) {
+                    item { LessonPurchaseCard(lesson, loginRequired, isChangingLessons, onLogin, onBuy) }
+                } else if (lesson.isFree && lesson.isOwned == false && !isOwnTeacher) {
+                    item { FreeLessonCard(isChangingLessons, onAddFree) }
+                }
                 item {
                     IntroPlayerCard(
                         state = introState,
@@ -168,7 +177,7 @@ fun LessonScreen(
 }
 
 @Composable
-private fun LessonHero(lesson: Lesson) {
+private fun LessonHero(lesson: Lesson, onTeacherClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (lesson.level.isNotBlank()) MelovaChip(text = lesson.level)
@@ -183,6 +192,10 @@ private fun LessonHero(lesson: Lesson) {
         }
         if (lesson.teacher.isNotBlank()) {
             Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onTeacherClick)
+                    .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -193,6 +206,12 @@ private fun LessonHero(lesson: Lesson) {
                     modifier = Modifier.size(18.dp)
                 )
                 Text(text = lesson.teacher, style = MaterialTheme.typography.labelLarge, color = MelovaAccentSoft)
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MelovaAccentSoft,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
         if (lesson.description.isNotBlank()) {

@@ -2,6 +2,8 @@ package app.melova.data.remote.mapper
 
 import app.melova.data.model.Catalog
 import app.melova.data.model.Lesson
+import app.melova.data.model.LessonPayment
+import app.melova.data.model.LessonPurchaseStatus
 import app.melova.data.model.LessonSection
 import app.melova.data.model.Teacher
 import app.melova.data.model.TeacherProfile
@@ -14,13 +16,16 @@ fun CatalogResponseDto.toDomain(): Catalog = Catalog(
         val teacherId = dto.id?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         Teacher(id = teacherId, name = dto.name.orEmpty(), bio = dto.bio.orEmpty())
     },
-    lessons = lessons.orEmpty().mapNotNull { it.toDomain() }
+    lessons = lessons.orEmpty().mapNotNull { it.toDomain() },
+    followedTeacherIds = followedTeachers?.toSet()
 )
 
 fun TeacherProfileDto.toDomain(): TeacherProfile = TeacherProfile(
     id = id.orEmpty(),
     name = name.orEmpty(),
     bio = bio.orEmpty(),
+    cardNumber = cardNumber.orEmpty(),
+    cardHolder = cardHolder.orEmpty(),
     lessons = lessons.orEmpty().mapNotNull { it.toDomain() }
 )
 
@@ -40,8 +45,11 @@ private fun LessonDto.toDomain(): Lesson? {
         isFree = isFree != false,
         priceToman = priceToman ?: 0L,
         bazaarSku = bazaarSku.orEmpty(),
-        includedReviews = includedReviews ?: 0,
         isOwned = isOwned,
+        purchaseStatus = LessonPurchaseStatus.fromRaw(purchaseStatus),
+        payment = payment?.cardNumber?.takeIf { it.isNotBlank() }?.let {
+            LessonPayment(cardNumber = it, cardHolder = payment.cardHolder.orEmpty())
+        },
         sections = sections.orEmpty().mapNotNull { dto ->
             val sectionId = dto.id?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             LessonSection(

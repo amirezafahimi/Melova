@@ -45,6 +45,16 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    /** For the server's mock login, which has no code to wait for. */
+    fun signInWithoutCode() {
+        val state = _uiState.value
+        if (state.address.isBlank()) return
+        attempt {
+            val account = repository.verifyLoginCode(state.channel, state.address, code = "")
+            _uiState.update { it.copy(signedIn = account) }
+        }
+    }
+
     /** Accepts Persian digits and a pasted code; the last digit submits it. */
     fun setCode(text: String) {
         val code = digitsOnly(text).take(LOGIN_CODE_LENGTH)

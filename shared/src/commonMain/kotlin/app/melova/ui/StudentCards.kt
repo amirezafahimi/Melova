@@ -1,6 +1,7 @@
 package app.melova.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -11,9 +12,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -36,14 +38,16 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import app.melova.data.model.Lesson
+import app.melova.data.model.LessonPayment
+import app.melova.data.model.LessonPurchaseStatus
 import app.melova.data.model.Review
 import app.melova.data.model.ReviewStatus
-import app.melova.presentation.StudentUiState
 import app.melova.presentation.TeacherAskState
 import app.melova.ui.components.FormDialog
 import app.melova.ui.components.MelovaChip
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTextField
+import app.melova.ui.layout.LtrContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaError
 import app.melova.ui.theme.MelovaGold
@@ -59,7 +63,7 @@ internal fun formatToman(amount: Long): String =
 
 /**
  * Under the score: send this take to the teacher. When the scorer itself wasn't sure
- * ([referralReasons] not empty) the card leads with that, and the review is free.
+ * ([referralReasons] not empty) the card leads with that.
  */
 @Composable
 internal fun AskTeacherCard(
@@ -107,10 +111,9 @@ internal fun AskTeacherCard(
                     )
                     Text(
                         text = when {
-                            state.isSent -> "پاسخ استاد در صفحه‌ی «پروفایل» می‌آید." +
-                                (state.creditsLeft?.let { " بازبینی باقی‌مانده: $it" } ?: "")
-                            isReferral -> "تحلیل خودکار درباره‌ی این اجرا مطمئن نیست؛ ارسالش برای استاد رایگان است."
-                            else -> "همین اجرا را برای استاد بفرستید تا خودش گوش دهد و پاسخ بدهد. یک بازبینی از اعتبار شما کم می‌شود."
+                            state.isSent -> "پاسخ استاد در صفحه‌ی «پروفایل» می‌آید."
+                            isReferral -> "تحلیل خودکار درباره‌ی این اجرا مطمئن نیست."
+                            else -> "همین اجرا را برای استاد بفرستید تا خودش گوش دهد و پاسخ بدهد."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MelovaTextMuted
@@ -124,14 +127,6 @@ internal fun AskTeacherCard(
             }
             state.error?.let { error ->
                 Text(error, style = MaterialTheme.typography.bodySmall, color = MelovaError)
-                if (state.needsCredit) {
-                    Text(
-                        text = "برای خرید بازبینی، کد هنرجویی خود را به استاد بدهید تا پس از پرداخت برایتان ثبت کند.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MelovaTextMuted
-                    )
-                    state.studentId?.let { StudentCodeRow(it) }
-                }
             }
             if (!state.isSent) {
                 Button(
@@ -152,7 +147,7 @@ internal fun AskTeacherCard(
                         CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                         Text("  در حال ارسال…")
                     } else {
-                        Text(if (isReferral) "ارسال رایگان برای استاد" else "ارسال برای استاد")
+                        Text("ارسال برای استاد")
                     }
                 }
             }
@@ -186,17 +181,133 @@ internal fun AskTeacherCard(
     }
 }
 
-/** The student's code, to give the teacher when paying by card; tap to copy. */
+/** A paid lesson this student doesn't have yet: they pay by card and the teacher opens it. */
 @Composable
-internal fun StudentCodeRow(studentId: String) {
+internal fun LessonPurchaseCard(
+    lesson: Lesson,
+    loginRequired: Boolean,
+    isBusy: Boolean,
+    onLogin: () -> Unit,
+    onBuy: (payer: String) -> Unit
+) {
+    var paying by rememberSaveable { mutableStateOf(false) }
+    val status = lesson.purchaseStatus
+    MelovaSurfaceCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(
+                    imageVector = if (status == LessonPurchaseStatus.PENDING) Icons.Outlined.HourglassTop else Icons.Outlined.ShoppingBag,
+                    contentDescription = null,
+                    tint = MelovaGold,
+                    modifier = Modifier.size(28.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = when (status) {
+                            LessonPurchaseStatus.PENDING -> "پرداخت شما ثبت شد"
+                            LessonPurchaseStatus.REJECTED -> "استاد پرداخت شما را پیدا نکرد"
+                            null -> "خرید این درس"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MelovaText
+                    )
+                    if (lesson.priceToman > 0) {
+                        Text(formatToman(lesson.priceToman), style = MaterialTheme.typography.bodyMedium, color = MelovaSecondary)
+                    }
+                }
+            }
+            Text(
+                text = when {
+                    status == LessonPurchaseStatus.PENDING -> "استاد پرداخت را بررسی می‌کند و بعد از تأیید، درس باز می‌شود."
+                    status == LessonPurchaseStatus.REJECTED -> "اگر مبلغ را واریز کرده‌اید، نام واریزکننده را بررسی کنید و دوباره ثبت کنید."
+                    lesson.payment == null && !loginRequired -> "فروش این درس هنوز شروع نشده است."
+                    else -> "با خرید، همه‌ی بخش‌ها برای همیشه باز می‌شود و می‌توانید تمرینتان را برای استاد بفرستید."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MelovaTextMuted
+            )
+            when {
+                status == LessonPurchaseStatus.PENDING -> Unit
+                loginRequired -> Button(
+                    onClick = onLogin,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
+                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                ) { Text("ورود برای خرید درس") }
+                lesson.payment != null -> Button(
+                    onClick = { paying = true },
+                    enabled = !isBusy,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
+                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                ) { Text(if (status == LessonPurchaseStatus.REJECTED) "ثبت دوباره‌ی پرداخت" else "خرید درس") }
+            }
+        }
+    }
+
+    if (paying && lesson.payment != null) {
+        PayByCardDialog(
+            lesson = lesson,
+            payment = lesson.payment,
+            onConfirm = { payer ->
+                paying = false
+                onBuy(payer)
+            },
+            onDismiss = { paying = false }
+        )
+    }
+}
+
+@Composable
+private fun PayByCardDialog(
+    lesson: Lesson,
+    payment: LessonPayment,
+    onConfirm: (payer: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var payer by rememberSaveable { mutableStateOf("") }
+    FormDialog(
+        title = "خرید «${lesson.title}»",
+        confirmLabel = "پرداخت کردم",
+        confirmEnabled = payer.isNotBlank(),
+        onConfirm = { onConfirm(payer) },
+        onDismiss = onDismiss
+    ) {
+        Text(
+            text = "مبلغ را به کارت استاد واریز کنید و نام واریزکننده را بنویسید تا استاد پرداخت را پیدا کند.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MelovaTextMuted
+        )
+        if (lesson.priceToman > 0) {
+            Text(formatToman(lesson.priceToman), style = MaterialTheme.typography.titleMedium, color = MelovaSecondary)
+        }
+        CardNumberRow(payment.cardNumber)
+        if (payment.cardHolder.isNotBlank()) {
+            Text("به نام ${payment.cardHolder}", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
+        }
+        MelovaTextField(value = payer, onValueChange = { payer = it.take(120) }, label = "نام واریزکننده")
+    }
+}
+
+/** Tap to copy; the digits read left to right whatever the screen's direction. */
+@Composable
+private fun CardNumberRow(cardNumber: String) {
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("کد هنرجویی:", style = MaterialTheme.typography.bodyMedium, color = MelovaTextMuted)
-        Text(studentId, style = MaterialTheme.typography.titleSmall, color = MelovaText, modifier = Modifier.weight(1f))
+        Box(modifier = Modifier.weight(1f)) {
+            LtrContent {
+                Text(
+                    text = cardNumber.chunked(4).joinToString(" "),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MelovaText,
+                    maxLines = 1
+                )
+            }
+        }
         OutlinedButton(
             onClick = {
-                clipboard.setText(AnnotatedString(studentId))
+                clipboard.setText(AnnotatedString(cardNumber))
                 copied = true
             },
             shape = RoundedCornerShape(999.dp),
@@ -209,47 +320,25 @@ internal fun StudentCodeRow(studentId: String) {
     }
 }
 
-/** A paid lesson this student hasn't bought yet. */
+/** A free lesson not yet in the student's list. Singing in it adds it as well. */
 @Composable
-internal fun LockedLessonCard(lesson: Lesson, studentId: String?, loginRequired: Boolean = false, onLogin: () -> Unit = {}) {
-    MelovaSurfaceCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Outlined.Lock, contentDescription = null, tint = MelovaGold, modifier = Modifier.size(28.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("این درس پولی است", style = MaterialTheme.typography.titleMedium, color = MelovaText)
-                    Text(
-                        text = buildString {
-                            if (lesson.priceToman > 0) append("قیمت: ${formatToman(lesson.priceToman)}")
-                            if (lesson.includedReviews > 0) {
-                                if (isNotEmpty()) append(" • ")
-                                append("همراه با ${lesson.includedReviews} بازبینی استاد")
-                            }
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MelovaSecondary
-                    )
-                }
+internal fun FreeLessonCard(isBusy: Boolean, onAdd: () -> Unit) {
+    MelovaSurfaceCard(contentPadding = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("این درس رایگان است", style = MaterialTheme.typography.titleSmall, color = MelovaText)
+                Text(
+                    text = "اضافه کنید تا در صفحه‌ی تمرین بماند.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MelovaTextMuted
+                )
             }
-            Text(
-                text = if (loginRequired) {
-                    "برای خرید اول وارد حساب خود شوید تا درس روی حسابتان بماند؛ بعد کد هنرجویی‌تان را همین‌جا می‌بینید."
-                } else {
-                    "فعلاً خرید از طریق خود استاد انجام می‌شود: مبلغ را به استاد پرداخت کنید و کد هنرجویی‌تان را بدهید تا درس برایتان باز شود."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MelovaTextMuted
-            )
-            when {
-                loginRequired -> Button(
-                    onClick = onLogin,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                    modifier = Modifier.fillMaxWidth().height(46.dp)
-                ) { Text("ورود برای خرید درس") }
-                studentId != null -> StudentCodeRow(studentId)
-                else -> Text("در حال ساخت کد هنرجویی… اتصال اینترنت را بررسی کنید.", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-            }
+            Button(
+                onClick = onAdd,
+                enabled = !isBusy,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+            ) { Text("افزودن به درس‌های من") }
         }
     }
 }
@@ -284,9 +373,6 @@ internal fun ReviewReplyCard(
             if (review.replyText.isNotBlank()) {
                 Text(review.replyText, style = MaterialTheme.typography.bodyMedium, color = MelovaText)
             }
-            if (review.status == ReviewStatus.REFUNDED) {
-                Text("اعتبار این بازبینی به شما برگشت.", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-            }
             if (review.hasReplyAudio) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onTogglePlay, enabled = !isLoading) {
@@ -302,38 +388,6 @@ internal fun ReviewReplyCard(
                     }
                     Text("پاسخ صوتی استاد", style = MaterialTheme.typography.bodyMedium, color = MelovaText)
                 }
-            }
-        }
-    }
-}
-
-/** Review credits, and the code to give the teacher when paying, in the profile tab. */
-@Composable
-internal fun StudentAccountCard(state: StudentUiState) {
-    MelovaSurfaceCard {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val credits = state.reviewCredits
-            Text(
-                text = if (credits > 0) "بازبینی‌های باقی‌مانده: $credits" else "اعتبار بازبینی ندارید.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (credits > 0) MelovaSuccess else MelovaTextMuted
-            )
-            // A guest buys nothing, so they get the code once they have signed in.
-            if (!state.needsLogin) {
-                when {
-                    state.studentId != null -> StudentCodeRow(state.studentId)
-                    state.isLoading -> Text("در حال ساخت حساب…", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-                    else -> Text(
-                        text = state.loadError ?: "حساب هنوز ساخته نشده؛ اتصال اینترنت را بررسی کنید.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MelovaTextMuted
-                    )
-                }
-                Text(
-                    text = "این کد را هنگام پرداخت به استاد بدهید تا درس یا بازبینی برایتان ثبت شود.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MelovaTextMuted
-                )
             }
         }
     }
