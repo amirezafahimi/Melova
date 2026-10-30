@@ -127,6 +127,7 @@
     const audio = new Audio();
     audio.preload = 'auto';
     audio.preservesPitch = true;
+    audio.webkitPreservesPitch = true; // Safari before 17
     let url = null, ended = false, onEnded = null, onReady = null;
     audio.addEventListener('ended', () => { if (!audio.loop) { ended = true; if (onEnded) onEnded(); } });
     audio.addEventListener('canplay', () => { const ready = onReady; onReady = null; if (ready) ready(); });
@@ -149,10 +150,12 @@
       isPlaying: () => !audio.paused && !audio.ended,
       hasEnded: () => ended,
       isReady: () => audio.readyState >= 2,
-      // The app ramps the speed every 20 ms around a slowed clip. Each new rate restarts the
-      // browser's pitch-keeping stretcher, which cuts the sound, so move only in 0.1 steps.
+      // Each new rate restarts the browser's pitch-keeping stretcher, which cuts the sound,
+      // so an unchanged rate is left alone. Loading a file resets playbackRate to
+      // defaultPlaybackRate, so set both, or a speed set before the file loads is lost.
       setSpeed: (speed) => {
-        const rate = Math.round(speed * 10) / 10;
+        const rate = Math.round(speed * 100) / 100;
+        audio.defaultPlaybackRate = rate;
         if (Math.abs(audio.playbackRate - rate) > 0.001) audio.playbackRate = rate;
       },
       setLoop: (loop) => { audio.loop = loop; },

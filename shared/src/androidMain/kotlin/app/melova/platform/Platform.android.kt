@@ -15,6 +15,8 @@ actual val isDebugBuild: Boolean = BuildConfig.DEBUG
 actual val appVersionName: String
     get() = MelovaPlatform.context.run { packageManager.getPackageInfo(packageName, 0).versionName.orEmpty() }
 
+actual val smoothSpeedChanges: Boolean = true
+
 actual val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
 actual fun currentTimeMillis(): Long = System.currentTimeMillis()

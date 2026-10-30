@@ -22,6 +22,12 @@ expect val isDebugBuild: Boolean
 /** Shown on the profile screen. */
 expect val appVersionName: String
 
+/**
+ * Whether the player can change speed mid-play without a gap. Browsers restart their
+ * pitch-keeping stretcher on each change, so there a slowed clip plays at one speed.
+ */
+expect val smoothSpeedChanges: Boolean
+
 /** Blocking file and network work; the browser has one thread, so there it is the default. */
 expect val ioDispatcher: CoroutineDispatcher
 

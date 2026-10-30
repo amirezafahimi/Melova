@@ -21,6 +21,8 @@ actual val isDebugBuild: Boolean = window.location.hostname == "localhost"
 
 actual val appVersionName: String = "وب"
 
+actual val smoothSpeedChanges: Boolean = false
+
 actual val ioDispatcher: CoroutineDispatcher = Dispatchers.Default
 
 @OptIn(ExperimentalTime::class)

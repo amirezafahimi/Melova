@@ -35,6 +35,7 @@ import kotlinx.coroutines.withContext
 import app.melova.platform.LocalFile
 import app.melova.platform.ioDispatcher
 import app.melova.platform.currentTimeMillis
+import app.melova.platform.smoothSpeedChanges
 import kotlin.concurrent.Volatile
 
 class VocalTrainingViewModel(
@@ -404,7 +405,9 @@ class VocalTrainingViewModel(
             PlaybackTarget.TEACHER -> playTeacherFrom(clipStartMs)
             PlaybackTarget.NONE -> return
         }
-        clip?.let { player.setSpeed(it.speedAt(clipStartMs)) }
+        // Without smooth speed changes the whole clip plays at the slow speed.
+        val rampSpeed = clip?.takeIf { smoothSpeedChanges }
+        clip?.let { player.setSpeed(if (rampSpeed != null) it.speedAt(clipStartMs) else it.slowSpeed) }
 
         _uiState.update {
             it.copy(
@@ -417,7 +420,7 @@ class VocalTrainingViewModel(
         snippetStopJob = viewModelScope.launch {
             while (isActive && _uiState.value.playbackTarget == target) {
                 val positionMs = player.currentPositionMs()
-                clip?.let { player.setSpeed(it.speedAt(positionMs)) }
+                rampSpeed?.let { player.setSpeed(it.speedAt(positionMs)) }
                 if (positionMs >= clipEndMs - 40L) {
                     player.pause()
                     player.setSpeed(1f)
