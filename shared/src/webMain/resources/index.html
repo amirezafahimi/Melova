@@ -44,6 +44,24 @@
             window.addEventListener('unhandledrejection', function (event) { failed(event.reason); });
         })();
     </script>
+    <script>
+        // From iOS 27, Safari keeps only the last focus() before the next frame, and one made
+        // outside a tap stops the keyboard from opening. Compose 1.9.3 calls focus() again after
+        // every tap and text change, so on a field that already has focus, only the first call
+        // during a tap goes through. That call has to stay: it is what opens the keyboard on a
+        // field focused by code, such as the login code. Compose 1.12.2 has its own guard.
+        (function () {
+            var focus = HTMLElement.prototype.focus;
+            var tapping = false;
+            window.addEventListener('touchend', function () { tapping = true; }, true);
+            window.addEventListener('touchend', function () { tapping = false; });
+            HTMLElement.prototype.focus = function (options) {
+                if (this.getRootNode().activeElement === this && !tapping) return;
+                tapping = false;
+                focus.call(this, options);
+            };
+        })();
+    </script>
     <script src="melova-audio.js"></script>
     <script type="application/javascript" src="melova.js"></script>
     <script>
