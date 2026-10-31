@@ -67,6 +67,8 @@ private external object MelovaAudioGlobal : JsAny {
     fun watchChatLinks(opened: (String) -> Unit)
     fun pushAllowed(): Boolean
     fun onFirstTap(tapped: () -> Unit)
+    fun watchBack(pressed: () -> Unit)
+    fun holdBack(wanted: Boolean)
 }
 
 object MelovaAudioJs {
@@ -121,4 +123,10 @@ object MelovaAudioJs {
 
     /** [tapped] runs inside the person's first tap, where browsers accept a permission question. */
     fun onFirstTap(tapped: () -> Unit) = MelovaAudioGlobal.onFirstTap(tapped)
+
+    /** [pressed] runs when the browser's back button is used while [holdBack] holds it. */
+    fun watchBack(pressed: () -> Unit) = MelovaAudioGlobal.watchBack(pressed)
+
+    /** While [wanted], back stays in the app; otherwise it leaves the app as usual. */
+    fun holdBack(wanted: Boolean) = MelovaAudioGlobal.holdBack(wanted)
 }

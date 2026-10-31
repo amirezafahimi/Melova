@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import app.melova.platform.PlatformBackHandler
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaCard
@@ -101,6 +102,7 @@ fun MelovaDialog(
     properties: DialogProperties = DialogProperties(),
     content: @Composable ColumnScope.() -> Unit
 ) {
+    PlatformBackHandler(enabled = properties.dismissOnBackPress, onBack = onDismissRequest)
     RtlContent {
         Dialog(onDismissRequest = onDismissRequest, properties = properties) {
             RtlContent {

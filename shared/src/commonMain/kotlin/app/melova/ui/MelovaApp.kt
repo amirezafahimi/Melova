@@ -34,6 +34,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.savedstate.read
+import app.melova.platform.BrowserBackButton
 import app.melova.platform.ChatLinks
 import app.melova.platform.rememberNotificationPermission
 import app.melova.presentation.CatalogViewModel
@@ -141,6 +142,7 @@ fun MelovaApp(
             ChatLinks.opening.value = null
         }
     }
+    BrowserBackButton(navController)
     val selectTab: (MainTab) -> Unit = { tab ->
         navController.navigate(AppScreen.tabRoute(tab)) {
             // Home is always the bottom of the stack (the splash removes itself).

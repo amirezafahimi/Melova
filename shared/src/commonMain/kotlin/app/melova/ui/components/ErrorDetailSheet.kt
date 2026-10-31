@@ -50,6 +50,7 @@ import app.melova.data.model.ErrorDetail
 import app.melova.data.model.ErrorDetailLane
 import app.melova.data.model.ErrorMarkKind
 import app.melova.data.model.TahrirKind
+import app.melova.platform.PlatformBackHandler
 import app.melova.platform.pad2
 import app.melova.presentation.PlaybackTarget
 import app.melova.ui.layout.LtrContent
@@ -100,6 +101,7 @@ fun ErrorDetailSheet(
         else -> "تحریر"
     }
 
+    PlatformBackHandler(onBack = onDismiss)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),

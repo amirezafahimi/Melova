@@ -307,10 +307,41 @@
     }
   }
 
+  // One extra history entry catches the browser's back, so it never leaves the app from an
+  // inner page. The app has no addresses of its own, so one entry is enough for any depth.
+  let backHeld = Boolean(history.state && history.state.melovaBack);
+  let backWanted = false;
+  let backDropping = false;
+
+  function holdBack(wanted) {
+    backWanted = wanted;
+    if (backDropping) return;
+    if (wanted && !backHeld) {
+      history.pushState({ melovaBack: true }, '');
+      backHeld = true;
+    } else if (!wanted && backHeld) {
+      backDropping = true;
+      history.back();
+    }
+  }
+
+  function watchBack(pressed) {
+    window.addEventListener('popstate', (event) => {
+      backHeld = Boolean(event.state && event.state.melovaBack);
+      if (backHeld) return; // The forward button stepped onto the entry again.
+      if (backDropping) {
+        backDropping = false;
+        holdBack(backWanted);
+      } else {
+        pressed();
+      }
+    });
+  }
+
   // pickAudioFile is for the JS app, which a quick web build keeps from the last --legacy build.
   globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickFile, googleSignIn,
     pickAudioFile: () => pickFile('audio/*'), apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || ''),
     canInstall: () => installOffer !== null, watchInstall: (changed) => { onInstallChange = changed; }, install,
     pushState, pushAddress: async () => addressOf(await pushSubscription()), pushSubscribe, pushUnsubscribe, askNotifications, watchChatLinks,
-    pushAllowed: () => 'Notification' in window && Notification.permission === 'granted', onFirstTap };
+    pushAllowed: () => 'Notification' in window && Notification.permission === 'granted', onFirstTap, watchBack, holdBack };
 })();

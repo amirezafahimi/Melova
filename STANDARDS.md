@@ -24,6 +24,10 @@ rule, say so and update this file in the same change.
   something, `SectionHeader`, `ConfirmDialog`, `MelovaBackground`, `RtlContent`.
 - A new page is `MelovaBackground { RtlContent { LazyColumn … } }` with system bar insets and
   20.dp sides, and gets a route in `AppScreen` and a `composable` in `MelovaApp`.
+- Back does what the page's back button does, on every page, from Android's system back and the
+  browser's back alike. `MelovaTopBar`, `MelovaDialog` and sheets go through
+  `PlatformBackHandler`; a new layer on a page (dialog, sheet, step) that closes with a button
+  uses it too. A page's own back logic goes in the top bar's `onBack`, never only in the button.
 - Works at phone width in both themes. Anything shown over a photo or accent stays readable.
 - Numbers shown to people use Persian digits (`formatPersianInteger`).
 

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.melova.platform.PlatformBackHandler
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaAccentTint
@@ -99,6 +100,8 @@ fun MelovaTopBar(
     subtitle: String? = null,
     onBack: () -> Unit
 ) {
+    // Back from the system or the browser does exactly what this page's button does.
+    PlatformBackHandler(onBack = onBack)
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
