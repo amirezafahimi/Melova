@@ -94,6 +94,10 @@ kotlin {
             implementation(libs.ktor.client.js)
             implementation(libs.kotlinx.browser)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }
 

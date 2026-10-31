@@ -64,7 +64,7 @@ class PitchAnalyzer {
  * The YIN pitch estimator (de Cheveigné & Kawahara 2002) as TarsosDSP implements it:
  * threshold 0.20, parabolic interpolation, probability 1 − d'(τ).
  */
-private class Yin(private val sampleRate: Float, bufferSize: Int) {
+internal class Yin(private val sampleRate: Float, bufferSize: Int) {
     private val yinBuffer = FloatArray(bufferSize / 2)
 
     /** Pitch in Hz (−1 when unpitched) and its probability. */

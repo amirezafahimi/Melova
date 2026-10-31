@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Hearing
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -56,7 +55,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.melova.FeatureFlags
-import app.melova.audio.scoring.VocalAnalysisFeedback
 import app.melova.presentation.PlaybackTarget
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.VocalScoreResult
@@ -211,23 +209,13 @@ fun VocalTrainingScreen(
                     }
 
                     uiState.errorDetail?.let { detail ->
-                        val correction = detail.correction
-                        val comparison = detail.comparison
                         ErrorDetailSheet(
                             detail = detail,
-                            playingTarget = uiState.playingSnippetTarget.takeIf {
-                                uiState.playingSnippetStartMs == detail.key && uiState.isPlaying
-                            },
-                            teacherPositionMs = uiState.teacherPlaybackPositionMs,
-                            studentPositionMs = uiState.userPlaybackPositionMs,
-                            onPlayTeacher = {
-                                if (correction != null) viewModel.playCorrectionTeacherSnippet(correction)
-                                else if (comparison != null) viewModel.playTahrirTeacherSnippet(comparison)
-                            },
-                            onPlayStudent = {
-                                if (correction != null) viewModel.playCorrectionSnippet(correction)
-                                else if (comparison != null) viewModel.playTahrirStudentSnippet(comparison)
-                            },
+                            playing = uiState.detailPlaying,
+                            positionOf = viewModel::detailPositionMs,
+                            onToggle = viewModel::toggleDetailPlayback,
+                            onScrubStart = viewModel::startDetailScrub,
+                            onSeek = viewModel::seekDetail,
                             onDismiss = viewModel::hideErrorDetail
                         )
                     }
@@ -762,45 +750,6 @@ private fun HeadphoneHintBanner() {
 }
 
 @Composable
-private fun AnalysisLimitationsNote() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MelovaText.copy(alpha = 0.06f))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = null,
-                tint = MelovaText.copy(alpha = 0.55f),
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = "محدودیت‌های تحلیل",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MelovaText.copy(alpha = 0.75f),
-                textAlign = TextAlign.Start
-            )
-        }
-        VocalAnalysisFeedback.analysisLimitations.forEach { limitation ->
-            Text(
-                text = "• $limitation",
-                style = MaterialTheme.typography.bodySmall,
-                color = MelovaText.copy(alpha = 0.55f),
-                textAlign = TextAlign.Start
-            )
-        }
-    }
-}
-
-@Composable
 private fun HolisticScoreResultCard(
     result: VocalScoreResult,
     isNewBest: Boolean,
@@ -923,21 +872,6 @@ private fun HolisticScoreResultCard(
                 color = MelovaText.copy(alpha = 0.85f),
                 textAlign = TextAlign.Start
             )
-
-            Text(
-                text = "تحلیل فنی",
-                style = MaterialTheme.typography.titleMedium,
-                color = MelovaText,
-                textAlign = TextAlign.Start
-            )
-            Text(
-                text = result.technicalAnalysis,
-                style = MaterialTheme.typography.bodySmall,
-                color = MelovaText.copy(alpha = 0.75f),
-                textAlign = TextAlign.Start
-            )
-
-            AnalysisLimitationsNote()
 
             if (result.corrections.isNotEmpty()) {
                 Text(

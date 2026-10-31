@@ -6,7 +6,9 @@ import app.melova.platform.appContext
 import app.melova.platform.cacheDir
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import app.melova.audio.io.WavUtils
 import app.melova.audio.io.WaveformPeaksExtractor
+import app.melova.audio.pitch.PitchContour
 import app.melova.audio.scoring.VocalScorer
 import app.melova.data.model.ErrorDetail
 import app.melova.data.model.ErrorDetailLane
@@ -21,6 +23,7 @@ import app.melova.data.repository.LessonRepository
 import app.melova.data.repository.RemoteLessonRepository
 import app.melova.data.repository.StudentRepository
 import app.melova.data.repository.VocalScoringRepository
+import app.melova.audio.playback.DetailVoicePlayer
 import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.playback.TeacherVocalGenerator
 import app.melova.audio.capture.DeviceAudioHints
@@ -68,12 +71,12 @@ class VocalTrainingViewModel(
     @Volatile
     private var lastRecordingDurationMs: Long = 0L
 
-    /** Loudness envelopes for «دیدن جزییات», read once per lesson / take. */
+    /** Both voices' samples for «دیدن جزییات», read once per lesson / take. */
     @Volatile
-    private var teacherEnvelope: FloatArray? = null
+    private var teacherAudio: Pair<ShortArray, Int>? = null
 
     @Volatile
-    private var studentEnvelope: FloatArray? = null
+    private var studentAudio: Pair<ShortArray, Int>? = null
 
     private val _uiState = MutableStateFlow(
         VocalTrainingUiState(
@@ -86,6 +89,13 @@ class VocalTrainingViewModel(
     private var sessionJob: Job? = null
     private var progressJob: Job? = null
     private var snippetStopJob: Job? = null
+    private var detailJob: Job? = null
+    private var detailPlaybackJob: Job? = null
+
+    /** Made when the first detail sheet opens: most visits to this page never need them. */
+    private var teacherVoice: DetailVoicePlayer? = null
+    private var studentVoice: DetailVoicePlayer? = null
+    private var resumeAfterScrub = false
 
     init {
         loadLesson()
@@ -123,7 +133,7 @@ class VocalTrainingViewModel(
                 })
             }.onSuccess { (courseTitle, prepared, teacherPeaks) ->
                 lesson = prepared
-                teacherEnvelope = null
+                teacherAudio = null
                 _uiState.update {
                     it.copy(
                         courseTitle = courseTitle,
@@ -162,12 +172,12 @@ class VocalTrainingViewModel(
             runCatching {
                 val take = chatRepository.take(id)
                 val audio = chatRepository.takeAudio(id)
-                val (envelope, peaks) = withContext(ioDispatcher) {
-                    WaveformPeaksExtractor.envelope(audio) to WaveformPeaksExtractor.fromWavFile(audio)
+                val (pcm, peaks) = withContext(ioDispatcher) {
+                    WavUtils.readPcm16Samples(audio) to WaveformPeaksExtractor.fromWavFile(audio)
                 }
                 userRecordingFile = audio
-                studentEnvelope = envelope
-                val recordingMs = envelope.size.toLong() * WaveformPeaksExtractor.ENVELOPE_BIN_MS
+                studentAudio = pcm
+                val recordingMs = pcm.durationMs
                 _uiState.update {
                     it.copy(
                         mode = VocalTrainingMode.RESULT,
@@ -625,6 +635,10 @@ class VocalTrainingViewModel(
     }
 
     fun hideErrorDetail() {
+        detailJob?.cancel()
+        pauseDetailPlayback()
+        teacherVoice?.unload()
+        studentVoice?.unload()
         _uiState.update { it.copy(errorDetail = null) }
     }
 
@@ -636,45 +650,126 @@ class VocalTrainingViewModel(
         studentClip: PlaybackClip?
     ) {
         if (_uiState.value.scoreResult == null) return
-        viewModelScope.launch {
-            val lanes = withContext(ioDispatcher) {
-                runCatching {
-                    detailLane(loadTeacherEnvelope(), teacherMark, teacherClip) to
-                        studentMark?.let { detailLane(loadStudentEnvelope(), it, studentClip) }
-                }.getOrNull()
+        stopActivePlayback()
+        detailJob?.cancel()
+        detailJob = viewModelScope.launch {
+            val (teacherPcm, studentPcm) = withContext(ioDispatcher) {
+                runCatching { loadTeacherAudio() }.getOrNull() to
+                    runCatching { loadStudentAudio() }.getOrNull()
             }
+            val teacher = detailLane(teacherPcm, teacherMark, teacherClip)
+            val student = studentMark?.let { detailLane(studentPcm, it, studentClip) }
             _uiState.update {
                 if (it.scoreResult == null) it
-                else it.copy(errorDetail = detail.copy(teacher = lanes?.first, student = lanes?.second))
+                else it.copy(errorDetail = detail.copy(teacher = teacher, student = student))
             }
+            if (teacher != null) lesson?.referenceFile?.let { file ->
+                val voice = teacherVoice ?: DetailVoicePlayer(appContext).also { teacherVoice = it }
+                voice.load(file, teacher.startMs, teacher.endMs, teacher.speed)
+            }
+            if (student != null) {
+                val voice = studentVoice ?: DetailVoicePlayer(appContext).also { studentVoice = it }
+                voice.load(userRecordingFile, student.startMs, student.endMs, student.speed)
+            }
+            val lanes = withContext(ioDispatcher) {
+                val teacherLine = teacher?.let { lineOf(teacherPcm, it) }.orEmpty()
+                val studentLine = student?.let {
+                    PitchContour.inRegisterOf(teacherLine, lineOf(studentPcm, it))
+                }.orEmpty()
+                val guide = if (teacher != null && student != null) {
+                    PitchContour.guide(teacherLine, studentLine, student.markStartMs..student.markEndMs) {
+                        teacher.timeOn(student, it)
+                    }
+                } else {
+                    emptyList()
+                }
+                detail.copy(
+                    teacher = teacher?.copy(pitch = teacherLine),
+                    student = student?.copy(pitch = studentLine, guide = guide),
+                    pitchRange = PitchContour.rangeOf(listOf(teacherLine, studentLine, guide))
+                )
+            }
+            _uiState.update { if (it.errorDetail == null) it else it.copy(errorDetail = lanes) }
         }
     }
 
-    private fun loadTeacherEnvelope(): FloatArray? {
-        teacherEnvelope?.let { return it }
+    private suspend fun lineOf(pcm: Pair<ShortArray, Int>?, lane: ErrorDetailLane) =
+        pcm?.let { (samples, sampleRate) ->
+            PitchContour.of(samples, sampleRate, lane.startMs, lane.endMs)
+        }.orEmpty()
+
+    private fun loadTeacherAudio(): Pair<ShortArray, Int>? {
+        teacherAudio?.let { return it }
         val file = lesson?.referenceFile?.takeIf { it.exists() } ?: return null
-        return WaveformPeaksExtractor.envelope(file).also { teacherEnvelope = it }
+        return WavUtils.readPcm16Samples(file).also { teacherAudio = it }
     }
 
-    private fun loadStudentEnvelope(): FloatArray? {
-        studentEnvelope?.let { return it }
+    private fun loadStudentAudio(): Pair<ShortArray, Int>? {
+        studentAudio?.let { return it }
         if (!userRecordingFile.exists() || userRecordingFile.length() <= 44L) return null
-        return WaveformPeaksExtractor.envelope(userRecordingFile).also { studentEnvelope = it }
+        return WavUtils.readPcm16Samples(userRecordingFile).also { studentAudio = it }
     }
 
     /** The clip the student hears around the error, or a second each side of it. */
-    private fun detailLane(envelope: FloatArray?, mark: LongRange, clip: PlaybackClip?): ErrorDetailLane? {
-        if (envelope == null || envelope.isEmpty()) return null
-        val totalMs = envelope.size.toLong() * WaveformPeaksExtractor.ENVELOPE_BIN_MS
+    private fun detailLane(pcm: Pair<ShortArray, Int>?, mark: LongRange, clip: PlaybackClip?): ErrorDetailLane? {
+        val totalMs = pcm?.durationMs ?: return null
+        if (totalMs <= 0L) return null
         val startMs = (clip?.startMs ?: (mark.first - DETAIL_CONTEXT_MS)).coerceIn(0L, totalMs)
         val endMs = (clip?.endMs ?: (mark.last + DETAIL_CONTEXT_MS)).coerceIn(startMs + 1L, totalMs.coerceAtLeast(startMs + 1L))
         return ErrorDetailLane(
             startMs = startMs,
             endMs = endMs,
-            peaks = WaveformPeaksExtractor.window(envelope, startMs, endMs, DETAIL_BAR_COUNT),
             markStartMs = mark.first,
-            markEndMs = mark.last
+            markEndMs = mark.last,
+            speed = clip?.slowSpeed ?: 1f
         )
+    }
+
+    private val Pair<ShortArray, Int>.durationMs: Long
+        get() = if (second > 0) first.size * 1000L / second else 0L
+
+    /** Plays or pauses one voice of the open sheet; the other one waits where it stopped. */
+    fun toggleDetailPlayback(target: PlaybackTarget) {
+        val isPlayingTarget = _uiState.value.detailPlaying == target
+        pauseDetailPlayback()
+        if (!isPlayingTarget) playDetail(target)
+    }
+
+    private fun playDetail(target: PlaybackTarget) {
+        val voice = detailVoice(target) ?: return
+        voice.play()
+        _uiState.update { it.copy(detailPlaying = target) }
+        detailPlaybackJob = viewModelScope.launch {
+            while (isActive && !voice.hasFinished) delay(SPEED_TICK_MS)
+            voice.pause()
+            _uiState.update { it.copy(detailPlaying = PlaybackTarget.NONE) }
+        }
+    }
+
+    private fun pauseDetailPlayback() {
+        detailPlaybackJob?.cancel()
+        detailVoice(_uiState.value.detailPlaying)?.pause()
+        _uiState.update { it.copy(detailPlaying = PlaybackTarget.NONE) }
+    }
+
+    /** The head is being dragged: silence until it lands. */
+    fun startDetailScrub(target: PlaybackTarget) {
+        resumeAfterScrub = _uiState.value.detailPlaying == target
+        pauseDetailPlayback()
+    }
+
+    fun seekDetail(target: PlaybackTarget, positionMs: Long) {
+        detailVoice(target)?.seek(positionMs)
+        if (resumeAfterScrub) playDetail(target)
+        resumeAfterScrub = false
+    }
+
+    fun detailPositionMs(target: PlaybackTarget): Long = detailVoice(target)?.positionMs ?: 0L
+
+    private fun detailVoice(target: PlaybackTarget): DetailVoicePlayer? = when (target) {
+        PlaybackTarget.TEACHER -> teacherVoice
+        PlaybackTarget.USER -> studentVoice
+        PlaybackTarget.NONE -> null
     }
 
     private val PlaybackClip.focusCentreMs: Long
@@ -684,7 +779,7 @@ class VocalTrainingViewModel(
     fun dismissResults() {
         sessionJob?.cancel()
         stopActivePlayback()
-        studentEnvelope = null
+        studentAudio = null
         _uiState.update {
             it.copy(
                 mode = VocalTrainingMode.IDLE,
@@ -934,7 +1029,7 @@ class VocalTrainingViewModel(
             val peaks = withContext(ioDispatcher) {
                 WaveformPeaksExtractor.fromWavFile(recordingFile)
             }
-            studentEnvelope = null
+            studentAudio = null
 
             stopProgressPolling()
             val recordingSeconds = ((lastRecordingDurationMs + 999) / 1000).toInt().coerceAtLeast(1)
@@ -1046,6 +1141,8 @@ class VocalTrainingViewModel(
         stopProgressPolling()
         recorder.cancel()
         player.release()
+        teacherVoice?.release()
+        studentVoice?.release()
         super.onCleared()
     }
 
@@ -1059,7 +1156,6 @@ class VocalTrainingViewModel(
         /** How often the speed updates, so that its ramp sounds smooth. */
         private const val SPEED_TICK_MS = 20L
         private const val DETAIL_CONTEXT_MS = 1_000L
-        private const val DETAIL_BAR_COUNT = 140
     }
 }
 
@@ -1098,6 +1194,8 @@ data class VocalTrainingUiState(
     val teacherAsk: TeacherAskState = TeacherAskState(),
     /** The open «دیدن جزییات» sheet. */
     val errorDetail: ErrorDetail? = null,
+    /** The voice sounding in the detail sheet. */
+    val detailPlaying: PlaybackTarget = PlaybackTarget.NONE,
     /** A take opened from a chat: everything can be played, nothing can be recorded. */
     val isSharedTake: Boolean = false,
     /** Whose take it is, when the teacher is the one looking. */
