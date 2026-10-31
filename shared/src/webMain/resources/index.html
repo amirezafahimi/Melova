@@ -18,14 +18,20 @@
     <style>
         html, body { margin: 0; height: 100%; overflow: hidden; background: #1B1230; }
         #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+                   flex-direction: column;
                    padding: 24px; box-sizing: border-box; text-align: center; line-height: 1.9;
                    color: #ddd; font-family: sans-serif;
                    /* Covers the app until main.kt removes it, once the fonts are in. */
                    z-index: 10; background: #1B1230; }
+        #loading svg { width: 96px; height: 96px; overflow: visible; }
+        #loading .line { stroke-dasharray: 1; animation: draw 1.8s ease-in-out infinite alternate; }
+        #loading .dot { transform-box: fill-box; transform-origin: center; animation: pulse 0.9s ease-in-out infinite alternate; }
+        @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+        @keyframes pulse { from { transform: scale(0.75); } to { transform: scale(1.1); } }
     </style>
     <script>
         // melova.js picks the wasm build, or the JS build on browsers without WasmGC
-        // (iOS before 18.2). If loading fails, say so instead of leaving the loading text up.
+        // (iOS before 18.2). If loading fails, say so instead of leaving the loading mark up.
         (function () {
             function show(text) {
                 var box = document.getElementById('loading');
@@ -47,6 +53,15 @@
     </script>
 </head>
 <body>
-<div id="loading">در حال بارگذاری ملووا…</div>
+<div id="loading" role="img" aria-label="ملووا">
+    <!-- The launcher icon's mark, drawn inline so it shows before anything else has loaded. -->
+    <svg viewBox="0 0 108 108">
+        <g transform="translate(22 21) scale(0.32)">
+            <path class="line" pathLength="1" d="M28,150 C38,92 48,52 64,52 S88,120 100,120 S120,52 136,52 S160,98 166,150"
+                  fill="none" stroke="#9B7BFF" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="dot" d="M150,150 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0" fill="#F3C969"/>
+        </g>
+    </svg>
+</div>
 </body>
 </html>

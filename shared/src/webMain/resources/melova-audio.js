@@ -284,6 +284,15 @@
     return (await Notification.requestPermission()) === 'granted';
   }
 
+  function onFirstTap(tapped) {
+    const events = ['pointerup', 'touchend'];
+    const once = () => {
+      events.forEach((name) => document.removeEventListener(name, once, true));
+      tapped();
+    };
+    events.forEach((name) => document.addEventListener(name, once, true));
+  }
+
   // A tapped notification reaches an open page as a message, and a new page in its address.
   function watchChatLinks(opened) {
     const address = new URL(location.href);
@@ -302,5 +311,6 @@
   globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickFile, googleSignIn,
     pickAudioFile: () => pickFile('audio/*'), apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || ''),
     canInstall: () => installOffer !== null, watchInstall: (changed) => { onInstallChange = changed; }, install,
-    pushState, pushAddress: async () => addressOf(await pushSubscription()), pushSubscribe, pushUnsubscribe, askNotifications, watchChatLinks };
+    pushState, pushAddress: async () => addressOf(await pushSubscription()), pushSubscribe, pushUnsubscribe, askNotifications, watchChatLinks,
+    pushAllowed: () => 'Notification' in window && Notification.permission === 'granted', onFirstTap };
 })();

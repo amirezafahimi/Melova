@@ -85,6 +85,10 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.ktor.client.android)
             implementation(libs.ktor.client.okhttp)
+            // Ktor asks for 5.5, which needs compileSdk 37 and a newer Android Gradle plugin.
+            val okhttp = libs.versions.okhttp.get()
+            implementation("com.squareup.okhttp3:okhttp") { version { strictly(okhttp) } }
+            implementation("com.squareup.okhttp3:okhttp-android") { version { strictly(okhttp) } }
         }
         webMain.dependencies {
             implementation(libs.ktor.client.js)

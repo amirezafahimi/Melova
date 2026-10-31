@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Melova mark in one colour: Android tints a notification's small icon itself. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    <group android:translateY="-4">
+        <path
+            android:pathData="M28,150 C38,92 48,52 64,52 S88,120 100,120 S120,52 136,52 S160,98 166,150"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="20"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M150,150 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0" />
+    </group>
+</vector>

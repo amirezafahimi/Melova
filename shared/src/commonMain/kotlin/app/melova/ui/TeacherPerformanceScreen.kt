@@ -161,6 +161,7 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
                 ornaments = uiState.ornaments,
                 selectedIndex = uiState.playingIndex ?: uiState.selectedIndex,
                 zoom = uiState.zoom,
+                maxZoom = TeacherPerformanceViewModel.MAX_ZOOM,
                 onZoomChange = viewModel::setZoom,
                 onSeekToMs = viewModel::playAt,
                 onOrnamentClick = viewModel::playSegment

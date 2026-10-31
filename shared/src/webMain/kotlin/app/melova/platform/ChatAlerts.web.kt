@@ -26,6 +26,14 @@ actual object ChatAlerts {
 
     actual suspend fun address(): PushAddress? = MelovaAudioJs.pushAddress().address()
 
+    actual fun keepListening() = Unit
+
+    actual fun stopListening() = Unit
+
+    actual suspend fun isAllowed(): Boolean = MelovaAudioJs.pushAllowed()
+
+    actual fun atFirstChance(ask: () -> Unit) = MelovaAudioJs.onFirstTap(ask)
+
     private suspend fun Promise<JsAny?>.text(): String? = await<JsAny?>()?.unsafeCast<JsString>()?.toString()
 
     private suspend fun Promise<JsAny?>.address(): PushAddress? =

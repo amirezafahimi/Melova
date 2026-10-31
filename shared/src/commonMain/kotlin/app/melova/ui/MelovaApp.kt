@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.savedstate.read
 import app.melova.platform.ChatLinks
+import app.melova.platform.rememberNotificationPermission
 import app.melova.presentation.CatalogViewModel
 import app.melova.presentation.ChatViewModel
 import app.melova.presentation.LessonIntroViewModel
@@ -125,6 +127,13 @@ fun MelovaApp(
     // Waits for the splash, which would otherwise land on Home over the chat.
     val tappedChat by ChatLinks.opening.collectAsStateWithLifecycle()
     val isPastSplash = backStackEntry != null && backStackEntry?.destination?.route != AppScreen.SPLASH
+    val latestCanChat by rememberUpdatedState(canChat)
+    val askNotifications = rememberNotificationPermission { granted ->
+        if (granted && latestCanChat) chatViewModel.syncNotifications()
+    }
+    LaunchedEffect(isPastSplash) {
+        if (isPastSplash) chatViewModel.askAtStart(askNotifications)
+    }
     LaunchedEffect(tappedChat, canChat, isPastSplash) {
         val chatId = tappedChat ?: return@LaunchedEffect
         if (canChat && isPastSplash) {

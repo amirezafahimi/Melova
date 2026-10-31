@@ -12,7 +12,7 @@ class PushAddress(val endpoint: String, val p256dh: String, val auth: String)
 
 /**
  * Telling the person about new messages while the app is away. A browser gets them pushed
- * through a [PushAddress]; the Android app has none and looks for them itself every so often.
+ * through a [PushAddress]; the Android app has none and keeps the chat socket open itself.
  */
 expect object ChatAlerts {
     suspend fun state(): NotificationState
@@ -25,6 +25,18 @@ expect object ChatAlerts {
 
     /** This device's address, while notifications are on. */
     suspend fun address(): PushAddress?
+
+    /** Someone is signed in: if notifications are on, wait for their messages. */
+    fun keepListening()
+
+    /** Nobody is signed in any more. */
+    fun stopListening()
+
+    /** Whether the device already lets this app show notifications. */
+    suspend fun isAllowed(): Boolean
+
+    /** Runs [ask] as soon as a permission question may appear: browsers want a tap first. */
+    fun atFirstChance(ask: () -> Unit)
 }
 
 /** Asks to show notifications; the answer goes to [onResult]. */

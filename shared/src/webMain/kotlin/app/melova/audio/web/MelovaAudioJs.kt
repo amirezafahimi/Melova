@@ -65,6 +65,8 @@ private external object MelovaAudioGlobal : JsAny {
     fun pushUnsubscribe(): Promise<JsAny?>
     fun askNotifications(): Promise<JsAny?>
     fun watchChatLinks(opened: (String) -> Unit)
+    fun pushAllowed(): Boolean
+    fun onFirstTap(tapped: () -> Unit)
 }
 
 object MelovaAudioJs {
@@ -113,4 +115,10 @@ object MelovaAudioJs {
 
     /** Calls [opened] with the chat of each tapped notification, including the one that opened the page. */
     fun watchChatLinks(opened: (String) -> Unit) = MelovaAudioGlobal.watchChatLinks(opened)
+
+    /** Whether this browser already lets the app show notifications. */
+    fun pushAllowed(): Boolean = MelovaAudioGlobal.pushAllowed()
+
+    /** [tapped] runs inside the person's first tap, where browsers accept a permission question. */
+    fun onFirstTap(tapped: () -> Unit) = MelovaAudioGlobal.onFirstTap(tapped)
 }

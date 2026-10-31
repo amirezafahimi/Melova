@@ -10,6 +10,7 @@ import app.melova.data.model.ChatUpdate
 import app.melova.data.repository.ChatRepository
 import app.melova.platform.ChatAlerts
 import app.melova.platform.LocalFile
+import app.melova.platform.KeyValueStore
 import app.melova.platform.NotificationState
 import app.melova.platform.appContext
 import kotlinx.coroutines.Job
@@ -31,6 +32,7 @@ import kotlinx.coroutines.launch
 class ChatViewModel : ViewModel() {
     private val repository = ChatRepository(appContext)
     private val player = ReferenceAudioPlayer(appContext)
+    private val alertChoice = KeyValueStore(appContext, "chat_alert_choice")
     private var voiceJob: Job? = null
     private var reportedSeenId = 0L
 
@@ -235,7 +237,20 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    /** Notifications start on, so the very first opening asks; a choice made after that stands. */
+    fun askAtStart(ask: () -> Unit) {
+        viewModelScope.launch {
+            if (alertChoice.getInt(KEY_ASKED) != null || alertChoice.getInt(KEY_TURNED_OFF) != null) return@launch
+            if (ChatAlerts.isAllowed() || ChatAlerts.state() != NotificationState.OFF) return@launch
+            ChatAlerts.atFirstChance {
+                alertChoice.putInt(KEY_ASKED, 1)
+                ask()
+            }
+        }
+    }
+
     fun enableNotifications() {
+        alertChoice.remove(KEY_TURNED_OFF)
         viewModelScope.launch {
             runCatching { ChatAlerts.turnOn { repository.pushKey() }?.let { repository.subscribe(it) } }
                 .onFailure { _uiState.update { it.copy(message = "اعلان روشن نشد. دوباره امتحان کنید.") } }
@@ -244,6 +259,7 @@ class ChatViewModel : ViewModel() {
     }
 
     fun disableNotifications() {
+        alertChoice.putInt(KEY_TURNED_OFF, 1)
         viewModelScope.launch {
             runCatching { ChatAlerts.turnOff()?.let { repository.unsubscribe(it) } }
             refreshNotifications()
@@ -258,13 +274,19 @@ class ChatViewModel : ViewModel() {
     /** A device with notifications on hears about whoever is signed in on it now. */
     fun syncNotifications() {
         viewModelScope.launch {
-            runCatching { ChatAlerts.address()?.let { repository.subscribe(it) } }
+            val wanted = alertChoice.getInt(KEY_TURNED_OFF) == null && ChatAlerts.isAllowed()
+            runCatching {
+                val address = if (wanted) ChatAlerts.turnOn { repository.pushKey() } else ChatAlerts.address()
+                address?.let { repository.subscribe(it) }
+            }
+            ChatAlerts.keepListening()
             refreshNotifications()
         }
     }
 
     /** Signing out: this device stops hearing about the account, and picks up again on the next sign-in. */
     fun forgetThisDevice() {
+        ChatAlerts.stopListening()
         viewModelScope.launch { runCatching { ChatAlerts.address()?.let { repository.unsubscribe(it) } } }
     }
 
@@ -281,6 +303,8 @@ class ChatViewModel : ViewModel() {
         const val VOICE_TICK_MS = 100L
         const val MIN_RETRY_MS = 2_000L
         const val MAX_RETRY_MS = 30_000L
+        const val KEY_ASKED = "asked"
+        const val KEY_TURNED_OFF = "turned_off"
     }
 }
 
