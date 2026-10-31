@@ -45,6 +45,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.melova.data.model.TeacherOrnament
 import app.melova.data.model.TeacherOrnamentKind
+import app.melova.platform.persianDigits
 import app.melova.presentation.TeacherPerformanceUiState
 import app.melova.presentation.TeacherPerformanceViewModel
 import app.melova.ui.components.MelovaBackground
@@ -53,6 +54,7 @@ import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.TeacherOrnamentWaveform
 import app.melova.ui.components.ornamentColor
 import app.melova.ui.layout.LtrContent
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.LocalMelovaPalette
 import app.melova.ui.theme.MelovaAccent
@@ -78,7 +80,7 @@ fun TeacherPerformanceScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(PagePadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             RtlContent {
@@ -189,7 +191,7 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
             if (uiState.zoom > 1f) {
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
-                    text = "بزرگ‌نمایی ${formatFixed(uiState.zoom, 1)}×",
+                    text = persianDigits("بزرگ‌نمایی ${formatFixed(uiState.zoom, 1)}×"),
                     style = MaterialTheme.typography.labelSmall,
                     color = MelovaText.copy(alpha = 0.5f)
                 )
@@ -315,7 +317,7 @@ private fun OrnamentRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "${ornament.kind.title} $number",
+                text = persianDigits("${ornament.kind.title} $number"),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MelovaText
@@ -323,7 +325,7 @@ private fun OrnamentRow(
             LtrContent {
                 Text(
                     text = "${formatPreciseClock(ornament.startMs)} → ${formatPreciseClock(ornament.endMs)}" +
-                        "  (${formatFixed(ornament.durationMs / 1000f, 2)}s)",
+                        "  (${persianDigits(formatFixed(ornament.durationMs / 1000f, 2))}s)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MelovaText.copy(alpha = 0.6f)
                 )
@@ -447,7 +449,7 @@ private fun ornamentNumbers(ornaments: List<TeacherOrnament>): List<Int> {
 }
 
 private fun formatSpeed(speed: Float): String =
-    if (speed == speed.toInt().toFloat()) "${speed.toInt()}×" else "${speed}×"
+    persianDigits(if (speed == speed.toInt().toFloat()) "${speed.toInt()}×" else "${speed}×")
 
 /** m:ss.cc — hundredths, so a vowel's edges can be read exactly. */
 private fun formatPreciseClock(timeMs: Long): String {
@@ -455,5 +457,5 @@ private fun formatPreciseClock(timeMs: Long): String {
     val minutes = clamped / 60_000
     val seconds = (clamped / 1000) % 60
     val hundredths = (clamped % 1000) / 10
-    return "$minutes:${seconds.pad2()}.${hundredths.pad2()}"
+    return persianDigits("$minutes:${seconds.pad2()}.${hundredths.pad2()}")
 }

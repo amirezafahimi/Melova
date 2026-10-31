@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.melova.platform.PlatformBackHandler
+import app.melova.platform.persianDigits
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaAccentTint
@@ -199,7 +200,7 @@ fun ScoreBadge(score: Int, modifier: Modifier = Modifier, size: Dp = 46.dp) {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = score.toString(),
+            text = persianDigits(score.toString()),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = color
@@ -209,7 +210,7 @@ fun ScoreBadge(score: Int, modifier: Modifier = Modifier, size: Dp = 46.dp) {
 
 fun formatClock(timeMs: Long): String {
     val totalSeconds = (timeMs / 1000).coerceAtLeast(0)
-    return "${totalSeconds / 60}:${(totalSeconds % 60).pad2()}"
+    return persianDigits("${totalSeconds / 60}:${(totalSeconds % 60).pad2()}")
 }
 
 /** Pill-shaped single-choice selector, e.g. major/minor. */

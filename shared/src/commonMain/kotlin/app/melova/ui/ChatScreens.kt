@@ -97,6 +97,8 @@ import app.melova.ui.components.TakePhase
 import app.melova.ui.components.formatClock
 import app.melova.ui.components.rememberTakeController
 import app.melova.ui.layout.LtrContent
+import app.melova.ui.layout.PageBottomGap
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
@@ -145,7 +147,7 @@ fun ChatListScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                contentPadding = PagePadding,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item { MelovaTopBar(title = "گفتگوها", onBack = onBack) }
@@ -715,7 +717,7 @@ private fun ChatComposer(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = PageBottomGap),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         take.error?.let { error ->

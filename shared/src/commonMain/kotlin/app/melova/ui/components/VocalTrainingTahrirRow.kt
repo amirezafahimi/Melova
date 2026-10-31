@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.TahrirKind
+import app.melova.platform.persianDigits
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaSecondary
@@ -87,7 +88,7 @@ fun VocalTrainingTahrirRow(
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = "تطابق ${comparison.score}٪",
+                text = persianDigits("تطابق ${comparison.score}٪"),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = scoreColor,
@@ -199,5 +200,5 @@ private fun formatTahrirClock(ms: Long): String {
     val totalSeconds = (ms / 1000L).coerceAtLeast(0L)
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
-    return "$minutes:${seconds.pad2()}"
+    return persianDigits("$minutes:${seconds.pad2()}")
 }

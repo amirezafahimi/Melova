@@ -16,9 +16,14 @@ import app.melova.ui.theme.ThemePreferences
 /**
  * The whole app with its saved theme, shared by the Android activity and the web page.
  * [onDarkThemeChange] lets the host follow the theme (Android's system bar icons).
+ * [lateFontsLoaded] tells it fonts that fill in missing glyphs have arrived (the web page's emoji).
  */
 @Composable
-fun MelovaRoot(themePreferences: ThemePreferences, onDarkThemeChange: @Composable (Boolean) -> Unit = {}) {
+fun MelovaRoot(
+    themePreferences: ThemePreferences,
+    onDarkThemeChange: @Composable (Boolean) -> Unit = {},
+    lateFontsLoaded: Boolean = false
+) {
     var themeMode by remember { mutableStateOf(themePreferences.mode) }
     val darkTheme = when (themeMode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -28,7 +33,7 @@ fun MelovaRoot(themePreferences: ThemePreferences, onDarkThemeChange: @Composabl
     onDarkThemeChange(darkTheme)
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        MelovaTheme(darkTheme = darkTheme) {
+        MelovaTheme(darkTheme = darkTheme, lateFontsLoaded = lateFontsLoaded) {
             MelovaApp(
                 themeMode = themeMode,
                 onThemeModeChange = { mode ->

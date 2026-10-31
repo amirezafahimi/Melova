@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.melova.platform.appVersionName
 import app.melova.platform.formatPersianInteger
+import app.melova.platform.persianDigits
 import app.melova.platform.rememberInstallOffer
 import app.melova.presentation.CatalogUiState
 import app.melova.presentation.StudentUiState
@@ -58,6 +59,7 @@ import app.melova.ui.components.MelovaTextField
 import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.StudentAvatar
 import app.melova.ui.components.TeacherCard
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaGold
@@ -138,7 +140,7 @@ fun ProfileScreen(
                 }
                 item {
                     Text(
-                        text = "Melova • نسخه‌ی $appVersionName",
+                        text = persianDigits("Melova • نسخه‌ی $appVersionName"),
                         style = MaterialTheme.typography.labelSmall,
                         color = MelovaTextMuted,
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
@@ -255,7 +257,7 @@ private fun TeacherPanelCard(state: TeacherUiState, onSignIn: () -> Unit, onOpen
                 Text(
                     text = when {
                         !state.isSignedIn -> "ورود با کد استاد"
-                        else -> state.profile?.let { "${it.lessons.size} درس، ${it.lessons.count { l -> l.published }} منتشرشده" }
+                        else -> state.profile?.let { persianDigits("${it.lessons.size} درس، ${it.lessons.count { l -> l.published }} منتشرشده") }
                             ?: "در حال بارگذاری…"
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -292,7 +294,7 @@ fun FollowedTeachersScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                contentPadding = PagePadding,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item { MelovaTopBar(title = "استادهایی که دنبال می‌کنید", onBack = onBack) }

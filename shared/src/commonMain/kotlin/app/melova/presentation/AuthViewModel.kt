@@ -55,11 +55,11 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /** Accepts Persian digits and a pasted code; the last digit submits it. */
+    /** Accepts Persian digits and a pasted code, showing them as typed; the last digit submits it. */
     fun setCode(text: String) {
-        val code = digitsOnly(text).take(LOGIN_CODE_LENGTH)
+        val code = text.filter { digitsOnly(it.toString()).isNotEmpty() }.take(LOGIN_CODE_LENGTH)
         _uiState.update { it.copy(code = code, error = null) }
-        if (code.length == LOGIN_CODE_LENGTH) verifyCode(code)
+        if (code.length == LOGIN_CODE_LENGTH) verifyCode(digitsOnly(code))
     }
 
     private fun verifyCode(code: String) {

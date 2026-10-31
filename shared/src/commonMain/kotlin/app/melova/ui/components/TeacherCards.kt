@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.melova.data.model.Teacher
+import app.melova.platform.persianDigits
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaOutline
@@ -75,7 +76,7 @@ fun TeacherCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (teacher.bio.isBlank()) "$lessonCount درس" else "$lessonCount درس • ${teacher.bio}",
+                    text = persianDigits("$lessonCount درس").let { if (teacher.bio.isBlank()) it else "$it • ${teacher.bio}" },
                     style = MaterialTheme.typography.bodySmall,
                     color = MelovaTextMuted,
                     maxLines = 1,

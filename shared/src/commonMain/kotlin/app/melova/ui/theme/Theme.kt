@@ -38,13 +38,14 @@ private fun MelovaPalette.toColorScheme(): ColorScheme {
 @Composable
 fun MelovaTheme(
     darkTheme: Boolean,
+    lateFontsLoaded: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val palette = if (darkTheme) DarkPalette else LightPalette
     CompositionLocalProvider(LocalMelovaPalette provides palette) {
         MaterialTheme(
             colorScheme = palette.toColorScheme(),
-            typography = melovaTypography(),
+            typography = melovaTypography(lateFontsLoaded),
             content = content
         )
     }

@@ -28,6 +28,7 @@ import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.playback.TeacherVocalGenerator
 import app.melova.audio.capture.DeviceAudioHints
 import app.melova.audio.capture.VocalRecorder
+import app.melova.platform.persianDigits
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -927,8 +928,8 @@ class VocalTrainingViewModel(
                             it.copy(
                                 mode = VocalTrainingMode.IDLE,
                                 progress = 0f,
-                                statusMessage = "ضبط کوتاه بود (${recordedMs / 1000} ثانیه). " +
-                                    "حداقل ${minRequiredMs / 1000} ثانیه بخوانید و «توقف» بزنید."
+                                statusMessage = persianDigits("ضبط کوتاه بود (${recordedMs / 1000} ثانیه). ") +
+                                    persianDigits("حداقل ${minRequiredMs / 1000} ثانیه بخوانید و «توقف» بزنید.")
                             )
                         }
                     }
@@ -1051,7 +1052,7 @@ class VocalTrainingViewModel(
                     isNewBest = isNewBest,
                     bestScore = progressStore.bestScore(lessonId, sectionId),
                     statusMessage = score.summary.ifBlank {
-                        if (score.overall > 0) "نمره: ${score.overall}" else "تحلیل انجام شد"
+                        if (score.overall > 0) persianDigits("نمره: ${score.overall}") else "تحلیل انجام شد"
                     }
                 )
             }

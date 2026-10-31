@@ -75,6 +75,7 @@ import app.melova.audio.capture.TeacherTakeRecorder
 import app.melova.audio.io.WavUtils
 import app.melova.audio.io.WaveformPeaksExtractor
 import app.melova.audio.playback.ReferenceAudioPlayer
+import app.melova.platform.persianDigits
 import app.melova.ui.layout.LtrContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
@@ -559,7 +560,7 @@ private fun CountInPanel(countIn: Int, onCancel: () -> Unit) {
                         .background(Brush.linearGradient(listOf(MelovaAccent, MelovaSecondary))),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(value.toString(), fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(persianDigits(value.toString()), fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
             Text(

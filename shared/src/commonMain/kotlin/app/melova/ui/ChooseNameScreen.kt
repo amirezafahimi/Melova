@@ -33,6 +33,7 @@ import app.melova.ui.components.BusyOverlay
 import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaMark
 import app.melova.ui.components.MelovaTextField
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaText
@@ -53,7 +54,7 @@ fun ChooseNameScreen(isSaving: Boolean, onSave: (String) -> Unit, onSignOut: () 
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .imePadding()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(PagePadding),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Spacer(Modifier.height(64.dp))

@@ -16,6 +16,7 @@ import app.melova.data.remote.dto.PlaybackClipDto
 import app.melova.data.remote.dto.ScoreMetricDto
 import app.melova.data.remote.dto.ScoringResponseDto
 import app.melova.data.remote.dto.TahrirComparisonDto
+import app.melova.platform.persianDigits
 
 fun ScoringResponseDto.toDomain(): VocalScoreResult {
     val resolvedSummary = if (hasValidInput) {
@@ -27,9 +28,9 @@ fun ScoringResponseDto.toDomain(): VocalScoreResult {
     return VocalScoreResult(
         overall = overall,
         scoreMetrics = scoreMetrics.toDomainMetrics(pitchAccuracy),
-        summary = resolvedSummary,
-        technicalAnalysis = technicalAnalysis.ifBlank { failureReason.orEmpty() },
-        weakPoints = weakPoints,
+        summary = persianDigits(resolvedSummary),
+        technicalAnalysis = persianDigits(technicalAnalysis.ifBlank { failureReason.orEmpty() }),
+        weakPoints = weakPoints.map(::persianDigits),
         corrections = corrections.map { it.toDomain() },
         tahrirComparisons = tahrirComparisons.map { it.toDomain() },
         ornamentCorrections = ornamentCorrections.map { it.toDomain() },
@@ -66,12 +67,12 @@ fun PitchCorrectionDto.toDomain(): VocalScorer.PitchCorrection =
     VocalScorer.PitchCorrection(
         startMs = startMs,
         endMs = endMs,
-        timeLabel = timeLabel,
-        expectedNote = expectedNote,
-        sungNote = sungNote,
+        timeLabel = persianDigits(timeLabel),
+        expectedNote = persianDigits(expectedNote),
+        sungNote = persianDigits(sungNote),
         centsOff = centsOff,
         direction = direction.toCorrectionDirection(),
-        message = message,
+        message = persianDigits(message),
         referenceStartMs = referenceStartMs,
         referenceEndMs = referenceEndMs,
         studentClip = studentClip?.toDomain(),
@@ -82,12 +83,12 @@ fun OrnamentCorrectionDto.toDomain(): VocalScorer.PitchCorrection =
     VocalScorer.PitchCorrection(
         startMs = startMs,
         endMs = endMs,
-        timeLabel = timeLabel,
+        timeLabel = persianDigits(timeLabel),
         expectedNote = "",
         sungNote = "",
         centsOff = 0f,
         direction = VocalScorer.CorrectionDirection.GOOD,
-        message = message,
+        message = persianDigits(message),
         referenceStartMs = referenceStartMs,
         referenceEndMs = referenceEndMs,
         studentClip = studentClip?.toDomain(),
@@ -103,7 +104,7 @@ fun TahrirComparisonDto.toDomain(): TahrirComparison =
         studentEndMs = studentEndMs,
         score = score,
         vowelCount = vowelCount,
-        message = message,
+        message = persianDigits(message),
         studentClip = studentClip?.toDomain(),
         teacherClip = teacherClip?.toDomain()
     )

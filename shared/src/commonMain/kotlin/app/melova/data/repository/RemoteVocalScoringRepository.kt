@@ -12,6 +12,7 @@ import app.melova.data.remote.mapper.toRequestJson
 import app.melova.data.remote.multipartBody
 import app.melova.data.remote.serverBody
 import app.melova.platform.LocalFile
+import app.melova.platform.persianDigits
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.CancellationException
@@ -57,7 +58,7 @@ class RemoteVocalScoringRepository(
             val code = error.response.status.value
             val detail = serverBody(error)
             throw IOException(
-                detail.ifEmpty { "خطایی پیش آمد ($code)؛ دوباره تلاش کنید." },
+                persianDigits(detail.ifEmpty { "خطایی پیش آمد ($code)؛ دوباره تلاش کنید." }),
                 error
             )
         } catch (error: HttpRequestTimeoutException) {

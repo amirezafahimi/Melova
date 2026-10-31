@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
 import app.melova.data.repository.LessonFields
+import app.melova.platform.digitsOnly
+import app.melova.platform.persianDigits
 import app.melova.presentation.TeacherUiState
 import app.melova.presentation.TeacherViewModel
 import app.melova.ui.components.BusyOverlay
@@ -77,6 +79,7 @@ import app.melova.ui.components.TakeKind
 import app.melova.ui.components.TakePhase
 import app.melova.ui.components.TeacherAudioSlot
 import app.melova.ui.components.rememberTakeController
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
@@ -253,7 +256,7 @@ private fun TeacherLessonRow(number: Int, lesson: Lesson, onClick: () -> Unit) {
                     Text(
                         text = buildString {
                             append(if (lesson.hasIntro) "آموزش ✓" else "بدون آموزش")
-                            append("، $ready بخش")
+                            append(persianDigits("، $ready بخش"))
                             if (!lesson.isFree) append("، ${formatToman(lesson.priceToman)}")
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -403,7 +406,7 @@ fun LessonEditorScreen(
     }
     if (addingSection && lesson != null) {
         SectionFormDialog(
-            suggestedTitle = "بخش ${lesson.sections.size + 1}",
+            suggestedTitle = persianDigits("بخش ${lesson.sections.size + 1}"),
             busyLabel = state.busyLabel,
             onConfirm = { title, description, audio, onFailure ->
                 viewModel.addSection(
@@ -473,7 +476,7 @@ private fun TeacherSectionRow(number: Int, section: LessonSection, onDelete: () 
                 )
                 Text(
                     text = if (section.isAvailable) {
-                        "${(section.durationMs + 999) / 1000} ثانیه"
+                        persianDigits("${(section.durationMs + 999) / 1000} ثانیه")
                     } else {
                         "فایل صوتی پیدا نشد"
                     },
@@ -589,9 +592,9 @@ private fun SaleCard(lesson: Lesson, hasCard: Boolean, onEdit: () -> Unit) {
 /** Price 0 makes the lesson free again. */
 @Composable
 private fun SaleDialog(lesson: Lesson, onConfirm: (sku: String, priceToman: Long) -> Unit, onDismiss: () -> Unit) {
-    var priceText by rememberSaveable { mutableStateOf(lesson.priceToman.takeIf { it > 0 }?.toString().orEmpty()) }
+    var priceText by rememberSaveable { mutableStateOf(lesson.priceToman.takeIf { it > 0 }?.let { persianDigits(it.toString()) }.orEmpty()) }
     var sku by rememberSaveable { mutableStateOf(lesson.bazaarSku) }
-    val price = priceText.filter { it.isDigit() }.toLongOrNull() ?: 0L
+    val price = digitsOnly(priceText).toLongOrNull() ?: 0L
     FormDialog(
         title = "قیمت درس",
         confirmLabel = "ذخیره",
@@ -625,7 +628,7 @@ internal fun TeacherScaffold(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                contentPadding = PagePadding,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item { MelovaTopBar(title = title, subtitle = subtitle, onBack = onBack) }
@@ -764,7 +767,7 @@ private fun NumberBadge(number: Int) {
             .background(MelovaCardElevated),
         contentAlignment = Alignment.Center
     ) {
-        Text(number.toString(), style = MaterialTheme.typography.titleMedium, color = MelovaAccentSoft)
+        Text(persianDigits(number.toString()), style = MaterialTheme.typography.titleMedium, color = MelovaAccentSoft)
     }
 }
 

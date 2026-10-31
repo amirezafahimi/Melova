@@ -1,5 +1,6 @@
 package app.melova.ui
 
+import app.melova.platform.persianDigits
 import app.melova.platform.rememberMicPermission
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -75,6 +76,7 @@ import app.melova.ui.components.MelovaMediaIconButton
 import app.melova.ui.components.MelovaProgressBar
 import app.melova.ui.components.PitchCorrectionRow
 import app.melova.ui.layout.LtrContent
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
@@ -121,7 +123,7 @@ fun MelovaScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(PagePadding),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 MelovaTopBar(
@@ -439,7 +441,7 @@ private fun ScoreResultCard(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     LtrContent {
                         Text(
-                            text = "${result.overall}",
+                            text = persianDigits(result.overall.toString()),
                             style = MaterialTheme.typography.displaySmall,
                             fontWeight = FontWeight.Bold,
                             color = MelovaAccentSoft
@@ -519,7 +521,7 @@ private fun ScoreRow(label: String, score: Int, ltrSuffix: String? = null) {
         }
         LtrContent {
             Text(
-                text = "$score%",
+                text = persianDigits("$score%"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = scoreColor(score)
@@ -532,7 +534,7 @@ private fun formatProgressTime(uiState: MelovaUiState): String {
     val totalSeconds = uiState.durationSeconds.coerceAtLeast(1)
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
-    return "$minutes:${seconds.pad2()}"
+    return persianDigits("$minutes:${seconds.pad2()}")
 }
 
 private fun statusLabel(mode: SessionMode, isPlaying: Boolean): String = when (mode) {

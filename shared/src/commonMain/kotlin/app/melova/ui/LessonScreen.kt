@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -61,6 +60,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
+import app.melova.platform.persianDigits
 import app.melova.presentation.CatalogUiState
 import app.melova.presentation.IntroStatus
 import app.melova.presentation.LessonIntroUiState
@@ -73,6 +73,7 @@ import app.melova.ui.components.ScoreBadge
 import app.melova.ui.components.SectionHeader
 import app.melova.ui.components.formatClock
 import app.melova.ui.layout.LtrContent
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
@@ -125,7 +126,7 @@ fun LessonScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                contentPadding = PagePadding,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item { MelovaTopBar(title = lesson?.title ?: "درس", onBack = onBack) }
@@ -179,7 +180,7 @@ fun LessonScreen(
                 item {
                     SectionHeader(
                         title = "بخش‌های تمرین",
-                        trailing = "${catalogState.practicedSections(lesson)} از ${lesson.sections.size}"
+                        trailing = persianDigits("${catalogState.practicedSections(lesson)} از ${lesson.sections.size}")
                     )
                 }
                 itemsIndexed(lesson.sections, key = { _, section -> section.id }) { index, section ->
@@ -203,7 +204,7 @@ private fun LessonHero(lesson: Lesson, onTeacherClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (lesson.level.isNotBlank()) MelovaChip(text = lesson.level)
-            MelovaChip(text = "${lesson.sections.size} بخش", color = MelovaAccentSoft)
+            MelovaChip(text = persianDigits("${lesson.sections.size} بخش"), color = MelovaAccentSoft)
         }
         if (lesson.subtitle.isNotBlank()) {
             Text(
@@ -398,7 +399,7 @@ private fun SectionCard(
                 ) {
                     if (section.isAvailable) {
                         Text(
-                            text = number.toString(),
+                            text = persianDigits(number.toString()),
                             style = MaterialTheme.typography.titleMedium,
                             color = MelovaAccentSoft
                         )
@@ -441,7 +442,7 @@ private fun SectionCard(
                     }
                     if (section.durationMs > 0L) {
                         Text(
-                            text = "${(section.durationMs + 999) / 1000} ثانیه",
+                            text = persianDigits("${(section.durationMs + 999) / 1000} ثانیه"),
                             style = MaterialTheme.typography.labelSmall,
                             color = MelovaTextMuted
                         )

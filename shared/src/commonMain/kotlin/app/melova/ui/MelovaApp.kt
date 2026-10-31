@@ -47,6 +47,7 @@ import app.melova.presentation.TeacherPerformanceViewModel
 import app.melova.presentation.VocalTrainingViewModel
 import app.melova.ui.components.MainTab
 import app.melova.ui.components.MelovaBottomBar
+import app.melova.ui.layout.PageBottomGap
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaCardElevated
 import app.melova.ui.theme.MelovaText
@@ -499,7 +500,7 @@ fun MelovaApp(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(bottom = if (currentTab != null) 110.dp else 16.dp)
+                .padding(bottom = if (currentTab != null) 122.dp else PageBottomGap)
         ) { data ->
             RtlContent {
                 Snackbar(containerColor = MelovaCardElevated, contentColor = MelovaText) {

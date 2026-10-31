@@ -1,6 +1,7 @@
 package app.melova.data.remote
 
 import app.melova.platform.ioDispatcher
+import app.melova.platform.persianDigits
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
@@ -24,7 +25,7 @@ suspend fun <T> apiCall(block: suspend () -> T): T = withContext(ioDispatcher) {
         throw error
     } catch (error: ResponseException) {
         val code = error.response.status.value
-        throw ApiException(serverDetail(error) ?: "خطایی پیش آمد ($code)", code, error)
+        throw ApiException(serverDetail(error) ?: persianDigits("خطایی پیش آمد ($code)"), code, error)
     } catch (error: HttpRequestTimeoutException) {
         throw ApiException("پاسخ طول کشید؛ دوباره تلاش کنید.", null, error)
     } catch (error: ConnectTimeoutException) {
@@ -41,7 +42,7 @@ suspend fun <T> apiCall(block: suspend () -> T): T = withContext(ioDispatcher) {
 suspend fun serverDetail(error: ResponseException): String? =
     runCatching {
         MelovaNetwork.json.parseToJsonElement(error.response.bodyAsText())
-            .jsonObject["detail"]?.jsonPrimitive?.content
+            .jsonObject["detail"]?.jsonPrimitive?.content?.let(::persianDigits)
     }.getOrNull()
 
 /** The raw body of a failed call, trimmed. */

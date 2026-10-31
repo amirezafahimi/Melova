@@ -170,7 +170,7 @@ fun ErrorDetailSheet(
                 if (correction != null) {
                     NoteFacts(correction, markColor)
                 } else if (comparison != null) {
-                    DetailPill(text = "تطابق ${comparison.score}٪", color = markColor)
+                    DetailPill(text = persianDigits("تطابق ${comparison.score}٪"), color = markColor)
                 }
 
                 DetailLaneCard(
@@ -231,7 +231,7 @@ private fun NoteFacts(correction: VocalScorer.PitchCorrection, markColor: Color)
             VocalScorer.CorrectionDirection.FLAT -> "پایین‌تر"
             VocalScorer.CorrectionDirection.GOOD -> null
         }
-        if (way != null && cents > 0) DetailPill(text = "$cents سنت $way", color = markColor)
+        if (way != null && cents > 0) DetailPill(text = persianDigits("$cents سنت $way"), color = markColor)
     }
 }
 

@@ -47,6 +47,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.melova.data.model.Lesson
+import app.melova.platform.formatPersianInteger
+import app.melova.platform.persianDigits
 import app.melova.presentation.CatalogUiState
 import app.melova.ui.components.BottomBarContentPadding
 import app.melova.ui.components.MelovaBackground
@@ -151,7 +153,7 @@ fun HomeScreen(
                         myLessons.isEmpty() -> item(key = "no-lessons") { NoLessonsCard(onExploreClick) }
                         else -> {
                             item(key = "lessons-header") {
-                                SectionHeader(title = "درس‌های من", trailing = "${myLessons.size} درس")
+                                SectionHeader(title = "درس‌های من", trailing = persianDigits("${myLessons.size} درس"))
                             }
                             items(myLessons, key = { it.id }) { lesson ->
                                 MyLessonRow(
@@ -241,7 +243,7 @@ private fun ContinueCard(
                     if (lesson != null) {
                         val left = lesson.availableSections - practicedInLesson
                         Text(
-                            text = "${lesson.teacher}، $left بخش مانده",
+                            text = "${lesson.teacher}، ${formatPersianInteger(left.toLong())} بخش مانده",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f),
                             maxLines = 1,
@@ -273,7 +275,7 @@ private fun ContinueCard(
                     followLayoutDirection = true
                 )
                 Text(
-                    text = "$practiced از $total بخش",
+                    text = persianDigits("$practiced از $total بخش"),
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.White.copy(alpha = 0.9f)
                 )

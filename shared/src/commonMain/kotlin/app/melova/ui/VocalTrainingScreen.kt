@@ -1,5 +1,6 @@
 package app.melova.ui
 
+import app.melova.platform.persianDigits
 import app.melova.platform.rememberMicPermission
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -77,6 +78,7 @@ import app.melova.ui.components.StudentRecordingWaveform
 import app.melova.ui.components.VocalTrainingCorrectionRow
 import app.melova.ui.components.VocalTrainingTahrirRow
 import app.melova.ui.layout.LtrContent
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
@@ -122,7 +124,7 @@ fun VocalTrainingScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .verticalScroll(scrollState)
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(PagePadding),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 RtlContent {
@@ -264,7 +266,7 @@ private fun LessonCard(uiState: VocalTrainingUiState, onRetry: () -> Unit) {
                 )
                 if (uiState.durationSeconds > 0) {
                     Text(
-                        text = "• ${uiState.durationSeconds} ثانیه",
+                        text = persianDigits("• ${uiState.durationSeconds} ثانیه"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MelovaText.copy(alpha = 0.6f),
                         textAlign = TextAlign.Start
@@ -272,7 +274,7 @@ private fun LessonCard(uiState: VocalTrainingUiState, onRetry: () -> Unit) {
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 uiState.bestScore?.let { best ->
-                    MelovaChip(text = "بهترین نمره: $best", color = MelovaGold)
+                    MelovaChip(text = persianDigits("بهترین نمره: $best"), color = MelovaGold)
                 }
             }
 
@@ -849,7 +851,7 @@ private fun HolisticScoreResultCard(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     LtrContent {
                         Text(
-                            text = "${result.overall}",
+                            text = persianDigits(result.overall.toString()),
                             style = MaterialTheme.typography.displaySmall,
                             fontWeight = FontWeight.Bold,
                             color = scoreColor(result.overall)
@@ -1012,7 +1014,7 @@ private fun UserRecordingSection(
                     textAlign = TextAlign.Start
                 )
                 Text(
-                    text = "نسخه ضبط‌شده • ${durationSeconds.coerceAtLeast(1)} ثانیه",
+                    text = persianDigits("نسخه ضبط‌شده • ${durationSeconds.coerceAtLeast(1)} ثانیه"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MelovaText.copy(alpha = 0.65f),
                     textAlign = TextAlign.Start
@@ -1108,6 +1110,6 @@ private fun formatPlaybackClock(timeMs: Long): String {
     val totalSeconds = (timeMs / 1000).coerceAtLeast(0)
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
-    return "$minutes:${seconds.pad2()}"
+    return persianDigits("$minutes:${seconds.pad2()}")
 }
 

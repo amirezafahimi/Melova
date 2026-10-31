@@ -23,13 +23,19 @@ rule, say so and update this file in the same change.
 - Reuse before writing: `MelovaSurfaceCard`, `MelovaTopBar`, `MelovaNavRow` for a row that opens
   something, `SectionHeader`, `ConfirmDialog`, `MelovaBackground`, `RtlContent`.
 - A new page is `MelovaBackground { RtlContent { LazyColumn … } }` with system bar insets and
-  20.dp sides, and gets a route in `AppScreen` and a `composable` in `MelovaApp`.
+  `PagePadding`, and gets a route in `AppScreen` and a `composable` in `MelovaApp`.
 - Back does what the page's back button does, on every page, from Android's system back and the
   browser's back alike. `MelovaTopBar`, `MelovaDialog` and sheets go through
   `PlatformBackHandler`; a new layer on a page (dialog, sheet, step) that closes with a button
   uses it too. A page's own back logic goes in the top bar's `onBack`, never only in the button.
 - Works at phone width in both themes. Anything shown over a photo or accent stays readable.
-- Numbers shown to people use Persian digits (`formatPersianInteger`).
+- Nothing sits on the bottom edge of the screen. Whatever is pinned to the bottom of a page (a
+  message box, buttons, the tab bar) keeps `PageBottomGap` under it, and a scrolling page ends
+  with it through `PagePadding`. System bar insets don't count: they are zero in the browser.
+- Numbers the app writes use Persian digits (`formatPersianInteger`, `persianDigits`), and so do
+  numbers in text the backend sends. The font draws each digit as it was written, so a number
+  that skips these shows in English. What people typed (messages, names, titles, phone, email)
+  stays exactly as they typed it.
 
 ## Shared code
 

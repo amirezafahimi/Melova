@@ -47,6 +47,7 @@ import app.melova.ui.components.MelovaTextField
 import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.StudentAvatar
 import app.melova.ui.layout.LtrContent
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaText
@@ -76,7 +77,7 @@ fun EditProfileScreen(
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .imePadding()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(PagePadding),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 MelovaTopBar(title = "ویرایش پروفایل", onBack = onBack)

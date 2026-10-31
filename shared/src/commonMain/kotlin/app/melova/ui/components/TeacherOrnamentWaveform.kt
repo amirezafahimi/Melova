@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.melova.data.model.TeacherOrnament
 import app.melova.data.model.TeacherOrnamentKind
+import app.melova.platform.persianDigits
 import app.melova.ui.theme.LocalMelovaPalette
 import app.melova.ui.theme.MelovaPalette
 import kotlinx.coroutines.Job
@@ -303,7 +304,7 @@ fun TeacherOrnamentWaveform(
                     strokeWidth = 1.dp.toPx()
                 )
                 if (isSecond && tick > 0L) {
-                    val text = textMeasurer.measure("${tick / 1_000}s", rulerStyle)
+                    val text = textMeasurer.measure("${persianDigits((tick / 1_000).toString())}s", rulerStyle)
                     drawText(
                         textLayoutResult = text,
                         topLeft = Offset(

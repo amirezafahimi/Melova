@@ -12,6 +12,7 @@ import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.capture.VocalRecorder
 import app.melova.audio.scoring.VocalScorer
 import app.melova.data.ScaleExercise
+import app.melova.platform.persianDigits
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -140,7 +141,7 @@ class MelovaViewModel : ViewModel() {
         generated: ReferenceAudioGenerator.GeneratedExercise
     ): String {
         val durationText = formatDurationSeconds(generated.durationMs)
-        return "${generated.exercise.description} این تمرین ${generated.noteCount} نت دارد و حدود $durationText طول می‌کشد."
+        return "${generated.exercise.description} این تمرین ${persianDigits(generated.noteCount.toString())} نت دارد و حدود $durationText طول می‌کشد."
     }
 
     private fun startOrResumePlayback() {
@@ -306,11 +307,11 @@ class MelovaViewModel : ViewModel() {
     private fun formatDurationSeconds(durationMs: Long): String {
         val totalSeconds = ((durationMs + 999) / 1000).toInt()
         return if (totalSeconds < 60) {
-            "$totalSeconds ثانیه"
+            persianDigits("$totalSeconds ثانیه")
         } else {
             val minutes = totalSeconds / 60
             val seconds = totalSeconds % 60
-            "$minutes:${seconds.toString().padStart(2, '0')} دقیقه"
+            persianDigits("$minutes:${seconds.toString().padStart(2, '0')} دقیقه")
         }
     }
 

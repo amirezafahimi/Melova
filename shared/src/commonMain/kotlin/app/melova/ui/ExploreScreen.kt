@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.melova.platform.persianDigits
 import app.melova.presentation.CatalogUiState
 import app.melova.ui.components.BottomBarContentPadding
 import app.melova.ui.components.FollowButton
@@ -51,6 +52,7 @@ import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.SectionHeader
 import app.melova.ui.components.TeacherAvatar
 import app.melova.ui.components.TeacherCard
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaOutline
@@ -115,7 +117,7 @@ fun ExploreScreen(
                             }
                         }
                         if (searching && lessons.isNotEmpty()) {
-                            fullWidth("lessons") { SectionHeader(title = "درس‌ها", trailing = "${lessons.size} درس") }
+                            fullWidth("lessons") { SectionHeader(title = "درس‌ها", trailing = persianDigits("${lessons.size} درس")) }
                         }
                         items(lessons, key = { "lesson-" + it.id }) { lesson ->
                             LessonGridTile(lesson = lesson, onClick = { onLessonClick(lesson.id) })
@@ -173,7 +175,7 @@ fun TeacherPageScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                contentPadding = PagePadding,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item { MelovaTopBar(title = teacher?.name ?: "استاد", subtitle = "صفحه‌ی استاد", onBack = onBack) }
@@ -192,7 +194,7 @@ fun TeacherPageScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(teacher.name, style = MaterialTheme.typography.titleLarge, color = MelovaText)
                                     Text(
-                                        text = "${lessons.size} درس، ${state.availableSections(teacherId)} بخش",
+                                        text = persianDigits("${lessons.size} درس، ${state.availableSections(teacherId)} بخش"),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MelovaAccentSoft
                                     )

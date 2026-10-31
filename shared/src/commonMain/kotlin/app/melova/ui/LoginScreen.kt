@@ -69,6 +69,7 @@ import app.melova.ui.components.MelovaSegmentedControl
 import app.melova.ui.components.MelovaTextField
 import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.layout.LtrContent
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaCard
@@ -112,7 +113,7 @@ fun LoginScreen(
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .imePadding()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(PagePadding),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 MelovaTopBar(title = "ورود", onBack = if (onCodeStep) viewModel::backToAddress else onBack)
@@ -332,7 +333,7 @@ private fun CodeCell(digit: Char?, isNext: Boolean, modifier: Modifier = Modifie
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = digit?.let { formatPersianInteger(it.digitToInt().toLong()) }.orEmpty(),
+            text = digit?.toString().orEmpty(),
             style = MaterialTheme.typography.titleLarge,
             color = MelovaText
         )

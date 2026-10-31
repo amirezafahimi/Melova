@@ -1,7 +1,6 @@
 package app.melova.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBars
@@ -30,6 +29,7 @@ import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaNavRow
 import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.SectionHeader
+import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentTint
@@ -55,7 +55,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                contentPadding = PagePadding,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item { MelovaTopBar(title = "تنظیمات", onBack = onBack) }

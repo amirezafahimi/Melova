@@ -36,6 +36,7 @@ import app.melova.data.model.Lesson
 import app.melova.data.model.LessonPurchaseRequest
 import app.melova.data.model.StudentCard
 import app.melova.data.model.TeacherReport
+import app.melova.platform.persianDigits
 import app.melova.presentation.TeacherDeskUiState
 import app.melova.presentation.TeacherDeskViewModel
 import app.melova.ui.components.FormDialog
@@ -92,13 +93,13 @@ internal fun TeacherDeskEntryCard(
             DeskEntryRow(
                 Icons.Outlined.ChatBubbleOutline,
                 "گفتگو با هنرجوها",
-                if (unreadChats > 0) "$unreadChats پیام تازه" else "پیام‌ها و نتیجه‌ی تمرین هنرجوها",
+                if (unreadChats > 0) persianDigits("$unreadChats پیام تازه") else "پیام‌ها و نتیجه‌ی تمرین هنرجوها",
                 onOpenChats
             )
             DeskEntryRow(
                 Icons.Outlined.PeopleOutline,
                 "هنرجوها و پرداخت‌ها",
-                if (pendingPurchases > 0) "$pendingPurchases خرید منتظر تأیید شماست" else "تأیید خریدها و باز کردن درس برای هنرجو",
+                if (pendingPurchases > 0) persianDigits("$pendingPurchases خرید منتظر تأیید شماست") else "تأیید خریدها و باز کردن درس برای هنرجو",
                 onOpenStudents
             )
             DeskEntryRow(Icons.Outlined.Insights, "گزارش درآمد و زمان", "درآمد هر ساعت وقت شما، در مقایسه با کلاس خصوصی", onOpenReport)
@@ -144,7 +145,7 @@ fun TeacherStudentsScreen(
 
     TeacherScaffold(title = "هنرجوها و پرداخت‌ها", subtitle = null, onBack = onBack, busyLabel = state.busyLabel) {
         if (state.purchaseRequests.isNotEmpty()) {
-            item { SectionHeader(title = "خریدهای منتظر تأیید", trailing = "${state.purchaseRequests.size} خرید") }
+            item { SectionHeader(title = "خریدهای منتظر تأیید", trailing = persianDigits("${state.purchaseRequests.size} خرید")) }
             items(state.purchaseRequests, key = { "request-" + it.id }) { request ->
                 PurchaseRequestCard(
                     request = request,
@@ -174,7 +175,7 @@ fun TeacherStudentsScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(student.name.ifBlank { "بی‌نام" }, style = MaterialTheme.typography.titleMedium, color = MelovaText)
                         Text(
-                            text = "${lessons.count { it.id in student.ownedLessons && !it.isFree }} درس پولی",
+                            text = persianDigits("${lessons.count { it.id in student.ownedLessons && !it.isFree }} درس پولی"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MelovaAccentSoft
                         )
@@ -272,7 +273,7 @@ private fun PaymentDialog(
             MelovaSurfaceCard(
                 onClick = {
                     lessonId = if (selected) null else option.id
-                    if (!selected && priceText.isBlank() && option.priceToman > 0) priceText = option.priceToman.toString()
+                    if (!selected && priceText.isBlank() && option.priceToman > 0) priceText = persianDigits(option.priceToman.toString())
                 },
                 enabled = !owned,
                 contentPadding = 10.dp
@@ -347,7 +348,7 @@ fun TeacherReportScreen(
     }
 
     if (editingRate) {
-        var rateText by rememberSaveable { mutableStateOf(state.privateHourlyRateToman?.toString().orEmpty()) }
+        var rateText by rememberSaveable { mutableStateOf(state.privateHourlyRateToman?.let { persianDigits(it.toString()) }.orEmpty()) }
         FormDialog(
             title = "درآمد هر ساعت کلاس خصوصی",
             confirmLabel = "ذخیره",
@@ -418,12 +419,12 @@ private fun ReportNumbers(report: TeacherReport) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ReportLine("درآمد ناخالص", formatToman(report.grossToman))
             ReportLine("درآمد خالص", formatToman(report.netToman))
-            ReportLine("هنرجوی پرداخت‌کننده", report.payingStudents.toString())
-            ReportLine("کل وقت شما", "${formatFixed(report.teacherMinutes, 0)} دقیقه")
-            report.minutesPerPayingStudent?.let { ReportLine("وقت برای هر هنرجو", "${formatFixed(it, 1)} دقیقه") }
-            ReportLine("بازبینی پاسخ‌داده", report.reviewsAnswered.toString())
-            ReportLine("میانگین هر بازبینی", "${formatFixed(report.averageReviewMinutes, 1)} دقیقه")
-            ReportLine("در انتظار پاسخ", report.reviewsWaiting.toString())
+            ReportLine("هنرجوی پرداخت‌کننده", persianDigits(report.payingStudents.toString()))
+            ReportLine("کل وقت شما", persianDigits("${formatFixed(report.teacherMinutes, 0)} دقیقه"))
+            report.minutesPerPayingStudent?.let { ReportLine("وقت برای هر هنرجو", persianDigits("${formatFixed(it, 1)} دقیقه")) }
+            ReportLine("بازبینی پاسخ‌داده", persianDigits(report.reviewsAnswered.toString()))
+            ReportLine("میانگین هر بازبینی", persianDigits("${formatFixed(report.averageReviewMinutes, 1)} دقیقه"))
+            ReportLine("در انتظار پاسخ", persianDigits(report.reviewsWaiting.toString()))
         }
     }
 }

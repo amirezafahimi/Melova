@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.melova.data.model.ScoreMetric
+import app.melova.platform.persianDigits
 import app.melova.ui.layout.LtrContent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaText
@@ -65,7 +66,7 @@ private fun ScoreMetricRow(metric: ScoreMetric) {
         }
         LtrContent {
             Text(
-                text = "${metric.value}%",
+                text = persianDigits("${metric.value}%"),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MelovaAccentSoft

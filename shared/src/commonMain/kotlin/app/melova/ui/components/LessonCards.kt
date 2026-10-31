@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonPurchaseStatus
+import app.melova.platform.persianDigits
 import app.melova.ui.formatToman
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
@@ -57,7 +58,7 @@ private fun LessonBadge(number: Int, isDone: Boolean, size: Int) {
         if (isDone) {
             Icon(Icons.Default.Check, contentDescription = "تکمیل شد", tint = MelovaSuccess)
         } else {
-            Text(number.toString(), style = MaterialTheme.typography.titleLarge, color = MelovaAccentSoft)
+            Text(persianDigits(number.toString()), style = MaterialTheme.typography.titleLarge, color = MelovaAccentSoft)
         }
     }
 }
@@ -209,7 +210,7 @@ fun LessonRowCard(
                     )
                     Text(
                         text = buildString {
-                            append("${lesson.sections.size} بخش")
+                            append(persianDigits("${lesson.sections.size} بخش"))
                             if (lesson.level.isNotBlank()) append(" • ${lesson.level}")
                             if (lesson.hasIntro) append(" • آموزش صوتی")
                         },

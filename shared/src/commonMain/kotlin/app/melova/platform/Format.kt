@@ -37,6 +37,7 @@ fun formatPersianInteger(amount: Long): String {
     return if (amount < 0) "-$persian" else persian
 }
 
+/** For numbers the app writes itself: the font draws each digit as it was written. */
 fun persianDigits(text: String): String =
     text.map { ch -> if (ch in '0'..'9') '۰' + (ch - '0') else ch }.joinToString("")
 

@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import app.melova.ui.layout.PageBottomGap
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
@@ -52,7 +53,7 @@ import app.melova.ui.theme.MelovaTextMuted
 enum class MainTab { EXPLORE, PRACTICE, PROFILE }
 
 /** Bottom space tab screens leave so their last item clears the floating bar. */
-val BottomBarContentPadding = 128.dp
+val BottomBarContentPadding = 140.dp
 
 /**
  * Floating bottom bar. In RTL the first item sits on the right: explore (right),
@@ -69,7 +70,7 @@ fun MelovaBottomBar(
             modifier = modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = PageBottomGap),
             contentAlignment = Alignment.BottomCenter
         ) {
             Row(
