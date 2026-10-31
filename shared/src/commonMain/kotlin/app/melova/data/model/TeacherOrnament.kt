@@ -1,7 +1,7 @@
 package app.melova.data.model
 
 /**
- * یک تحریر، ویبراتو یا گذر استاد؛ [startMs] و [endMs] دقیقاً ابتدا و انتهای همان مصوت‌اند.
+ * One tahrir, vibrato or glide of the teacher; [startMs] and [endMs] are exactly that vowel's ends.
  */
 data class TeacherOrnament(
     val kind: TeacherOrnamentKind,

@@ -19,6 +19,8 @@ interface MelovaRemoteDataSource {
 
     suspend fun downloadSectionAudio(lessonId: String, sectionId: String): ByteArray
 
+    suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, speed: Float): ByteArray
+
     suspend fun getSectionOrnaments(lessonId: String, sectionId: String): TeacherOrnamentsResponseDto
 
     suspend fun scorePerformance(body: OutgoingContent): ScoringResponseDto

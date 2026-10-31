@@ -171,7 +171,7 @@ data class StudentUiState(
     val needsLogin: Boolean
         get() = account?.signedIn == false && loginMethods?.any == true
 
-    /** Teachers know a student by name, so a signed-in account has to have one. */
+    /** Teachers know a student by name, so a new account gives one before going on. */
     val needsName: Boolean
-        get() = account?.signedIn == true && account.name.isBlank()
+        get() = account?.needsName == true
 }

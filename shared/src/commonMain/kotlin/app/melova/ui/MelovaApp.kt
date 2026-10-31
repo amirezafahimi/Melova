@@ -33,6 +33,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.savedstate.read
+import app.melova.platform.ChatLinks
 import app.melova.presentation.CatalogViewModel
 import app.melova.presentation.ChatViewModel
 import app.melova.presentation.LessonIntroViewModel
@@ -82,7 +83,10 @@ fun MelovaApp(
     LaunchedEffect(studentState.account?.id, studentState.account?.isTeacher) {
         teacherViewModel.onAccountChanged()
     }
-    LaunchedEffect(studentState.account?.id, canChat) { chatViewModel.clear() }
+    LaunchedEffect(studentState.account?.id, canChat) {
+        chatViewModel.clear()
+        if (canChat) chatViewModel.syncNotifications()
+    }
     if (canChat) StayConnected(studentState.account?.id to teacherState.isSignedIn, chatViewModel)
     LaunchedEffect(chatState.message) {
         chatState.message?.let {
@@ -117,6 +121,17 @@ fun MelovaApp(
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentTab = AppScreen.tabFor(backStackEntry?.destination?.route)
+
+    // Waits for the splash, which would otherwise land on Home over the chat.
+    val tappedChat by ChatLinks.opening.collectAsStateWithLifecycle()
+    val isPastSplash = backStackEntry != null && backStackEntry?.destination?.route != AppScreen.SPLASH
+    LaunchedEffect(tappedChat, canChat, isPastSplash) {
+        val chatId = tappedChat ?: return@LaunchedEffect
+        if (canChat && isPastSplash) {
+            navController.navigate(AppScreen.chat(chatId))
+            ChatLinks.opening.value = null
+        }
+    }
     val selectTab: (MainTab) -> Unit = { tab ->
         navController.navigate(AppScreen.tabRoute(tab)) {
             // Home is always the bottom of the stack (the splash removes itself).
@@ -190,8 +205,6 @@ fun MelovaApp(
                 ProfileScreen(
                     catalogState = catalogState,
                     teacherState = teacherState,
-                    themeMode = themeMode,
-                    onThemeModeChange = onThemeModeChange,
                     onTeacherSignIn = { code ->
                         if (studentState.account?.signedIn == true) {
                             studentViewModel.sayITeach(code)
@@ -202,14 +215,36 @@ fun MelovaApp(
                     onOpenTeacherPanel = { navController.navigate(AppScreen.TEACHER_PANEL) },
                     studentState = studentState,
                     onLogin = { navController.navigate(AppScreen.login(LoginReason.PROFILE)) },
-                    onSignOut = studentViewModel::signOut,
                     onEditProfile = { navController.navigate(AppScreen.EDIT_PROFILE) },
                     onOpenFollowedTeachers = { navController.navigate(AppScreen.FOLLOWED_TEACHERS) },
+                    onOpenSettings = { navController.navigate(AppScreen.SETTINGS) },
+                    onOpenFaq = { navController.navigate(AppScreen.FAQ) },
                     canChat = canChat,
                     unreadChats = chatState.unread,
                     onOpenChats = { navController.navigate(AppScreen.CHATS) },
                     onStudentAppear = studentViewModel::refresh
                 )
+            }
+
+            composable(AppScreen.SETTINGS) {
+                SettingsScreen(
+                    themeMode = themeMode,
+                    onThemeModeChange = onThemeModeChange,
+                    canChat = canChat,
+                    chatState = chatState,
+                    chatViewModel = chatViewModel,
+                    isSignedIn = studentState.account?.signedIn == true,
+                    onSignOut = {
+                        chatViewModel.forgetThisDevice()
+                        studentViewModel.signOut()
+                        navController.popBackStack()
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(AppScreen.FAQ) {
+                FaqScreen(onBack = { navController.popBackStack() })
             }
 
             composable(AppScreen.FOLLOWED_TEACHERS) {

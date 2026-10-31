@@ -4,9 +4,9 @@ import kotlin.math.PI
 import kotlin.math.cos
 
 /**
- * بازه‌ی پخش یک خطا که سرور اعلام می‌کند: از [startMs] تا [endMs] پخش می‌شود و
- * محدوده‌ی خطا ([slowStartMs] تا [slowEndMs]) با سرعت [slowSpeed] پخش می‌شود.
- * سرعت در [rampMs] قبل از خطا آرام‌آرام کم می‌شود و بعد از آن آرام‌آرام برمی‌گردد.
+ * The stretch of a mistake to play: [startMs] to [endMs], with the mistake itself
+ * ([slowStartMs] to [slowEndMs]) at [slowSpeed]. Speed eases down over the [rampMs] before the
+ * mistake and back up after it.
  */
 data class PlaybackClip(
     val startMs: Long,
@@ -16,7 +16,7 @@ data class PlaybackClip(
     val slowSpeed: Float,
     val rampMs: Long
 ) {
-    /** سرعت پخش در موقعیت [positionMs] از فایل. */
+    /** The playback speed at [positionMs] of the file. */
     fun speedAt(positionMs: Long): Float {
         val ramp = rampMs.coerceAtLeast(1L)
         val fade = when {

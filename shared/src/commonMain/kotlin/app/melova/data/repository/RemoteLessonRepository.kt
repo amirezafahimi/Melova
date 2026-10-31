@@ -36,7 +36,7 @@ class RemoteLessonRepository(
                 val rawCatalog = MelovaNetwork.json.encodeToString(CatalogResponseDto.serializer(), response)
                 cacheFile.writeText(rawCatalog)
                 response.toDomain()
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 val cached = cacheFile.takeIf { it.exists() }?.let {
                     runCatching { MelovaNetwork.json.decodeFromString(CatalogResponseDto.serializer(), it.readText()) }.getOrNull()
                 } ?: throw IOException(
@@ -83,6 +83,28 @@ class RemoteLessonRepository(
         }
     }
 
+    override suspend fun sectionSlowAudioFile(
+        context: PlatformContext,
+        lesson: Lesson,
+        section: LessonSection,
+        speed: Float
+    ): LocalFile = withContext(ioDispatcher) {
+        cachedDownload(
+            dir = lessonDir(context, lesson.id),
+            // Not starting with the section's own prefix, which would clear this copy away.
+            prefix = "slow_${safeName(speed.toString())}_${safeName(section.id)}_",
+            version = section.audioVersion,
+            extension = ".wav"
+        ) { target ->
+            remoteDataSource.downloadSectionSlowAudio(lesson.id, section.id, speed).writeAtomically(target, minBytes = 45L)
+            require(TeacherReferenceCache.isValidWav(target)) { "فایل صوتی استاد معتبر نیست." }
+            val (samples, sampleRate) = WavUtils.readPcm16Samples(target)
+            if (samples.isNotEmpty()) {
+                WavUtils.writePcm16Wav(target, WavUtils.normalizePeak(samples), sampleRate)
+            }
+        }
+    }
+
     override suspend fun sectionOrnaments(
         lesson: Lesson,
         section: LessonSection
@@ -92,7 +114,7 @@ class RemoteLessonRepository(
 
         val response = try {
             remoteDataSource.getSectionOrnaments(lesson.id, section.id)
-        } catch (error: Exception) {
+        } catch (error: Throwable) {
             throw IOException("دریافت تحریرهای استاد ممکن نشد. اتصال اینترنت را بررسی کنید.", error)
         }
         response.failureReason?.takeIf { it.isNotBlank() }?.let { throw IOException(it) }
@@ -117,7 +139,7 @@ class RemoteLessonRepository(
 
         try {
             download(target)
-        } catch (error: Exception) {
+        } catch (error: Throwable) {
             target.delete()
             throw IOException("دانلود فایل صوتی ممکن نشد. اتصال اینترنت را بررسی کنید.", error)
         }

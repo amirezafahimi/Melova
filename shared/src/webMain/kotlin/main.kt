@@ -8,7 +8,9 @@ import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.ComposeViewport
+import app.melova.audio.web.MelovaAudioJs
 import app.melova.data.repository.StudentRepository
+import app.melova.platform.ChatLinks
 import app.melova.platform.MelovaPlatform
 import app.melova.platform.WebContext
 import app.melova.resources.Res
@@ -28,6 +30,7 @@ fun main() {
     MelovaPlatform.context = WebContext
     // Before any request, so the catalog already knows which lessons this student owns.
     StudentRepository(WebContext).restoreSession()
+    MelovaAudioJs.watchChatLinks { ChatLinks.opening.value = it }
     val themePreferences = ThemePreferences(WebContext)
     ComposeViewport(document.body!!) {
         // The page keeps its loading text until every font is in, so no text ever shows in

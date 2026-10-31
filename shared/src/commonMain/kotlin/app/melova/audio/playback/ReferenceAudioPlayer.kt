@@ -20,10 +20,10 @@ expect class ReferenceAudioPlayer(context: PlatformContext) {
     fun togglePlayPause()
     fun stop()
 
-    /** سرعت پخش؛ زیر و بمی صدا عوض نمی‌شود تا فالشی همان‌طور که بوده شنیده شود. */
+    /** Playback speed; the pitch stays, so an off note is heard as it was sung. */
     fun setSpeed(speed: Float)
 
-    /** پخش دوباره‌ی همان فایل از ابتدا تا وقتی خاموش شود (برای تکرار یک بازه). */
+    /** Plays the same file over from the start until turned off, to repeat a segment. */
     fun setLooping(loop: Boolean)
 
     fun currentPositionMs(): Long

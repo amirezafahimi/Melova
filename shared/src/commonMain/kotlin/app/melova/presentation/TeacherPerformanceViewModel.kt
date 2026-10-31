@@ -27,8 +27,8 @@ import app.melova.platform.LocalFile
 import app.melova.platform.ioDispatcher
 
 /**
- * نمای پیشرفته‌ی اجرای استاد: موج صدا، بازه‌های تحریر (T) و ویبراتو (V) و پخش
- * دقیق هر بازه با سرعت دلخواه.
+ * The teacher's performance in detail: the wave, its tahrir (T) and vibrato (V) segments,
+ * and exact playback of each at any speed.
  */
 class TeacherPerformanceViewModel(
     savedStateHandle: SavedStateHandle
@@ -47,9 +47,11 @@ class TeacherPerformanceViewModel(
     private var progressJob: Job? = null
     private var playJob: Job? = null
 
-    private var teacherFile: LocalFile? = null
-    private var teacherSamples: ShortArray = ShortArray(0)
-    private var sampleRate: Int = WavUtils.SAMPLE_RATE
+    private var slowJob: Job? = null
+
+    /** What the player reads from: the teacher's file, or a slower copy once one is here. */
+    private var voice: Voice? = null
+    private val voices = mutableMapOf<Float, Voice>()
 
     /**
      * A segment plays from its own cut of the audio, so it ends where the
@@ -91,9 +93,7 @@ class TeacherPerformanceViewModel(
                 val (samples, rate) = withContext(ioDispatcher) { WavUtils.readPcm16Samples(file) }
                 lesson = remoteLesson
                 section = remoteSection
-                teacherFile = file
-                teacherSamples = samples
-                sampleRate = rate
+                voice = Voice(file, samples, rate, speed = 1f).also { voices[1f] = it }
                 loadWholeFile()
                 _uiState.update {
                     it.copy(
@@ -155,13 +155,13 @@ class TeacherPerformanceViewModel(
         playWholeFrom(fromMs)
     }
 
-    /** پخش از لحظه‌ای که روی موج زده شده تا انتهای اجرا. */
+    /** Plays from the tapped moment of the wave to the end. */
     fun playAt(positionMs: Long) {
         if (!_uiState.value.isReady) return
         playWholeFrom(positionMs)
     }
 
-    /** پخش فقط همان بازه، از ابتدای مصوت تا انتهای آن. */
+    /** Plays just this segment, from the start of its vowel to the end. */
     fun playSegment(index: Int) {
         if (!_uiState.value.isReady) return
         val ornament = _uiState.value.ornaments.getOrNull(index) ?: return
@@ -178,15 +178,55 @@ class TeacherPerformanceViewModel(
             withContext(ioDispatcher) { writeSegment(ornament.startMs, ornament.endMs) }
             player.prepare(segmentFile, onFinished = ::onPlaybackFinished)
             player.setLooping(_uiState.value.loopSegment)
-            player.setSpeed(_uiState.value.speed)
+            applySpeed()
             player.playFrom(0L)
             startProgressPolling()
         }
     }
 
+    /** The player's own stretching covers the wait; the better copy takes over when it arrives. */
     fun setSpeed(speed: Float) {
-        player.setSpeed(speed)
         _uiState.update { it.copy(speed = speed) }
+        applySpeed()
+        slowJob?.cancel()
+        slowJob = viewModelScope.launch {
+            val wanted = voiceAt(speed) ?: return@launch
+            if (wanted !== voice) switchTo(wanted)
+        }
+    }
+
+    /** Null when it can't be had, and the slowing stays with the player. */
+    private suspend fun voiceAt(speed: Float): Voice? {
+        voices[speed]?.let { return it }
+        val currentLesson = lesson ?: return null
+        val currentSection = section ?: return null
+        return runCatching {
+            val file = lessonRepository.sectionSlowAudioFile(appContext, currentLesson, currentSection, speed)
+            val (samples, rate) = withContext(ioDispatcher) { WavUtils.readPcm16Samples(file) }
+            Voice(file, samples, rate, speed).also { voices[speed] = it }
+        }.getOrNull()
+    }
+
+    private fun switchTo(next: Voice) {
+        val wasPlaying = player.isPlaying
+        val positionMs = playheadMs()
+        val segment = _uiState.value.playingIndex
+        voice = next
+        when {
+            segment != null && wasPlaying -> playSegment(segment)
+            wasPlaying -> {
+                loadWholeFile()
+                player.playFrom((positionMs / next.speed).toLong())
+            }
+            else -> {
+                loadWholeFile()
+                _uiState.update { it.copy(playingIndex = null) }
+            }
+        }
+    }
+
+    private fun applySpeed() {
+        player.setSpeed(_uiState.value.speed / (voice?.speed ?: 1f))
     }
 
     fun toggleLoop() {
@@ -217,8 +257,8 @@ class TeacherPerformanceViewModel(
         val startMs = positionMs.coerceIn(0L, totalMs)
         playJob?.cancel()
         if (loadedClipStartMs != null) loadWholeFile()
-        player.setSpeed(_uiState.value.speed)
-        player.playFrom(startMs)
+        applySpeed()
+        player.playFrom((startMs / (voice?.speed ?: 1f)).toLong())
         _uiState.update {
             it.copy(isPlaying = true, positionMs = startMs, playingIndex = null)
         }
@@ -226,27 +266,31 @@ class TeacherPerformanceViewModel(
     }
 
     private fun loadWholeFile() {
-        val file = teacherFile ?: return
+        val file = voice?.file ?: return
         player.prepare(file, onFinished = ::onPlaybackFinished)
-        player.setSpeed(_uiState.value.speed)
+        applySpeed()
         loadedClipStartMs = null
     }
 
-    private fun playheadMs(): Long = (loadedClipStartMs ?: 0L) + player.currentPositionMs()
+    /** Where in the teacher's own time the player is; a slow copy runs longer than that. */
+    private fun playheadMs(): Long =
+        (loadedClipStartMs ?: 0L) + (player.currentPositionMs() * (voice?.speed ?: 1f)).toLong()
 
     /** The segment's own samples, with a few ms fade at each edge so the cut does not click. */
     private fun writeSegment(startMs: Long, endMs: Long) {
-        val from = (startMs * sampleRate / 1000L).toInt().coerceIn(0, teacherSamples.size)
-        val to = (endMs * sampleRate / 1000L).toInt().coerceIn(from, teacherSamples.size)
-        val clip = teacherSamples.copyOfRange(from, to)
-        val fade = minOf(clip.size / 4, sampleRate * EDGE_FADE_MS / 1000)
+        val source = voice ?: return
+        val samplesPerMs = source.sampleRate / source.speed / 1000f
+        val from = (startMs * samplesPerMs).toInt().coerceIn(0, source.samples.size)
+        val to = (endMs * samplesPerMs).toInt().coerceIn(from, source.samples.size)
+        val clip = source.samples.copyOfRange(from, to)
+        val fade = minOf(clip.size / 4, source.sampleRate * EDGE_FADE_MS / 1000)
         for (index in 0 until fade) {
             val gain = index.toFloat() / fade
             clip[index] = (clip[index] * gain).toInt().toShort()
             val tail = clip.size - 1 - index
             clip[tail] = (clip[tail] * gain).toInt().toShort()
         }
-        WavUtils.writePcm16Wav(segmentFile, clip, sampleRate)
+        WavUtils.writePcm16Wav(segmentFile, clip, source.sampleRate)
     }
 
     private fun startProgressPolling() {
@@ -291,6 +335,9 @@ class TeacherPerformanceViewModel(
         private const val SEGMENT_FILE_NAME = "teacher_segment.wav"
     }
 }
+
+/** The teacher's voice at [speed], which is 1 for their own file. */
+private class Voice(val file: LocalFile, val samples: ShortArray, val sampleRate: Int, val speed: Float)
 
 data class TeacherPerformanceUiState(
     val title: String = "",

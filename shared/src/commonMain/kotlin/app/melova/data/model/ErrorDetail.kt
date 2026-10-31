@@ -3,8 +3,8 @@ package app.melova.data.model
 import app.melova.audio.scoring.VocalScorer
 
 /**
- * «دیدن جزییات» یک خطا: موج استاد و هنرجو در اطراف خطا، با لحظه‌ی خطای نت
- * (یک نقطه) یا بازه‌ی تحریر و ویبراتو روی آن.
+ * «دیدن جزییات» for one mistake: both waves around it, with the moment of a note mistake
+ * (a point) or the span of a tahrir or vibrato marked on them.
  */
 data class ErrorDetail(
     /** Same key the rows use for the snippet that is playing. */

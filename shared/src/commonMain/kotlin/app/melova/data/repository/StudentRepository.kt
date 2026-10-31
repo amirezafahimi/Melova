@@ -50,7 +50,12 @@ class StudentRepository(
         true
     }
 
-    suspend fun account(): StudentAccount = followTeacherRole(apiCall { api.me() }.toDomain())
+    suspend fun account(): StudentAccount = followTeacherRole(apiCall { api.me() }.toDomain()).withNameQuestion()
+
+    private fun StudentAccount.withNameQuestion(): StudentAccount {
+        if (name.isNotBlank()) session.awaitingName = false
+        return copy(needsName = session.awaitingName && signedIn && name.isBlank())
+    }
 
     /** The signed-in student says they teach, which [code] proves. The account stays a teacher for good. */
     suspend fun sayITeach(code: String): StudentAccount =
@@ -63,7 +68,7 @@ class StudentRepository(
     }
 
     suspend fun setName(name: String): StudentAccount =
-        apiCall { api.updateMe(mapOf("name" to name.trim())) }.toDomain()
+        apiCall { api.updateMe(mapOf("name" to name.trim())) }.toDomain().withNameQuestion()
 
     /** The server crops it to a square; read now, as the picked file is only temporary. */
     suspend fun setPhoto(photo: LocalFile): StudentAccount {
@@ -122,8 +127,9 @@ class StudentRepository(
         val token = account.token ?: throw IOException("ورود ممکن نشد.")
         session.save(id, token)
         session.loginOffered = true
+        session.awaitingName = account.isNewAccount == true
         restoreSession()
-        return followTeacherRole(account.toDomain())
+        return followTeacherRole(account.toDomain()).withNameQuestion()
     }
 
     /** Back to being a guest, with a new guest account. */

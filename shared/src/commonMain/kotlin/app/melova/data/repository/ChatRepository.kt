@@ -24,6 +24,7 @@ import app.melova.data.remote.mapper.toDomain
 import app.melova.data.remote.writeAtomically
 import app.melova.platform.LocalFile
 import app.melova.platform.PlatformContext
+import app.melova.platform.PushAddress
 import app.melova.platform.cacheDir
 import kotlinx.io.IOException
 
@@ -51,6 +52,14 @@ class ChatRepository(
     /** The person has the chat on screen up to this message. */
     suspend fun markRead(chatId: String, messageId: Long): ChatUpdate =
         apiCall { api.read(session.token, chatId, messageId) }.run { toUpdate(chat, messages) }
+
+    /** The key a browser needs before it gives out a push address. */
+    suspend fun pushKey(): String = apiCall { api.pushKey() }.key ?: throw IOException("اعلان روشن نشد.")
+
+    /** From now on this device hears about this person's messages. */
+    suspend fun subscribe(address: PushAddress) = apiCall { api.subscribe(session.token, address) }
+
+    suspend fun unsubscribe(address: PushAddress) = apiCall { api.unsubscribe(address) }
 
     /** What the server pushes, until the connection ends. [onReady] comes once it is listening. */
     suspend fun listen(onReady: () -> Unit, onUpdate: (ChatUpdate) -> Unit) {

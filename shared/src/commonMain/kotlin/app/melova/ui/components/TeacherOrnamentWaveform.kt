@@ -1,5 +1,6 @@
 package app.melova.ui.components
 
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -18,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -37,14 +39,14 @@ import app.melova.data.model.TeacherOrnament
 import app.melova.data.model.TeacherOrnamentKind
 import app.melova.ui.theme.LocalMelovaPalette
 import app.melova.ui.theme.MelovaPalette
+import kotlinx.coroutines.flow.conflate
 import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * موج صدای استاد با بازه‌های تحریر (T)، ویبراتو (V) و گذر (G). هر بازه دقیقاً از ابتدای
- * مصوت تا انتهای آن کشیده می‌شود. زدن روی یک بازه همان بازه را پخش می‌کند و
- * زدن بیرون از بازه‌ها پخش را از همان لحظه شروع می‌کند. با [zoom] بزرگ‌تر از ۱
- * موج به‌صورت افقی پیمایش می‌شود و نشانگر پخش در دید می‌ماند.
+ * The teacher's wave with its tahrir (T), vibrato (V) and glide (G) segments, each spanning
+ * exactly its vowel. Tapping a segment plays it; tapping outside plays from that moment. With
+ * [zoom] above 1 the wave scrolls sideways and keeps the playhead in view.
  */
 @Composable
 fun TeacherOrnamentWaveform(
@@ -80,18 +82,34 @@ fun TeacherOrnamentWaveform(
         val currentZoom by rememberUpdatedState(zoom)
         val currentContentPx by rememberUpdatedState(contentPx)
 
-        LaunchedEffect(playheadMs, zoom, contentPx) {
-            // During a pinch the wave stays put under the fingers, wherever the playhead is.
-            pinch?.let { focus ->
-                scrollState.scrollTo((focus.fraction * contentPx - focus.viewportX).toInt().coerceAtLeast(0))
-                return@LaunchedEffect
-            }
-            if (zoom <= 1f) return@LaunchedEffect
-            val playheadPx = playheadMs.toFloat() / totalMs * contentPx
-            val left = scrollState.value.toFloat()
-            if (playheadPx < left || playheadPx > left + viewportPx * 0.85f) {
-                scrollState.scrollTo((playheadPx - viewportPx * 0.15f).toInt().coerceAtLeast(0))
-            }
+        val currentPlayheadMs by rememberUpdatedState(playheadMs)
+        val currentViewportPx by rememberUpdatedState(viewportPx)
+        val currentTotalMs by rememberUpdatedState(totalMs)
+
+        LaunchedEffect(scrollState) {
+            // Conflated, so ticks that arrive during a smooth scroll are dropped rather than queued.
+            snapshotFlow { Triple(currentPlayheadMs, currentZoom, currentContentPx) }
+                .conflate()
+                .collect { (playhead, zoomNow, content) ->
+                    // During a pinch the wave stays put under the fingers, wherever the playhead is.
+                    pinch?.let { focus ->
+                        scrollState.scrollTo((focus.fraction * content - focus.viewportX).toInt().coerceAtLeast(0))
+                        return@collect
+                    }
+                    if (zoomNow <= 1f || scrollState.isScrollInProgress) return@collect
+                    val width = currentViewportPx
+                    val playheadPx = playhead.toFloat() / currentTotalMs * content
+                    val onScreen = playheadPx - scrollState.value
+                    when {
+                        onScreen in 0f..width * FOLLOW_FROM -> Unit
+                        // Past the follow line the wave slides under the pointer instead of jumping a page.
+                        onScreen in 0f..width -> scrollState.scrollTo((playheadPx - width * FOLLOW_FROM).toInt())
+                        else -> scrollState.animateScrollTo(
+                            value = (playheadPx - width * ARRIVE_AT).toInt().coerceAtLeast(0),
+                            animationSpec = tween(ARRIVE_MS)
+                        )
+                    }
+                }
         }
 
         Box(
@@ -270,6 +288,13 @@ fun TeacherOrnamentWaveform(
         }
     }
 }
+
+/** Share of the view the playhead may cross before the wave starts to follow it. */
+private const val FOLLOW_FROM = 0.7f
+
+/** Where in the view the playhead lands after the wave moves to find it. */
+private const val ARRIVE_AT = 0.2f
+private const val ARRIVE_MS = 260
 
 /** Where the fingers are: this share of the wave stays at this x on screen. */
 private class PinchFocus(val fraction: Float, val viewportX: Float)

@@ -106,14 +106,14 @@ actual class ReferenceAudioPlayer actual constructor(context: Context) {
         player.clearMediaItems()
     }
 
-    /** سرعت پخش؛ زیر و بمی صدا عوض نمی‌شود تا فالشی همان‌طور که بوده شنیده شود. */
+    /** Playback speed; the pitch stays, so an off note is heard as it was sung. */
     actual fun setSpeed(speed: Float) {
         if (player.playbackParameters.speed != speed) {
             player.playbackParameters = PlaybackParameters(speed, 1f)
         }
     }
 
-    /** پخش دوباره‌ی همان فایل از ابتدا تا وقتی خاموش شود (برای تکرار یک بازه). */
+    /** Plays the same file over from the start until turned off, to repeat a segment. */
     actual fun setLooping(loop: Boolean) {
         player.repeatMode = if (loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
     }

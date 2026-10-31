@@ -8,7 +8,9 @@ import app.melova.data.model.ChatMessage
 import app.melova.data.model.ChatThread
 import app.melova.data.model.ChatUpdate
 import app.melova.data.repository.ChatRepository
+import app.melova.platform.ChatAlerts
 import app.melova.platform.LocalFile
+import app.melova.platform.NotificationState
 import app.melova.platform.appContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -223,7 +225,47 @@ class ChatViewModel : ViewModel() {
     /** Sign-in and sign-out change whose chats these are. */
     fun clear() {
         stopVoice()
-        _uiState.value = ChatUiState()
+        _uiState.update { ChatUiState(notifications = it.notifications) }
+    }
+
+    fun refreshNotifications() {
+        viewModelScope.launch {
+            val state = ChatAlerts.state()
+            _uiState.update { it.copy(notifications = state) }
+        }
+    }
+
+    fun enableNotifications() {
+        viewModelScope.launch {
+            runCatching { ChatAlerts.turnOn { repository.pushKey() }?.let { repository.subscribe(it) } }
+                .onFailure { _uiState.update { it.copy(message = "اعلان روشن نشد. دوباره امتحان کنید.") } }
+            refreshNotifications()
+        }
+    }
+
+    fun disableNotifications() {
+        viewModelScope.launch {
+            runCatching { ChatAlerts.turnOff()?.let { repository.unsubscribe(it) } }
+            refreshNotifications()
+        }
+    }
+
+    fun onNotificationsRefused() {
+        _uiState.update { it.copy(message = "اعلان ملووا مسدود است. از تنظیمات گوشی یا مرورگر آن را باز کنید.") }
+        refreshNotifications()
+    }
+
+    /** A device with notifications on hears about whoever is signed in on it now. */
+    fun syncNotifications() {
+        viewModelScope.launch {
+            runCatching { ChatAlerts.address()?.let { repository.subscribe(it) } }
+            refreshNotifications()
+        }
+    }
+
+    /** Signing out: this device stops hearing about the account, and picks up again on the next sign-in. */
+    fun forgetThisDevice() {
+        viewModelScope.launch { runCatching { ChatAlerts.address()?.let { repository.unsubscribe(it) } } }
     }
 
     fun consumeMessage() {
@@ -258,5 +300,6 @@ data class ChatUiState(
     val isVoicePlaying: Boolean = false,
     val voicePositionMs: Long = 0L,
     val voiceDurationMs: Long = 0L,
+    val notifications: NotificationState = NotificationState.UNSUPPORTED,
     val message: String? = null
 )

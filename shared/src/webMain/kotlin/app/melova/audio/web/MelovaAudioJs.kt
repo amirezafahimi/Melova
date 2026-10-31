@@ -59,6 +59,12 @@ private external object MelovaAudioGlobal : JsAny {
     fun canInstall(): Boolean
     fun watchInstall(changed: () -> Unit)
     fun install()
+    fun pushState(): Promise<JsAny?>
+    fun pushAddress(): Promise<JsAny?>
+    fun pushSubscribe(key: String): Promise<JsAny?>
+    fun pushUnsubscribe(): Promise<JsAny?>
+    fun askNotifications(): Promise<JsAny?>
+    fun watchChatLinks(opened: (String) -> Unit)
 }
 
 object MelovaAudioJs {
@@ -89,4 +95,22 @@ object MelovaAudioJs {
     fun watchInstall(changed: () -> Unit) = MelovaAudioGlobal.watchInstall(changed)
 
     fun install() = MelovaAudioGlobal.install()
+
+    /** Resolves to on, off, blocked, needs-install or unsupported. */
+    fun pushState(): Promise<JsAny?> = MelovaAudioGlobal.pushState()
+
+    /** Resolves to this browser's address as JSON, or null when it has none. */
+    fun pushAddress(): Promise<JsAny?> = MelovaAudioGlobal.pushAddress()
+
+    /** Resolves to the new address as JSON. */
+    fun pushSubscribe(key: String): Promise<JsAny?> = MelovaAudioGlobal.pushSubscribe(key)
+
+    /** Resolves to the address that stopped, as JSON, or null when there was none. */
+    fun pushUnsubscribe(): Promise<JsAny?> = MelovaAudioGlobal.pushUnsubscribe()
+
+    /** Resolves to whether the person allowed notifications. */
+    fun askNotifications(): Promise<JsAny?> = MelovaAudioGlobal.askNotifications()
+
+    /** Calls [opened] with the chat of each tapped notification, including the one that opened the page. */
+    fun watchChatLinks(opened: (String) -> Unit) = MelovaAudioGlobal.watchChatLinks(opened)
 }

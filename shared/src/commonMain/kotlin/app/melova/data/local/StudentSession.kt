@@ -28,11 +28,20 @@ class StudentSession(context: PlatformContext) {
         get() = prefs.getInt(KEY_LOGIN_OFFERED) == 1
         set(value) = prefs.putInt(KEY_LOGIN_OFFERED, if (value) 1 else 0)
 
-    fun clear() = save("", "")
+    /** Set while a new account hasn't given its name, so closing the app doesn't skip the question. */
+    var awaitingName: Boolean
+        get() = prefs.getInt(KEY_AWAITING_NAME) == 1
+        set(value) = prefs.putInt(KEY_AWAITING_NAME, if (value) 1 else 0)
+
+    fun clear() {
+        save("", "")
+        awaitingName = false
+    }
 
     private companion object {
         const val KEY_ID = "id"
         const val KEY_TOKEN = "token"
         const val KEY_LOGIN_OFFERED = "login_offered"
+        const val KEY_AWAITING_NAME = "awaiting_name"
     }
 }

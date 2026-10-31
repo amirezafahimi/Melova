@@ -12,7 +12,9 @@ data class StudentAccount(
     val photoVersion: Long?,
     /** A teacher is an ordinary account that also has the teacher panel. */
     val isTeacher: Boolean,
-    val ownedLessons: Set<String>
+    val ownedLessons: Set<String>,
+    /** Only an account just made is asked its name; one that signed in before never is. */
+    val needsName: Boolean = false
 )
 
 /** Which ways of signing in the server offers, narrowed to what this platform can do. */

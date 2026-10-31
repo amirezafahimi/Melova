@@ -87,6 +87,7 @@ import app.melova.platform.rememberMicPermission
 import app.melova.presentation.ChatUiState
 import app.melova.presentation.ChatViewModel
 import app.melova.ui.components.MelovaBackground
+import app.melova.ui.components.MelovaNavRow
 import app.melova.ui.components.MelovaChip
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTopBar
@@ -305,21 +306,13 @@ internal fun ChatsIconButton(unread: Int, onClick: () -> Unit) {
 /** The way into the chats from Profile. */
 @Composable
 internal fun ChatsEntryRow(unread: Int, onClick: () -> Unit) {
-    MelovaSurfaceCard(onClick = onClick, contentPadding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, tint = MelovaAccentSoft)
-            Column(modifier = Modifier.weight(1f)) {
-                Text("گفتگوها", style = MaterialTheme.typography.titleSmall, color = MelovaText)
-                Text(
-                    "پاسخ استادها و نتیجه‌ی تمرین‌هایی که فرستاده‌اید",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MelovaTextMuted
-                )
-            }
-            if (unread > 0) UnreadBadge(unread)
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
-        }
-    }
+    MelovaNavRow(
+        icon = Icons.Outlined.ChatBubbleOutline,
+        title = "گفتگوها",
+        subtitle = "پاسخ استادها و نتیجه‌ی تمرین‌هایی که فرستاده‌اید",
+        onClick = onClick,
+        trailing = { if (unread > 0) UnreadBadge(unread) }
+    )
 }
 
 @Composable

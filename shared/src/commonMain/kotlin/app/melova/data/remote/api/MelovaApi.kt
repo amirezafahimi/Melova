@@ -36,6 +36,11 @@ class MelovaApi(private val client: HttpClient) {
         client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/audio")
             .bodyAsBytes()
 
+    /** The section at a lower speed, stretched on the server with far fewer artefacts than the player's own. */
+    suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, speed: Float): ByteArray =
+        client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/audio/slow?speed=$speed")
+            .bodyAsBytes()
+
     /** The teacher's tahrir and vibrato vowels in one section. */
     suspend fun sectionOrnaments(lessonId: String, sectionId: String): TeacherOrnamentsResponseDto =
         client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/ornaments")

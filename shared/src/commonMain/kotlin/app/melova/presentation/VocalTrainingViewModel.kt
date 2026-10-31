@@ -421,8 +421,8 @@ class VocalTrainingViewModel(
     }
 
     /**
-     * پخش گزیده‌ی یک بازه‌ی دقیق [startMs, endMs] از صدای استاد یا هنرجو.
-     * با [clip]، سرعت پخش در محدوده‌ی خطا آرام‌آرام کم و بعد از آن آرام‌آرام زیاد می‌شود.
+     * Plays exactly [startMs, endMs] of the teacher's or student's voice.
+     * With [clip], speed eases down into the mistake and back up after it.
      */
     private fun playRegionSnippet(
         target: PlaybackTarget,
@@ -1056,7 +1056,7 @@ class VocalTrainingViewModel(
         private const val USER_RECORDING_FILE_NAME = "user_vocal.wav"
         private const val PRACTICE_TIP = "برای تحلیل بهتر، جمله‌های استاد را عیناً بخوانید؛ بدون تکرار یا اصلاح."
         private const val CORRECTION_CLIP_PADDING_MS = 1_000L
-        /** هر چند میلی‌ثانیه سرعت پخش به‌روز شود تا کم و زیاد شدنش نرم باشد. */
+        /** How often the speed updates, so that its ramp sounds smooth. */
         private const val SPEED_TICK_MS = 20L
         private const val DETAIL_CONTEXT_MS = 1_000L
         private const val DETAIL_BAR_COUNT = 140

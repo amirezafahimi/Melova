@@ -29,3 +29,29 @@ self.addEventListener('fetch', (event) => {
       .catch(() => caches.match(request).then((cached) => cached || Promise.reject(new Error('offline'))))
   );
 });
+
+self.addEventListener('push', (event) => {
+  const message = event.data ? event.data.json() : {};
+  event.waitUntil(self.registration.showNotification(message.title || 'ملووا', {
+    body: message.body || '',
+    icon: 'icons/icon-192.png',
+    lang: 'fa',
+    dir: 'rtl',
+    tag: message.chat_id,
+    renotify: Boolean(message.chat_id),
+    data: { chat: message.chat_id },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const chat = event.notification.data && event.notification.data.chat;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      const open = windows[0];
+      if (!open) return self.clients.openWindow(chat ? './?chat=' + encodeURIComponent(chat) : './');
+      if (chat) open.postMessage({ chat });
+      return open.focus();
+    })
+  );
+});

@@ -27,6 +27,9 @@ class MelovaRemoteDataSourceImpl(
     override suspend fun downloadSectionAudio(lessonId: String, sectionId: String) =
         MelovaNetwork.api.downloadSectionAudio(lessonId, sectionId)
 
+    override suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, speed: Float) =
+        MelovaNetwork.api.downloadSectionSlowAudio(lessonId, sectionId, speed)
+
     // The first request analyses the teacher's file, which takes as long as scoring.
     override suspend fun getSectionOrnaments(lessonId: String, sectionId: String): TeacherOrnamentsResponseDto =
         api.sectionOrnaments(lessonId, sectionId)

@@ -1,8 +1,8 @@
 package app.melova.data.model
 
 /**
- * یک ناحیه تحریر استاد و مقایسه‌اش با اجرای هنرجو.
- * بازه‌های زمانی برای پخش گزیده‌ی صدای استاد و هنرجو استفاده می‌شوند.
+ * One tahrir of the teacher compared with the student's take.
+ * The time spans play the excerpts of both voices.
  */
 data class TahrirComparison(
     val kind: TahrirKind,
@@ -16,7 +16,7 @@ data class TahrirComparison(
     val studentClip: PlaybackClip? = null,
     val teacherClip: PlaybackClip? = null
 ) {
-    /** شناسه‌ی پایدار برای تشخیص اینکه کدام ردیف در حال پخش است. */
+    /** A stable id, to tell which row is playing. */
     val key: Long get() = refStartMs
 
     val hasStudentRegion: Boolean

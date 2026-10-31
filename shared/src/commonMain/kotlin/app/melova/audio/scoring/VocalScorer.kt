@@ -31,7 +31,7 @@ class VocalScorer {
         val message: String,
         val referenceStartMs: Long = startMs,
         val referenceEndMs: Long? = null,
-        /** بازه‌ی پخش آهسته‌ی این خطا در صدای هنرجو و استاد (از سرور). */
+        /** The stretch of this mistake that plays slowly, in the student's and the teacher's voice. */
         val studentClip: PlaybackClip? = null,
         val teacherClip: PlaybackClip? = null
     )

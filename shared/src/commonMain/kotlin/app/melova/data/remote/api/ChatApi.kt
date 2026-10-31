@@ -11,8 +11,10 @@ import app.melova.data.remote.dto.ChatEventDto
 import app.melova.data.remote.dto.ChatHelloDto
 import app.melova.data.remote.dto.ChatThreadDto
 import app.melova.data.remote.dto.ChatsDto
+import app.melova.data.remote.dto.PushKeyDto
 import app.melova.data.remote.dto.SharedTakeDto
 import app.melova.data.remote.multipartBody
+import app.melova.platform.PushAddress
 import app.melova.platform.apiBaseUrl
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.webSocket
@@ -49,6 +51,21 @@ class ChatApi(private val client: HttpClient, private val socketClient: HttpClie
             header(TEACHER_TOKEN, teacherToken)
             jsonBody(JsonObject(mapOf("message_id" to JsonPrimitive(messageId))))
         }.decode()
+
+    suspend fun pushKey(): PushKeyDto = client.call(HttpMethod.Get, "api/v1/push/key").decode()
+
+    suspend fun subscribe(teacherToken: String?, address: PushAddress) {
+        client.call(HttpMethod.Post, "api/v1/push/subscriptions") {
+            header(TEACHER_TOKEN, teacherToken)
+            jsonBody(mapOf("endpoint" to address.endpoint, "p256dh" to address.p256dh, "auth" to address.auth).toJson())
+        }
+    }
+
+    suspend fun unsubscribe(address: PushAddress) {
+        client.call(HttpMethod.Post, "api/v1/push/subscriptions/remove") {
+            jsonBody(mapOf("endpoint" to address.endpoint).toJson())
+        }
+    }
 
     /** Hands over what the server pushes, and returns once the connection has ended. */
     suspend fun listen(teacherToken: String?, onEvent: (ChatEventDto) -> Unit) {

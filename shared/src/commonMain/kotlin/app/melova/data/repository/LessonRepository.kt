@@ -23,6 +23,9 @@ interface LessonRepository {
     /** Local copy of the teacher's performance for one section (16-bit PCM WAV). */
     suspend fun sectionAudioFile(context: PlatformContext, lesson: Lesson, section: LessonSection): LocalFile
 
+    /** A slower copy of the section's audio with the same pitch; fails where the server can't make one. */
+    suspend fun sectionSlowAudioFile(context: PlatformContext, lesson: Lesson, section: LessonSection, speed: Float): LocalFile
+
     /** The teacher's tahrir and vibrato vowels in one section, in time order. */
     suspend fun sectionOrnaments(lesson: Lesson, section: LessonSection): List<TeacherOrnament>
 }

@@ -72,3 +72,6 @@ data class SharedTakeDto(
     @SerialName("student_name") val studentName: String? = null,
     @SerialName("result") val result: ScoringResponseDto? = null
 )
+
+@Serializable
+data class PushKeyDto(@SerialName("key") val key: String? = null)

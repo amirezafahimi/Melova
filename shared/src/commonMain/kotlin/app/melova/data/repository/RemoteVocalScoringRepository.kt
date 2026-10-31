@@ -65,7 +65,7 @@ class RemoteVocalScoringRepository(
                 "زمان انتظار تمام شد؛ دوباره تلاش کنید.",
                 error
             )
-        } catch (error: IOException) {
+        } catch (error: Throwable) {
             throw IOException(
                 "اتصال برقرار نشد؛ اینترنت را بررسی کنید.",
                 error
@@ -80,7 +80,7 @@ class RemoteVocalScoringRepository(
             throw error
         } catch (error: ResponseException) {
             throw error
-        } catch (error: Exception) {
+        } catch (error: Throwable) {
             throw IOException(
                 "اتصال برقرار نشد؛ اینترنت را بررسی کنید.",
                 error

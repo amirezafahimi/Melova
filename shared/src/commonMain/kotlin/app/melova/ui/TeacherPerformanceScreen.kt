@@ -64,7 +64,7 @@ import app.melova.ui.theme.MelovaText
 import app.melova.platform.formatFixed
 import app.melova.platform.pad2
 
-/** جزئیات اجرای استاد: موج صدا با بازه‌های T و V و پخش آهسته‌ی هر بازه. */
+/** The teacher's performance in detail: the wave with its T and V segments, each playable slowly. */
 @Composable
 fun TeacherPerformanceScreen(
     onBack: () -> Unit,

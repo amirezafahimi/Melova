@@ -31,7 +31,8 @@ suspend fun <T> apiCall(block: suspend () -> T): T = withContext(ioDispatcher) {
         throw ApiException("اتصال برقرار نشد؛ اینترنت را بررسی کنید.", null, error)
     } catch (error: IOException) {
         throw ApiException("اتصال برقرار نشد؛ اینترنت را بررسی کنید.", null, error)
-    } catch (error: Exception) {
+    } catch (error: Throwable) {
+        // Throwable: a failed request in the browser is not an Exception, and says "Failed to fetch".
         throw ApiException("اتصال برقرار نشد؛ اینترنت را بررسی کنید.", null, error)
     }
 }

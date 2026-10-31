@@ -71,9 +71,9 @@ import kotlin.math.roundToInt
 private const val MOMENT_GLOW_MS = 60L
 
 /**
- * «دیدن جزییات» یک خطا: موج استاد و هنرجو زیر هم، هر کدام در بازه‌ای که پخش
- * می‌شود. خطای نت یک نقطه است و تحریر یا ویبراتو یک بازه‌ی رنگی؛ زدن روی هر موج
- * همان تکه را آهسته پخش می‌کند و خط پخش روی موج حرکت می‌کند.
+ * «دیدن جزییات» for one mistake: the teacher's and student's waves one above the other, each
+ * over the stretch that plays. A note mistake is a point, a tahrir or vibrato a coloured span;
+ * tapping a wave plays that piece slowly, with the playhead moving over it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

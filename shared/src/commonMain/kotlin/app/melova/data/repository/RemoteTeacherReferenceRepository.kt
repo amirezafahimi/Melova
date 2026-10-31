@@ -35,7 +35,7 @@ class RemoteTeacherReferenceRepository(
 
                 val sidecar = downloadSyllablesSidecar(context)
                 toCachedReference(wavFile, sidecar ?: syllablesFile.takeIf { it.exists() })
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 wavFile.delete()
                 TeacherReferenceCache.metaFile(context).delete()
                 syllablesFile.delete()

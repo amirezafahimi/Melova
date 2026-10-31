@@ -24,7 +24,9 @@ data class StudentMeDto(
     /** After sending a take: the chat it went into. */
     @SerialName("chat_id") val chatId: String? = null,
     /** Sign-in calls only: the token that replaces this install's old one. */
-    @SerialName("token") val token: String? = null
+    @SerialName("token") val token: String? = null,
+    /** Sign-in calls only: this sign-in made the account, so it has no name yet. */
+    @SerialName("is_new_account") val isNewAccount: Boolean? = null
 )
 
 /** Which ways of signing in this server has turned on. */

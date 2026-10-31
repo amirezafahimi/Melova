@@ -18,6 +18,8 @@ object AppScreen {
     const val LOGIN = "login/{$ARG_LOGIN_REASON}"
     const val EDIT_PROFILE = "profile/edit"
     const val FOLLOWED_TEACHERS = "profile/teachers"
+    const val SETTINGS = "profile/settings"
+    const val FAQ = "profile/faq"
 
     const val SOLFEGE = "solfege"
     const val LESSON = "lesson/{${LessonIntroViewModel.ARG_LESSON_ID}}"

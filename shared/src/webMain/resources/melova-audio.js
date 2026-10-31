@@ -237,8 +237,70 @@
     if (offer) offer.prompt();
   }
 
+  // Chat notifications. On iOS a browser tab can't have them, only the app added to the home screen.
+  function needsInstall() {
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    return isIos && !navigator.standalone;
+  }
+
+  function canPush() {
+    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  }
+
+  async function pushSubscription() {
+    if (!canPush()) return null;
+    const registration = await navigator.serviceWorker.ready;
+    return registration.pushManager.getSubscription();
+  }
+
+  function addressOf(subscription) {
+    if (!subscription) return null;
+    const { endpoint, keys } = subscription.toJSON();
+    return JSON.stringify({ endpoint, p256dh: keys.p256dh, auth: keys.auth });
+  }
+
+  async function pushState() {
+    if (needsInstall()) return 'needs-install';
+    if (!canPush()) return 'unsupported';
+    if (Notification.permission === 'denied') return 'blocked';
+    const subscription = Notification.permission === 'granted' ? await pushSubscription() : null;
+    return subscription ? 'on' : 'off';
+  }
+
+  async function pushSubscribe(key) {
+    const text = atob(key.replace(/-/g, '+').replace(/_/g, '/').padEnd(key.length + (4 - key.length % 4) % 4, '='));
+    const applicationServerKey = Uint8Array.from(text, (char) => char.charCodeAt(0));
+    const registration = await navigator.serviceWorker.ready;
+    return addressOf(await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey }));
+  }
+
+  async function pushUnsubscribe() {
+    const subscription = await pushSubscription();
+    if (subscription) await subscription.unsubscribe();
+    return addressOf(subscription);
+  }
+
+  async function askNotifications() {
+    return (await Notification.requestPermission()) === 'granted';
+  }
+
+  // A tapped notification reaches an open page as a message, and a new page in its address.
+  function watchChatLinks(opened) {
+    const address = new URL(location.href);
+    const chat = address.searchParams.get('chat');
+    if (chat) {
+      address.searchParams.delete('chat');
+      history.replaceState(null, '', address);
+      opened(chat);
+    }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => { if (event.data && event.data.chat) opened(event.data.chat); });
+    }
+  }
+
   // pickAudioFile is for the JS app, which a quick web build keeps from the last --legacy build.
   globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickFile, googleSignIn,
     pickAudioFile: () => pickFile('audio/*'), apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || ''),
-    canInstall: () => installOffer !== null, watchInstall: (changed) => { onInstallChange = changed; }, install };
+    canInstall: () => installOffer !== null, watchInstall: (changed) => { onInstallChange = changed; }, install,
+    pushState, pushAddress: async () => addressOf(await pushSubscription()), pushSubscribe, pushUnsubscribe, askNotifications, watchChatLinks };
 })();
