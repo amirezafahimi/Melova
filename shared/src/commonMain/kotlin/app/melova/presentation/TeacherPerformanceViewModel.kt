@@ -195,11 +195,15 @@ class TeacherPerformanceViewModel(
     }
 
     fun zoomIn() {
-        _uiState.update { it.copy(zoom = (it.zoom * 2).coerceAtMost(MAX_ZOOM)) }
+        setZoom(_uiState.value.zoom * 2)
     }
 
     fun zoomOut() {
-        _uiState.update { it.copy(zoom = (it.zoom / 2).coerceAtLeast(1)) }
+        setZoom(_uiState.value.zoom / 2)
+    }
+
+    fun setZoom(zoom: Float) {
+        _uiState.update { it.copy(zoom = zoom.coerceIn(1f, MAX_ZOOM)) }
     }
 
     fun stopPlayback() {
@@ -278,7 +282,7 @@ class TeacherPerformanceViewModel(
         const val ARG_LESSON_ID = "lessonId"
         const val ARG_SECTION_ID = "sectionId"
         val SPEEDS = listOf(0.25f, 0.5f, 0.75f, 1f)
-        const val MAX_ZOOM = 16
+        const val MAX_ZOOM = 16f
         /** One waveform bar per this many milliseconds, so zooming in stays sharp. */
         private const val MS_PER_BAR = 10L
         private const val MAX_BARS = 12_000
@@ -307,5 +311,5 @@ data class TeacherPerformanceUiState(
     /** The segment playing now; playback stops (or loops) at its end. */
     val playingIndex: Int? = null,
     val loopSegment: Boolean = false,
-    val zoom: Int = 1
+    val zoom: Float = 1f
 )

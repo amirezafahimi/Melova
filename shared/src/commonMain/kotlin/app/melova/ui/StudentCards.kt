@@ -124,12 +124,13 @@ internal fun AskTeacherCard(
                 Text(error, style = MaterialTheme.typography.bodySmall, color = MelovaError)
             }
             if (state.isSent && state.chatId != null) {
-                OutlinedButton(
+                Button(
                     onClick = { onOpenChat(state.chatId) },
                     shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
                     modifier = Modifier.fillMaxWidth().height(46.dp)
                 ) {
-                    Text("رفتن به گفتگو", color = MelovaText)
+                    Text("باز کردن گفتگو با استاد")
                 }
             }
             if (!state.isSent) {
@@ -327,21 +328,20 @@ private fun CardNumberRow(cardNumber: String) {
 /** A free lesson not yet in the student's list. Singing in it adds it as well. */
 @Composable
 internal fun FreeLessonCard(isBusy: Boolean, onAdd: () -> Unit) {
-    MelovaSurfaceCard(contentPadding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("این درس رایگان است", style = MaterialTheme.typography.titleSmall, color = MelovaText)
-                Text(
-                    text = "اضافه کنید تا در صفحه‌ی تمرین بماند.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MelovaTextMuted
-                )
-            }
+    MelovaSurfaceCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("این درس رایگان است", style = MaterialTheme.typography.titleMedium, color = MelovaText)
+            Text(
+                text = "اضافه کنید تا در صفحه‌ی تمرین بماند.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MelovaTextMuted
+            )
             Button(
                 onClick = onAdd,
                 enabled = !isBusy,
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+                colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
+                modifier = Modifier.fillMaxWidth().height(46.dp)
             ) { Text("افزودن به درس‌های من") }
         }
     }

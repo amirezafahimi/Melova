@@ -11,7 +11,7 @@ import app.melova.platform.filesDir
 object TeacherReferenceCache {
     const val WAV_NAME = "teacher_vocal_reference.wav"
     const val META_NAME = "teacher_vocal_reference.meta"
-    const val BACKEND_SOURCE_LABEL = "نمونه استاد (سرور)"
+    const val BACKEND_SOURCE_LABEL = "نمونه استاد"
     const val BACKEND_META = "backend:teacher_vocal_demo.wav:peak-0.92"
 
     fun wavFile(context: PlatformContext): LocalFile = LocalFile(filesDir(context), WAV_NAME)

@@ -13,12 +13,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -33,6 +38,7 @@ import app.melova.data.model.TeacherOrnamentKind
 import app.melova.ui.theme.LocalMelovaPalette
 import app.melova.ui.theme.MelovaPalette
 import kotlin.math.abs
+import kotlin.math.hypot
 
 /**
  * موج صدای استاد با بازه‌های تحریر (T)، ویبراتو (V) و گذر (G). هر بازه دقیقاً از ابتدای
@@ -47,7 +53,8 @@ fun TeacherOrnamentWaveform(
     playheadMs: Long,
     ornaments: List<TeacherOrnament>,
     selectedIndex: Int?,
-    zoom: Int,
+    zoom: Float,
+    onZoomChange: (Float) -> Unit,
     onSeekToMs: (Long) -> Unit,
     onOrnamentClick: (Int) -> Unit,
     modifier: Modifier = Modifier
@@ -65,13 +72,21 @@ fun TeacherOrnamentWaveform(
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val viewportWidth = maxWidth
-        val contentWidth = viewportWidth * zoom.coerceAtLeast(1)
+        val contentWidth = viewportWidth * zoom.coerceAtLeast(1f)
         val viewportPx = with(density) { viewportWidth.toPx() }
         val contentPx = with(density) { contentWidth.toPx() }
         val scrollState = rememberScrollState()
+        var pinch by remember { mutableStateOf<PinchFocus?>(null) }
+        val currentZoom by rememberUpdatedState(zoom)
+        val currentContentPx by rememberUpdatedState(contentPx)
 
         LaunchedEffect(playheadMs, zoom, contentPx) {
-            if (zoom <= 1) return@LaunchedEffect
+            // During a pinch the wave stays put under the fingers, wherever the playhead is.
+            pinch?.let { focus ->
+                scrollState.scrollTo((focus.fraction * contentPx - focus.viewportX).toInt().coerceAtLeast(0))
+                return@LaunchedEffect
+            }
+            if (zoom <= 1f) return@LaunchedEffect
             val playheadPx = playheadMs.toFloat() / totalMs * contentPx
             val left = scrollState.value.toFloat()
             if (playheadPx < left || playheadPx > left + viewportPx * 0.85f) {
@@ -79,7 +94,42 @@ fun TeacherOrnamentWaveform(
             }
         }
 
-        Box(modifier = Modifier.horizontalScroll(scrollState)) {
+        Box(
+            modifier = Modifier
+                .pointerInput(scrollState) {
+                    // Runs before the scrolling and the taps, and takes the event from them for two fingers.
+                    awaitEachGesture {
+                        // Measured from where the fingers landed: several moves can arrive in one frame,
+                        // before the new zoom is back here, and adding them up would lose all but the last.
+                        var startSpan = 0f
+                        var startZoom = 1f
+                        var fraction = 0f
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val fingers = event.changes.filter { it.pressed }
+                            if (fingers.isEmpty()) break
+                            if (fingers.size < 2) {
+                                startSpan = 0f
+                                continue
+                            }
+                            val (first, second) = fingers
+                            val span = hypot(first.position.x - second.position.x, first.position.y - second.position.y)
+                            val viewportX = (first.position.x + second.position.x) / 2f
+                            if (startSpan <= 0f) {
+                                startSpan = span
+                                startZoom = currentZoom
+                                fraction = (scrollState.value + viewportX) / currentContentPx
+                            } else {
+                                pinch = PinchFocus(fraction = fraction, viewportX = viewportX)
+                                onZoomChange(startZoom * span / startSpan)
+                            }
+                            event.changes.forEach { it.consume() }
+                        }
+                        pinch = null
+                    }
+                }
+                .horizontalScroll(scrollState)
+        ) {
             Canvas(
                 modifier = Modifier
                     .width(contentWidth)
@@ -102,7 +152,7 @@ fun TeacherOrnamentWaveform(
                             }
                         }
                     }
-                    .pointerInput(ornaments, durationMs, zoom) {
+                    .pointerInput(ornaments, durationMs) {
                         detectTapGestures { offset ->
                             val width = size.width.toFloat().coerceAtLeast(1f)
                             val tappedMs = ((offset.x / width) * totalMs).toLong().coerceIn(0L, totalMs)
@@ -220,6 +270,9 @@ fun TeacherOrnamentWaveform(
         }
     }
 }
+
+/** Where the fingers are: this share of the wave stays at this x on screen. */
+private class PinchFocus(val fraction: Float, val viewportX: Float)
 
 fun ornamentColor(kind: TeacherOrnamentKind, palette: MelovaPalette): Color = when (kind) {
     TeacherOrnamentKind.TAHRIR -> palette.gold

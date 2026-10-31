@@ -24,15 +24,15 @@ suspend fun <T> apiCall(block: suspend () -> T): T = withContext(ioDispatcher) {
         throw error
     } catch (error: ResponseException) {
         val code = error.response.status.value
-        throw ApiException(serverDetail(error) ?: "خطای سرور ($code)", code, error)
+        throw ApiException(serverDetail(error) ?: "خطایی پیش آمد ($code)", code, error)
     } catch (error: HttpRequestTimeoutException) {
-        throw ApiException("پاسخ سرور طول کشید؛ دوباره تلاش کنید.", null, error)
+        throw ApiException("پاسخ طول کشید؛ دوباره تلاش کنید.", null, error)
     } catch (error: ConnectTimeoutException) {
-        throw ApiException("ارتباط با سرور برقرار نشد.", null, error)
+        throw ApiException("اتصال برقرار نشد؛ اینترنت را بررسی کنید.", null, error)
     } catch (error: IOException) {
-        throw ApiException("ارتباط با سرور برقرار نشد.", null, error)
+        throw ApiException("اتصال برقرار نشد؛ اینترنت را بررسی کنید.", null, error)
     } catch (error: Exception) {
-        throw ApiException("ارتباط با سرور برقرار نشد.", null, error)
+        throw ApiException("اتصال برقرار نشد؛ اینترنت را بررسی کنید.", null, error)
     }
 }
 

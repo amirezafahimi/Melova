@@ -265,6 +265,7 @@ fun MelovaApp(
                     loginRequired = studentState.needsLogin,
                     isChangingLessons = studentState.isChangingLessons,
                     onLogin = { navController.navigate(AppScreen.login(LoginReason.PURCHASE)) },
+                    onLoginToAdd = { navController.navigate(AppScreen.login(LoginReason.ADD_LESSON)) },
                     onBuy = { payer -> studentViewModel.buyLesson(lessonId, payer) },
                     onAddFree = { studentViewModel.addLesson(lessonId) },
                     onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) }

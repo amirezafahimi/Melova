@@ -12,7 +12,6 @@ import app.melova.data.remote.mapper.toRequestJson
 import app.melova.data.remote.multipartBody
 import app.melova.data.remote.serverBody
 import app.melova.platform.LocalFile
-import app.melova.platform.apiBaseUrl
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.CancellationException
@@ -58,19 +57,17 @@ class RemoteVocalScoringRepository(
             val code = error.response.status.value
             val detail = serverBody(error)
             throw IOException(
-                if (detail.isNotEmpty()) "HTTP $code: $detail"
-                else "HTTP $code ${error.response.status.description}",
+                detail.ifEmpty { "خطایی پیش آمد ($code)؛ دوباره تلاش کنید." },
                 error
             )
         } catch (error: HttpRequestTimeoutException) {
             throw IOException(
-                "زمان انتظار تمام شد — سرور $apiBaseUrl پاسخ نداد.",
+                "زمان انتظار تمام شد؛ دوباره تلاش کنید.",
                 error
             )
         } catch (error: IOException) {
             throw IOException(
-                "اتصال به سرور برقرار نشد ($apiBaseUrl). " +
-                    "backend/run_server.sh را اجرا کنید و IP در local.properties را بررسی کنید.",
+                "اتصال برقرار نشد؛ اینترنت را بررسی کنید.",
                 error
             )
         }
@@ -85,8 +82,7 @@ class RemoteVocalScoringRepository(
             throw error
         } catch (error: Exception) {
             throw IOException(
-                "سرور در دسترس نیست ($apiBaseUrl). " +
-                    "اول ./backend/run_server.sh را اجرا کنید.",
+                "اتصال برقرار نشد؛ اینترنت را بررسی کنید.",
                 error
             )
         }

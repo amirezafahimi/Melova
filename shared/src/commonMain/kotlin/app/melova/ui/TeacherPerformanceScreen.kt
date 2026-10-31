@@ -133,7 +133,7 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
             Spacer(modifier = Modifier.weight(1f))
             MelovaMediaIconButton(
                 onClick = viewModel::zoomOut,
-                enabled = uiState.zoom > 1,
+                enabled = uiState.zoom > 1f,
                 icon = Icons.Default.ZoomOut,
                 contentDescription = "کوچک‌نمایی موج",
                 containerColor = MelovaAccentTint,
@@ -161,6 +161,7 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
                 ornaments = uiState.ornaments,
                 selectedIndex = uiState.playingIndex ?: uiState.selectedIndex,
                 zoom = uiState.zoom,
+                onZoomChange = viewModel::setZoom,
                 onSeekToMs = viewModel::playAt,
                 onOrnamentClick = viewModel::playSegment
             )
@@ -184,17 +185,18 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
                     )
                 }
             }
-            if (uiState.zoom > 1) {
+            if (uiState.zoom > 1f) {
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
-                    text = "بزرگ‌نمایی ${uiState.zoom}×",
+                    text = "بزرگ‌نمایی ${formatFixed(uiState.zoom, 1)}×",
                     style = MaterialTheme.typography.labelSmall,
                     color = MelovaText.copy(alpha = 0.5f)
                 )
             }
         }
         Text(
-            text = "روی هر بازه بزنید تا فقط همان مصوت پخش شود؛ بیرون از بازه‌ها، پخش از همان لحظه شروع می‌شود.",
+            text = "روی هر بازه بزنید تا فقط همان مصوت پخش شود؛ بیرون از بازه‌ها، پخش از همان لحظه شروع می‌شود. " +
+                "با دو انگشت موج را بزرگ یا کوچک کنید.",
             style = MaterialTheme.typography.labelSmall,
             color = MelovaText.copy(alpha = 0.45f),
             textAlign = TextAlign.Start

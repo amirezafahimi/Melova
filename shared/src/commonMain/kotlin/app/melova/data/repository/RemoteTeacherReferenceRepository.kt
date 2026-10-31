@@ -9,7 +9,6 @@ import app.melova.data.remote.writeAtomically
 import kotlinx.coroutines.withContext
 import app.melova.data.remote.ApiException
 import app.melova.data.remote.apiCall
-import app.melova.platform.apiBaseUrl
 import app.melova.platform.LocalFile
 import app.melova.platform.PlatformContext
 import app.melova.platform.ioDispatcher
@@ -41,7 +40,7 @@ class RemoteTeacherReferenceRepository(
                 TeacherReferenceCache.metaFile(context).delete()
                 syllablesFile.delete()
                 throw TeacherReferenceException(
-                    "دریافت نمونه استاد از سرور ممکن نشد. سرور را اجرا کنید ($apiBaseUrl).",
+                    "دریافت نمونه استاد ممکن نشد؛ دوباره تلاش کنید.",
                     error
                 )
             }

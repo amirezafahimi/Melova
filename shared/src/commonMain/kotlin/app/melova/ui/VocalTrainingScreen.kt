@@ -43,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,6 +93,7 @@ import app.melova.ui.theme.MelovaInfo
 import app.melova.ui.theme.MelovaTextMuted
 import app.melova.ui.theme.MelovaText
 import app.melova.platform.pad2
+import kotlinx.coroutines.launch
 
 @Composable
 fun VocalTrainingScreen(
@@ -104,6 +106,8 @@ fun VocalTrainingScreen(
     viewModel: VocalTrainingViewModel = viewModel { VocalTrainingViewModel(createSavedStateHandle()) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
     val micPermission = rememberMicPermission { granted ->
         if (granted) viewModel.onRecordClicked()
         else viewModel.onRecordPermissionDenied()
@@ -119,7 +123,7 @@ fun VocalTrainingScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
@@ -168,6 +172,7 @@ fun VocalTrainingScreen(
                             onStopRecording = viewModel::onStopClicked,
                             onStopPlayback = viewModel::onStopClicked,
                             onRetryRecording = viewModel::retryRecording,
+                            onSubmitRecording = viewModel::submitRecording,
                             onToggleUserPlayback = viewModel::toggleUserRecordingPlayback,
                             onPlayUserRecordingAt = viewModel::playUserRecordingAt,
                             onPlayCorrectionFromMarker = viewModel::playCorrectionFromMarker
@@ -196,7 +201,10 @@ fun VocalTrainingScreen(
                                 onShowCorrectionDetail = viewModel::showCorrectionDetail,
                                 onShowTahrirDetail = viewModel::showTahrirDetail,
                                 onRetryRecording = viewModel::retryRecording,
-                                onDismiss = viewModel::dismissResults,
+                                onDismiss = {
+                                    viewModel.dismissResults()
+                                    scope.launch { scrollState.animateScrollTo(0) }
+                                },
                                 isReadOnly = uiState.isSharedTake
                             )
                         }
@@ -491,12 +499,14 @@ private fun StudentRecordingPanel(
     onStopRecording: () -> Unit,
     onStopPlayback: () -> Unit,
     onRetryRecording: () -> Unit,
+    onSubmitRecording: () -> Unit,
     onToggleUserPlayback: () -> Unit,
     onPlayUserRecordingAt: (Long) -> Unit,
     onPlayCorrectionFromMarker: (app.melova.audio.scoring.VocalScorer.PitchCorrection) -> Unit
 ) {
     val isRecording = uiState.mode == VocalTrainingMode.RECORDING
     val isAnalyzing = uiState.mode == VocalTrainingMode.ANALYZING
+    val isReviewing = uiState.mode == VocalTrainingMode.REVIEW
     val showResultRecording = uiState.mode == VocalTrainingMode.RESULT &&
         (scoreResult != null || uiState.isSharedTake)
 
@@ -593,7 +603,7 @@ private fun StudentRecordingPanel(
                     }
                 }
 
-                showResultRecording -> {
+                isReviewing || showResultRecording -> {
                     UserRecordingSection(
                         durationSeconds = uiState.userRecordingDurationSeconds,
                         playbackPositionMs = uiState.userPlaybackPositionMs,
@@ -612,7 +622,29 @@ private fun StudentRecordingPanel(
                         onPlayAtMs = onPlayUserRecordingAt,
                         onPlayCorrectionFromMarker = onPlayCorrectionFromMarker
                     )
-                    if (!uiState.isSharedTake) {
+                    if (isReviewing) {
+                        Button(
+                            onClick = onSubmitRecording,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+                        ) {
+                            Text("ارسال برای تحلیل")
+                        }
+                        OutlinedButton(
+                            onClick = onRetryRecording,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.Mic, contentDescription = null, tint = MelovaAccentSoft)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ضبط دوباره", color = MelovaText)
+                        }
+                    } else if (!uiState.isSharedTake) {
                         Button(
                             onClick = onRetryRecording,
                             modifier = Modifier
@@ -720,7 +752,7 @@ private fun HeadphoneHintBanner() {
             Text(
                 text = "۱) نمونه استاد را با هدفون گوش دهید.  ۲) ضبط را بزنید و همان ملودی را بخوانید؛ " +
                     "اکتاو بالاتر یا پایین‌تر هم قبول است و لازم نیست سرعتتان دقیقاً مثل استاد باشد.  " +
-                    "۳) نتیجه را ببینید و روی هر خطا بزنید تا اجرای خودتان و استاد را مقایسه کنید.",
+                    "۳) اجرایتان را گوش دهید و برای تحلیل بفرستید.  ۴) روی هر خطا بزنید تا اجرای خودتان و استاد را مقایسه کنید.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MelovaText.copy(alpha = 0.8f),
                 textAlign = TextAlign.Start
@@ -1104,13 +1136,15 @@ private fun UserRecordingSection(
                 onSeekToMs = onPlayAtMs,
                 onCorrectionClick = onPlayCorrectionFromMarker
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                LegendDot(color = MelovaWarning, label = "بم")
-                LegendDot(color = MelovaInfo, label = "زیر")
-                LegendDot(color = MelovaTextMuted, label = "نت نخوانده")
+            if (corrections.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    LegendDot(color = MelovaWarning, label = "بم")
+                    LegendDot(color = MelovaInfo, label = "زیر")
+                    LegendDot(color = MelovaTextMuted, label = "نت نخوانده")
+                }
             }
         }
     }

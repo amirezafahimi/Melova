@@ -164,21 +164,23 @@ private fun layoutCorrectionMarkers(
     val layouts = mutableListOf<CorrectionMarkerLayout>()
 
     corrections.sortedBy { markerStartMs(it) }.forEach { correction ->
-        val baseX = (markerStartMs(correction).toFloat() / duration) * width
+        val baseX = ((markerStartMs(correction).toFloat() / duration) * width)
             .coerceIn(6f, width - 6f)
         val barIndex = ((baseX / width) * barCount).toInt().coerceIn(0, barCount - 1)
         val peak = peaks.getOrElse(barIndex) { 0f }
         val barHeight = (peak.coerceIn(0f, 1f) * height * 0.72f).coerceAtLeast(4f)
         val baseY = (centerY - barHeight / 2f - 6f).coerceAtLeast(10f)
 
+        // Past the top edge there's no room left, so a dense cluster's last markers overlap.
+        val topLayer = ((baseY - 8f) / layerStepPx).toInt()
         var layer = 0
         var position = Offset(baseX, baseY)
-        while (layouts.any { placed ->
+        while (layer < topLayer && layouts.any { placed ->
                 hypot(placed.position.x - position.x, placed.position.y - position.y) < minGapPx
             }
         ) {
             layer++
-            position = Offset(baseX, (baseY - layer * layerStepPx).coerceAtLeast(8f))
+            position = Offset(baseX, baseY - layer * layerStepPx)
         }
 
         layouts += CorrectionMarkerLayout(correction, position)

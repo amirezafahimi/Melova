@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,6 +98,7 @@ fun LessonScreen(
     /** A purchase or an added lesson is on its way to the server. */
     isChangingLessons: Boolean = false,
     onLogin: () -> Unit = {},
+    onLoginToAdd: () -> Unit = {},
     onBuy: (payer: String) -> Unit = {},
     onAddFree: () -> Unit = {},
     onTeacherClick: (String) -> Unit = {},
@@ -104,6 +106,14 @@ fun LessonScreen(
 ) {
     val introState by introViewModel.uiState.collectAsStateWithLifecycle()
     val lesson = catalogState.lesson(lessonId)
+    var addAfterLogin by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(loginRequired) {
+        if (!loginRequired && addAfterLogin) {
+            addAfterLogin = false
+            onAddFree()
+        }
+    }
 
     // Refresh best scores when the student comes back from a practice section.
     LaunchedEffect(Unit) { onResume() }
@@ -142,8 +152,20 @@ fun LessonScreen(
                 val locked = !lesson.isOpen && !isOwnTeacher
                 if (locked) {
                     item { LessonPurchaseCard(lesson, loginRequired, isChangingLessons, onLogin, onBuy) }
-                } else if (lesson.isFree && lesson.isOwned == false && !isOwnTeacher) {
-                    item { FreeLessonCard(isChangingLessons, onAddFree) }
+                } else if (lesson.isFree && lesson.isOwned != true && !isOwnTeacher) {
+                    item {
+                        FreeLessonCard(
+                            isBusy = isChangingLessons,
+                            onAdd = {
+                                if (loginRequired) {
+                                    addAfterLogin = true
+                                    onLoginToAdd()
+                                } else {
+                                    onAddFree()
+                                }
+                            }
+                        )
+                    }
                 }
                 item {
                     IntroPlayerCard(

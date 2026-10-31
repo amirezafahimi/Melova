@@ -139,7 +139,7 @@ class VocalTrainingViewModel(
                         statusMessage = if (reviewId != null) {
                             it.statusMessage
                         } else {
-                            "اول نمونه استاد را گوش دهید، بعد ضبط را شروع کنید."
+                            PRACTICE_TIP
                         }
                     )
                 }
@@ -268,7 +268,7 @@ class VocalTrainingViewModel(
     }
 
     fun toggleUserRecordingPlayback() {
-        if (_uiState.value.mode != VocalTrainingMode.RESULT) return
+        if (!_uiState.value.hasTake) return
         if (!userRecordingFile.exists() || userRecordingFile.length() <= 44L) return
 
         cancelSnippetStop()
@@ -290,7 +290,7 @@ class VocalTrainingViewModel(
     }
 
     fun playUserRecordingAt(positionMs: Long) {
-        if (_uiState.value.mode != VocalTrainingMode.RESULT) return
+        if (!_uiState.value.hasTake) return
         cancelSnippetStop()
         _uiState.update { it.copy(playingSnippetStartMs = null, playingSnippetTarget = null) }
         playUserRecordingFrom(positionMs.coerceAtLeast(0L), highlightCorrectionMs = null)
@@ -680,22 +680,21 @@ class VocalTrainingViewModel(
     private val PlaybackClip.focusCentreMs: Long
         get() = (slowStartMs + slowEndMs) / 2
 
+    /** Back to the page as it first opened. */
     fun dismissResults() {
         sessionJob?.cancel()
         stopActivePlayback()
+        studentEnvelope = null
         _uiState.update {
             it.copy(
                 mode = VocalTrainingMode.IDLE,
                 scoreResult = null,
                 errorDetail = null,
                 teacherAsk = TeacherAskState(),
-                progress = 0f,
-                isPlaying = false,
-                playbackTarget = PlaybackTarget.NONE,
+                isNewBest = false,
+                userRecordingDurationSeconds = 0,
                 waveformPeaks = emptyList(),
-                selectedCorrectionStartMs = null,
-                playingSnippetStartMs = null,
-                playingSnippetTarget = null
+                statusMessage = PRACTICE_TIP
             )
         }
     }
@@ -708,7 +707,7 @@ class VocalTrainingViewModel(
     }
 
     private fun playUserRecordingFrom(positionMs: Long, highlightCorrectionMs: Long?) {
-        if (_uiState.value.mode != VocalTrainingMode.RESULT) return
+        if (!_uiState.value.hasTake) return
         if (!userRecordingFile.exists() || userRecordingFile.length() <= 44L) return
 
         cancelSnippetStop()
@@ -802,7 +801,7 @@ class VocalTrainingViewModel(
             it.copy(
                 mode = VocalTrainingMode.RECORDING,
                 progress = 0f,
-                statusMessage = "در حال ضبط... پس از اتمام «توقف» را بزنید"
+                statusMessage = "در حال ضبط... در پایان، «پایان ضبط» را بزنید"
             )
         }
 
@@ -840,7 +839,7 @@ class VocalTrainingViewModel(
                     }
                     else -> {
                         lastRecordingDurationMs = recordedMs
-                        analyzeRecording(currentLesson.referenceFile, recordingFile)
+                        showTakeForReview(recordingFile)
                     }
                 }
             } catch (_: CancellationException) {
@@ -882,6 +881,29 @@ class VocalTrainingViewModel(
         }
     }
 
+    /** The student hears and sees the take first; nothing is uploaded until they send it. */
+    private suspend fun showTakeForReview(recordingFile: LocalFile) {
+        val peaks = withContext(ioDispatcher) { WaveformPeaksExtractor.fromWavFile(recordingFile) }
+        _uiState.update {
+            it.copy(
+                mode = VocalTrainingMode.REVIEW,
+                progress = 0f,
+                userRecordingDurationSeconds = ((lastRecordingDurationMs + 999) / 1000).toInt().coerceAtLeast(1),
+                waveformPeaks = peaks,
+                userPlaybackPositionMs = 0L,
+                statusMessage = "اجرایتان را گوش دهید؛ اگر راضی بودید برای تحلیل بفرستید."
+            )
+        }
+    }
+
+    fun submitRecording() {
+        val currentLesson = lesson ?: return
+        if (_uiState.value.mode != VocalTrainingMode.REVIEW) return
+        sessionJob?.cancel()
+        stopActivePlayback()
+        sessionJob = viewModelScope.launch { analyzeRecording(currentLesson.referenceFile, userRecordingFile) }
+    }
+
     private suspend fun analyzeRecording(referenceFile: LocalFile, recordingFile: LocalFile) {
         _uiState.update {
             it.copy(
@@ -890,7 +912,7 @@ class VocalTrainingViewModel(
                 scoreResult = null,
                 errorDetail = null,
                 teacherAsk = TeacherAskState(),
-                statusMessage = "تحلیل اجرا روی سرور..."
+                statusMessage = "تحلیل اجرا توسط برنامه..."
             )
         }
         startAnalyzingProgressPolling()
@@ -942,12 +964,13 @@ class VocalTrainingViewModel(
             stopProgressPolling()
             _uiState.update {
                 it.copy(
-                    mode = VocalTrainingMode.IDLE,
+                    // The take stays, so it can be sent again without singing it again.
+                    mode = VocalTrainingMode.REVIEW,
                     progress = 0f,
                     scoreResult = null,
                     errorDetail = null,
                     teacherAsk = TeacherAskState(),
-                    statusMessage = "خطا در ارتباط با سرور: ${e.message ?: "نامشخص"}"
+                    statusMessage = "تحلیل انجام نشد. ${e.message.orEmpty()}".trim()
                 )
             }
         }
@@ -985,7 +1008,7 @@ class VocalTrainingViewModel(
         progressJob?.cancel()
         progressJob = viewModelScope.launch {
             while (isActive &&
-                _uiState.value.mode == VocalTrainingMode.RESULT &&
+                _uiState.value.hasTake &&
                 _uiState.value.playbackTarget == PlaybackTarget.USER
             ) {
                 _uiState.update {
@@ -1031,6 +1054,7 @@ class VocalTrainingViewModel(
         const val ARG_SECTION_ID = "sectionId"
         const val ARG_REVIEW_ID = "reviewId"
         private const val USER_RECORDING_FILE_NAME = "user_vocal.wav"
+        private const val PRACTICE_TIP = "برای تحلیل بهتر، جمله‌های استاد را عیناً بخوانید؛ بدون تکرار یا اصلاح."
         private const val CORRECTION_CLIP_PADDING_MS = 1_000L
         /** هر چند میلی‌ثانیه سرعت پخش به‌روز شود تا کم و زیاد شدنش نرم باشد. */
         private const val SPEED_TICK_MS = 20L
@@ -1039,7 +1063,7 @@ class VocalTrainingViewModel(
     }
 }
 
-enum class VocalTrainingMode { IDLE, RECORDING, ANALYZING, RESULT }
+enum class VocalTrainingMode { IDLE, RECORDING, REVIEW, ANALYZING, RESULT }
 
 enum class PlaybackTarget { NONE, TEACHER, USER }
 
@@ -1079,11 +1103,15 @@ data class VocalTrainingUiState(
     /** Whose take it is, when the teacher is the one looking. */
     val sharedTakeStudent: String? = null
 ) {
+    /** A take is on the page, waiting to be sent or already scored. */
+    val hasTake: Boolean
+        get() = mode == VocalTrainingMode.REVIEW || mode == VocalTrainingMode.RESULT
+
     val isPlayingTeacherSample: Boolean
         get() = playbackTarget == PlaybackTarget.TEACHER && isPlaying
 
     val isPlayingUserRecording: Boolean
-        get() = mode == VocalTrainingMode.RESULT &&
+        get() = hasTake &&
             playbackTarget == PlaybackTarget.USER &&
             isPlaying
 }
