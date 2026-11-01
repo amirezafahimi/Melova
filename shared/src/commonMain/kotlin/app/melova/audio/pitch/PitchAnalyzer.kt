@@ -62,17 +62,23 @@ class PitchAnalyzer {
 
 /**
  * The YIN pitch estimator (de Cheveigné & Kawahara 2002) as TarsosDSP implements it:
- * threshold 0.20, parabolic interpolation, probability 1 − d'(τ).
+ * threshold 0.20, parabolic interpolation, probability 1 − d'(τ). With [checkOctaveBelow] it
+ * also refuses a reading an octave above the voice, which TarsosDSP does not.
  */
-internal class Yin(private val sampleRate: Float, bufferSize: Int) {
+internal class Yin(
+    private val sampleRate: Float,
+    bufferSize: Int,
+    private val checkOctaveBelow: Boolean = false
+) {
     private val yinBuffer = FloatArray(bufferSize / 2)
 
     /** Pitch in Hz (−1 when unpitched) and its probability. */
     fun detect(audio: FloatArray): Pair<Float, Float> {
         difference(audio)
         cumulativeMeanNormalizedDifference()
-        val tau = absoluteThreshold()
-        if (tau == -1) return -1f to 0f
+        val firstDip = absoluteThreshold()
+        if (firstDip == -1) return -1f to 0f
+        val tau = if (checkOctaveBelow) dipOctaveBelow(firstDip) else firstDip
         val probability = 1f - yinBuffer[tau]
         val betterTau = parabolicInterpolation(tau)
         return sampleRate / betterTau to probability
@@ -111,6 +117,17 @@ internal class Yin(private val sampleRate: Float, bufferSize: Int) {
         return -1
     }
 
+    /**
+     * On an open vowel the second harmonic can pass the threshold first, a whole octave above
+     * the note, for as long as the vowel lasts. The true period then fits clearly better.
+     */
+    private fun dipOctaveBelow(tau: Int): Int {
+        val middle = 2 * tau
+        if (middle + OCTAVE_SEARCH >= yinBuffer.size) return tau
+        val dip = (middle - OCTAVE_SEARCH..middle + OCTAVE_SEARCH).minByOrNull { yinBuffer[it] } ?: return tau
+        return if (yinBuffer[dip] < yinBuffer[tau] - OCTAVE_MARGIN) dip else tau
+    }
+
     private fun parabolicInterpolation(tauEstimate: Int): Float {
         val x0 = if (tauEstimate < 1) tauEstimate else tauEstimate - 1
         val x2 = if (tauEstimate + 1 < yinBuffer.size) tauEstimate + 1 else tauEstimate
@@ -128,5 +145,7 @@ internal class Yin(private val sampleRate: Float, bufferSize: Int) {
 
     private companion object {
         const val THRESHOLD = 0.20f
+        const val OCTAVE_SEARCH = 2
+        const val OCTAVE_MARGIN = 0.03f
     }
 }

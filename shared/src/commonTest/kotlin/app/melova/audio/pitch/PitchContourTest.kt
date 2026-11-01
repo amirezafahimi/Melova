@@ -12,12 +12,17 @@ import kotlinx.coroutines.test.runTest
 private const val SAMPLE_RATE = 44_100
 
 /** A sung tone at [note], or silence where [note] gives null, from a function of time in ms. */
-private fun tone(durationMs: Int, note: (Long) -> Float?): ShortArray {
+private fun tone(
+    durationMs: Int,
+    fundamental: Double = 1.0,
+    secondHarmonic: Double = 0.0,
+    note: (Long) -> Float?
+): ShortArray {
     var phase = 0.0
     return ShortArray(durationMs * SAMPLE_RATE / 1000) { index ->
         val semitone = note(index * 1000L / SAMPLE_RATE) ?: return@ShortArray 0
         phase += 2 * PI * 440.0 * 2.0.pow((semitone - 69.0) / 12.0) / SAMPLE_RATE
-        (sin(phase) * 12_000).toInt().toShort()
+        ((fundamental * sin(phase) + secondHarmonic * sin(2 * phase)) * 12_000).toInt().toShort()
     }
 }
 
@@ -31,6 +36,25 @@ class PitchContourTest {
 
         assertEquals(1, line.size)
         assertTrue(line.single().all { abs(it.semitone - 57f) < 0.1f })
+    }
+
+    @Test
+    fun anOpenVowelWithAStrongSecondHarmonicStaysOnItsNote() = runTest {
+        // The «آ» of «تمام»: the harmonic won for 270 ms, more than the octave check could see.
+        val samples = tone(1_000, fundamental = 0.3, secondHarmonic = 1.0) { 60f }
+
+        val notes = PitchContour.of(samples, SAMPLE_RATE, 100, 900).flatten()
+
+        assertTrue(notes.isNotEmpty() && notes.all { abs(it.semitone - 60f) < 0.2f })
+    }
+
+    @Test
+    fun aHighNoteWithAHarmonicIsNotPulledAnOctaveDown() = runTest {
+        val samples = tone(1_000, fundamental = 1.0, secondHarmonic = 0.5) { 72f }
+
+        val notes = PitchContour.of(samples, SAMPLE_RATE, 100, 900).flatten()
+
+        assertTrue(notes.isNotEmpty() && notes.all { abs(it.semitone - 72f) < 0.2f })
     }
 
     @Test

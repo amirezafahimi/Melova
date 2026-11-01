@@ -20,7 +20,7 @@ object PitchContour {
         val step = (sampleRate / ANALYSIS_RATE).coerceAtLeast(1)
         val rate = sampleRate.toFloat() / step
         val windowSize = (2 * rate / LOWEST_HZ).toInt()
-        val yin = Yin(rate, windowSize)
+        val yin = Yin(rate, windowSize, checkOctaveBelow = true)
         val window = FloatArray(windowSize)
         val frameCount = ((endMs - startMs) / HOP_MS).toInt() + 1
         val notes = FloatArray(frameCount) { Float.NaN }
