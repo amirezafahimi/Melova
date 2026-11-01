@@ -36,7 +36,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -63,6 +67,7 @@ import app.melova.platform.rememberGoogleSignIn
 import app.melova.presentation.AuthUiState
 import app.melova.presentation.AuthViewModel
 import app.melova.presentation.LOGIN_CODE_LENGTH
+import app.melova.presentation.LoginGate
 import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaMark
 import app.melova.ui.components.MelovaSegmentedControl
@@ -85,6 +90,36 @@ enum class LoginReason(val message: String) {
     MESSAGE("برای پیام دادن به استاد وارد شوید تا پاسخ استاد به دست خودتان برسد."),
     PURCHASE("برای خرید درس وارد شوید تا درس همیشه برایتان بماند و گم نشود."),
     ADD_LESSON("برای افزودن درس وارد شوید تا درس همیشه برایتان بماند و گم نشود.")
+}
+
+/**
+ * A tap on something that takes an account. Someone not signed in goes to login, and [action]
+ * waits for them through the login page and the name page, so they land back on what they were
+ * doing. Leaving login, or leaving the account on the name page, drops it.
+ */
+@Composable
+internal fun rememberLoginGated(gate: LoginGate, onLogin: () -> Unit, action: () -> Unit): () -> Unit {
+    var isHeld by rememberSaveable { mutableStateOf(false) }
+    val latestAction by rememberUpdatedState(action)
+
+    LaunchedEffect(gate) {
+        when (gate) {
+            LoginGate.SIGN_IN -> isHeld = false
+            LoginGate.WAIT -> Unit
+            LoginGate.OPEN -> if (isHeld) {
+                isHeld = false
+                latestAction()
+            }
+        }
+    }
+    return {
+        if (gate == LoginGate.SIGN_IN) {
+            isHeld = true
+            onLogin()
+        } else {
+            action()
+        }
+    }
 }
 
 @Composable

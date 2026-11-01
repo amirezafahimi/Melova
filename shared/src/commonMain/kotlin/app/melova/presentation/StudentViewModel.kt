@@ -171,7 +171,24 @@ data class StudentUiState(
     val needsLogin: Boolean
         get() = account?.signedIn == false && loginMethods?.any == true
 
-    /** Teachers know a student by name, so a new account gives one before going on. */
+    /** Teachers know a student by name, so whoever signs in without one gives it before going on. */
     val needsName: Boolean
         get() = account?.needsName == true
+
+    val loginGate: LoginGate
+        get() = when {
+            needsLogin -> LoginGate.SIGN_IN
+            account == null || needsName -> LoginGate.WAIT
+            else -> LoginGate.OPEN
+        }
+}
+
+/** How far someone is from what takes an account: every page that sends them to login asks this. */
+enum class LoginGate {
+    /** Not signed in, and the server offers a way in. */
+    SIGN_IN,
+
+    /** Past the login page but not done: the name page is up, or the account is on its way. */
+    WAIT,
+    OPEN
 }

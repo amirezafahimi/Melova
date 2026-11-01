@@ -50,16 +50,17 @@ class StudentRepository(
         true
     }
 
-    suspend fun account(): StudentAccount = followTeacherRole(apiCall { api.me() }.toDomain()).withNameQuestion()
+    suspend fun account(): StudentAccount = followTeacherRole(apiCall { api.me() }.toAccount())
 
-    private fun StudentAccount.withNameQuestion(): StudentAccount {
-        if (name.isNotBlank()) session.awaitingName = false
-        return copy(needsName = session.awaitingName && signedIn && name.isBlank())
+    /** Every answer carries the account, so each one has to keep the name question open. */
+    private fun StudentMeDto.toAccount(): StudentAccount {
+        if (!name.isNullOrBlank()) session.awaitingName = false
+        return toDomain(awaitingName = session.awaitingName)
     }
 
     /** The signed-in student says they teach, which [code] proves. The account stays a teacher for good. */
     suspend fun sayITeach(code: String): StudentAccount =
-        followTeacherRole(apiCall { api.sayITeach(code.trim()) }.toDomain())
+        followTeacherRole(apiCall { api.sayITeach(code.trim()) }.toAccount())
 
     /** A signed-in account decides whether this install has the teacher panel. */
     private fun followTeacherRole(account: StudentAccount): StudentAccount {
@@ -68,15 +69,15 @@ class StudentRepository(
     }
 
     suspend fun setName(name: String): StudentAccount =
-        apiCall { api.updateMe(mapOf("name" to name.trim())) }.toDomain().withNameQuestion()
+        apiCall { api.updateMe(mapOf("name" to name.trim())) }.toAccount()
 
     /** The server crops it to a square; read now, as the picked file is only temporary. */
     suspend fun setPhoto(photo: LocalFile): StudentAccount {
         val part = FilePart("photo", "photo", "application/octet-stream", photo.readBytes())
-        return apiCall { api.setPhoto(part) }.toDomain()
+        return apiCall { api.setPhoto(part) }.toAccount()
     }
 
-    suspend fun removePhoto(): StudentAccount = apiCall { api.deletePhoto() }.toDomain()
+    suspend fun removePhoto(): StudentAccount = apiCall { api.deletePhoto() }.toAccount()
 
     /** The student's photo, downloaded once per version and kept. */
     suspend fun photo(account: StudentAccount): ByteArray? {
@@ -127,9 +128,10 @@ class StudentRepository(
         val token = account.token ?: throw IOException("ورود ممکن نشد.")
         session.save(id, token)
         session.loginOffered = true
-        session.awaitingName = account.isNewAccount == true
+        // Whoever signs in without a name is asked; toAccount closes this if they have one.
+        session.awaitingName = true
         restoreSession()
-        return followTeacherRole(account.toDomain()).withNameQuestion()
+        return followTeacherRole(account.toAccount())
     }
 
     /** Back to being a guest, with a new guest account. */
@@ -143,11 +145,11 @@ class StudentRepository(
     }
 
     suspend fun claimFreeLesson(lessonId: String): StudentAccount =
-        apiCall { api.claimFreeLesson(lessonId) }.toDomain()
+        apiCall { api.claimFreeLesson(lessonId) }.toAccount()
 
     /** The student paid for a lesson by card, under the name [payer]. */
     suspend fun requestLesson(lessonId: String, payer: String): StudentAccount =
-        apiCall { api.requestLesson(lessonId, payer.trim()) }.toDomain()
+        apiCall { api.requestLesson(lessonId, payer.trim()) }.toAccount()
 
     /** Whom the student follows now. Follows are kept on the account, so a sign-in brings them. */
     suspend fun follow(teacherIds: Set<String>): Set<String> {
@@ -189,12 +191,13 @@ class StudentRepository(
     }
 }
 
-internal fun StudentMeDto.toDomain() = StudentAccount(
+internal fun StudentMeDto.toDomain(awaitingName: Boolean) = StudentAccount(
     id = studentId.orEmpty(),
     name = name.orEmpty(),
     signedIn = signedIn == true,
     signedInAs = signedInAs?.takeIf { it.isNotBlank() },
     photoVersion = photoVersion,
     isTeacher = isTeacher == true,
-    ownedLessons = ownedLessons.orEmpty().toSet()
+    ownedLessons = ownedLessons.orEmpty().toSet(),
+    needsName = awaitingName && signedIn == true && name.isNullOrBlank()
 )

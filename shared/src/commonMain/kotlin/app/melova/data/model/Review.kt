@@ -13,7 +13,7 @@ data class StudentAccount(
     /** A teacher is an ordinary account that also has the teacher panel. */
     val isTeacher: Boolean,
     val ownedLessons: Set<String>,
-    /** Only an account just made is asked its name; one that signed in before never is. */
+    /** Whoever signs in without a name is asked for one, until they give it. */
     val needsName: Boolean = false
 )
 

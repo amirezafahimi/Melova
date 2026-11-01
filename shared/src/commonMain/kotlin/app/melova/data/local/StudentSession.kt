@@ -28,7 +28,7 @@ class StudentSession(context: PlatformContext) {
         get() = prefs.getInt(KEY_LOGIN_OFFERED) == 1
         set(value) = prefs.putInt(KEY_LOGIN_OFFERED, if (value) 1 else 0)
 
-    /** Set while a new account hasn't given its name, so closing the app doesn't skip the question. */
+    /** Set while someone who signed in hasn't given a name, so closing the app doesn't skip the question. */
     var awaitingName: Boolean
         get() = prefs.getInt(KEY_AWAITING_NAME) == 1
         set(value) = prefs.putInt(KEY_AWAITING_NAME, if (value) 1 else 0)

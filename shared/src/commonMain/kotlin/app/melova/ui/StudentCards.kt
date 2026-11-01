@@ -23,7 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonPayment
 import app.melova.data.model.LessonPurchaseStatus
+import app.melova.presentation.LoginGate
 import app.melova.presentation.TeacherAskState
 import app.melova.ui.components.FormDialog
 import app.melova.ui.components.MelovaSurfaceCard
@@ -65,21 +65,14 @@ internal fun AskTeacherCard(
     referralReasons: List<String>,
     onSend: (note: String) -> Unit,
     /** A guest signs in first; the take waits here and they carry on when they come back. */
-    loginRequired: Boolean = false,
+    loginGate: LoginGate = LoginGate.OPEN,
     onLogin: () -> Unit = {},
     onOpenChat: (chatId: String) -> Unit = {}
 ) {
     var composing by rememberSaveable { mutableStateOf(false) }
-    var composeAfterLogin by rememberSaveable { mutableStateOf(false) }
     var note by rememberSaveable { mutableStateOf("") }
     val isReferral = referralReasons.isNotEmpty()
-
-    LaunchedEffect(loginRequired) {
-        if (!loginRequired && composeAfterLogin) {
-            composeAfterLogin = false
-            composing = true
-        }
-    }
+    val startComposing = rememberLoginGated(loginGate, onLogin) { composing = true }
 
     MelovaSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -135,14 +128,7 @@ internal fun AskTeacherCard(
             }
             if (!state.isSent) {
                 Button(
-                    onClick = {
-                        if (loginRequired) {
-                            composeAfterLogin = true
-                            onLogin()
-                        } else {
-                            composing = true
-                        }
-                    },
+                    onClick = startComposing,
                     enabled = !state.isSending,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (isReferral) MelovaGold else MelovaAccent),
@@ -190,12 +176,14 @@ internal fun AskTeacherCard(
 @Composable
 internal fun LessonPurchaseCard(
     lesson: Lesson,
-    loginRequired: Boolean,
+    loginGate: LoginGate,
     isBusy: Boolean,
     onLogin: () -> Unit,
     onBuy: (payer: String) -> Unit
 ) {
     var paying by rememberSaveable { mutableStateOf(false) }
+    val startPaying = rememberLoginGated(loginGate, onLogin) { paying = true }
+    val loginRequired = loginGate == LoginGate.SIGN_IN
     val status = lesson.purchaseStatus
     MelovaSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -234,13 +222,13 @@ internal fun LessonPurchaseCard(
             when {
                 status == LessonPurchaseStatus.PENDING -> Unit
                 loginRequired -> Button(
-                    onClick = onLogin,
+                    onClick = startPaying,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
                     modifier = Modifier.fillMaxWidth().height(46.dp)
                 ) { Text("ورود برای خرید درس") }
                 lesson.payment != null -> Button(
-                    onClick = { paying = true },
+                    onClick = startPaying,
                     enabled = !isBusy,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
@@ -250,7 +238,8 @@ internal fun LessonPurchaseCard(
         }
     }
 
-    if (paying && lesson.payment != null) {
+    // The sign-in that led here may turn out to be an account that has already paid.
+    if (paying && lesson.payment != null && status != LessonPurchaseStatus.PENDING) {
         PayByCardDialog(
             lesson = lesson,
             payment = lesson.payment,

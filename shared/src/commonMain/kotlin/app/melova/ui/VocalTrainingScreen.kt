@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.melova.FeatureFlags
+import app.melova.presentation.LoginGate
 import app.melova.presentation.PlaybackTarget
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.VocalScoreResult
@@ -100,7 +101,7 @@ fun VocalTrainingScreen(
     onBack: () -> Unit,
     onOpenTeacherDetails: () -> Unit,
     /** Sending a take to the teacher takes a signed-in account. */
-    loginRequired: Boolean = false,
+    loginGate: LoginGate = LoginGate.OPEN,
     onLogin: () -> Unit = {},
     onOpenChat: (chatId: String) -> Unit = {},
     viewModel: VocalTrainingViewModel = viewModel { VocalTrainingViewModel(createSavedStateHandle()) }
@@ -227,7 +228,7 @@ fun VocalTrainingScreen(
                             state = uiState.teacherAsk,
                             referralReasons = result.teacherReferral?.reasons.orEmpty(),
                             onSend = viewModel::sendToTeacher,
-                            loginRequired = loginRequired,
+                            loginGate = loginGate,
                             onLogin = onLogin,
                             onOpenChat = onOpenChat
                         )

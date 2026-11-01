@@ -309,7 +309,7 @@ fun MelovaApp(
                     onResume = catalogViewModel::refreshProgress,
                     isOwnTeacher = teacherState.isSignedIn &&
                         teacherState.profile?.id == catalogState.lesson(lessonId)?.teacherId,
-                    loginRequired = studentState.needsLogin,
+                    loginGate = studentState.loginGate,
                     isChangingLessons = studentState.isChangingLessons,
                     onLogin = { navController.navigate(AppScreen.login(LoginReason.PURCHASE)) },
                     onLoginToAdd = { navController.navigate(AppScreen.login(LoginReason.ADD_LESSON)) },
@@ -333,7 +333,7 @@ fun MelovaApp(
                     onOpenTeacherDetails = {
                         navController.navigate(AppScreen.teacherPerformance(lessonId, sectionId))
                     },
-                    loginRequired = studentState.needsLogin,
+                    loginGate = studentState.loginGate,
                     onLogin = { navController.navigate(AppScreen.login(LoginReason.TEACHER)) },
                     onOpenChat = { navController.navigate(AppScreen.chat(it)) }
                 )
@@ -400,6 +400,11 @@ fun MelovaApp(
                 arguments = listOf(navArgument(AppScreen.ARG_TEACHER_ID) { type = NavType.StringType })
             ) { entry ->
                 val teacherId = entry.arguments?.read { getStringOrNull(AppScreen.ARG_TEACHER_ID) }.orEmpty()
+                val messageTeacher = rememberLoginGated(
+                    studentState.loginGate,
+                    onLogin = { navController.navigate(AppScreen.login(LoginReason.MESSAGE)) },
+                    action = { chatViewModel.startChat(teacherId) { navController.navigate(AppScreen.chat(it)) } }
+                )
                 TeacherPageScreen(
                     teacherId = teacherId,
                     state = catalogState,
@@ -407,15 +412,7 @@ fun MelovaApp(
                     onLessonClick = { navController.navigate(AppScreen.lesson(it)) },
                     isOpeningChat = chatState.isStartingChat,
                     // A teacher has nothing to say to their own page.
-                    onMessage = if (teacherState.profile?.id == teacherId) null else {
-                        {
-                            if (studentState.needsLogin) {
-                                navController.navigate(AppScreen.login(LoginReason.MESSAGE))
-                            } else {
-                                chatViewModel.startChat(teacherId) { navController.navigate(AppScreen.chat(it)) }
-                            }
-                        }
-                    },
+                    onMessage = if (teacherState.profile?.id == teacherId) null else messageTeacher,
                     onBack = { navController.popBackStack() }
                 )
             }

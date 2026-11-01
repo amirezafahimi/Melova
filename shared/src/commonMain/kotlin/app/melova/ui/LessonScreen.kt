@@ -45,7 +45,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +64,7 @@ import app.melova.presentation.CatalogUiState
 import app.melova.presentation.IntroStatus
 import app.melova.presentation.LessonIntroUiState
 import app.melova.presentation.LessonIntroViewModel
+import app.melova.presentation.LoginGate
 import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaChip
 import app.melova.ui.components.MelovaSurfaceCard
@@ -95,7 +95,7 @@ fun LessonScreen(
     /** Signed in as this lesson's teacher: a paid lesson is open to them. */
     isOwnTeacher: Boolean = false,
     /** Buying a lesson takes a signed-in account. */
-    loginRequired: Boolean = false,
+    loginGate: LoginGate = LoginGate.OPEN,
     /** A purchase or an added lesson is on its way to the server. */
     isChangingLessons: Boolean = false,
     onLogin: () -> Unit = {},
@@ -107,14 +107,7 @@ fun LessonScreen(
 ) {
     val introState by introViewModel.uiState.collectAsStateWithLifecycle()
     val lesson = catalogState.lesson(lessonId)
-    var addAfterLogin by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(loginRequired) {
-        if (!loginRequired && addAfterLogin) {
-            addAfterLogin = false
-            onAddFree()
-        }
-    }
+    val addFree = rememberLoginGated(loginGate, onLoginToAdd, onAddFree)
 
     // Refresh best scores when the student comes back from a practice section.
     LaunchedEffect(Unit) { onResume() }
@@ -152,20 +145,10 @@ fun LessonScreen(
                 item { LessonHero(lesson, onTeacherClick = { onTeacherClick(lesson.teacherId) }) }
                 val locked = !lesson.isOpen && !isOwnTeacher
                 if (locked) {
-                    item { LessonPurchaseCard(lesson, loginRequired, isChangingLessons, onLogin, onBuy) }
+                    item { LessonPurchaseCard(lesson, loginGate, isChangingLessons, onLogin, onBuy) }
                 } else if (lesson.isFree && lesson.isOwned != true && !isOwnTeacher) {
                     item {
-                        FreeLessonCard(
-                            isBusy = isChangingLessons,
-                            onAdd = {
-                                if (loginRequired) {
-                                    addAfterLogin = true
-                                    onLoginToAdd()
-                                } else {
-                                    onAddFree()
-                                }
-                            }
-                        )
+                        FreeLessonCard(isBusy = isChangingLessons, onAdd = addFree)
                     }
                 }
                 item {
