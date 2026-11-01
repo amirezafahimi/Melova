@@ -93,7 +93,7 @@ class RemoteLessonRepository(
             dir = lessonDir(context, lesson.id),
             // Not starting with the section's own prefix, which would clear this copy away.
             prefix = "slow_${safeName(speed.toString())}_${safeName(section.id)}_",
-            version = section.audioVersion,
+            version = "${section.audioVersion}_$SLOW_RECIPE",
             extension = ".wav"
         ) { target ->
             remoteDataSource.downloadSectionSlowAudio(lesson.id, section.id, speed).writeAtomically(target, minBytes = 45L)
@@ -158,6 +158,12 @@ class RemoteLessonRepository(
 
     private companion object {
         const val CATALOG_CACHE_NAME = "catalog.json"
+
+        /**
+         * Raised with every change to the server's stretching settings, so a phone
+         * that already has a slower copy of a section fetches the new one.
+         */
+        const val SLOW_RECIPE = "r2"
 
         /** Shared across screens so opening a lesson or section needs no extra request. */
         @Volatile
