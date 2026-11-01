@@ -38,7 +38,31 @@ object PitchContour {
 
         val floor = (levels.maxOrNull() ?: 0f) * MIN_RELATIVE_LEVEL
         for (frame in notes.indices) if (levels[frame] < floor) notes[frame] = Float.NaN
-        return runsOf(medianFiltered(withoutOctaveSlips(notes)), startMs).map(::softened)
+        return linesOf(notes, startMs)
+    }
+
+    /**
+     * The line the score itself was read from, over [startMs]..[endMs]: the server's readings laid
+     * on this object's own grid, so a line that came with the score and one measured here are
+     * cleaned and drawn the same way.
+     */
+    fun of(points: List<PitchPoint>, startMs: Long, endMs: Long): List<List<PitchPoint>> {
+        if (points.isEmpty() || endMs <= startMs) return emptyList()
+        val frameCount = ((endMs - startMs) / HOP_MS).toInt() + 1
+        val notes = FloatArray(frameCount) { Float.NaN }
+        for (point in points) {
+            val frame = ((point.timeMs - startMs) / HOP_MS).toInt()
+            if (frame in 0 until frameCount) notes[frame] = point.semitone
+        }
+        return linesOf(notes, startMs)
+    }
+
+    /** The note of [hz], as the lines carry it. */
+    fun semitoneOf(hz: Float): Float = 69f + OCTAVE * ln(hz / 440f) / ln(2f)
+
+    private fun linesOf(notes: FloatArray, startMs: Long): List<List<PitchPoint>> {
+        val sound = withoutStrayLeaps(withoutOctaveSlips(inOneRegister(notes)))
+        return runsOf(medianFiltered(sound), startMs).map(::softened)
     }
 
     /** [voice] moved by whole octaves to sit with [reference], as the score compares them. */
@@ -134,7 +158,52 @@ object PitchContour {
         return sqrt(energy / window.size)
     }
 
-    private fun semitoneOf(hz: Float): Float = 69f + OCTAVE * ln(hz / 440f) / ln(2f)
+    /**
+     * Whole octaves back onto the stretch's own register. [withoutOctaveSlips] reads each frame
+     * against its neighbours, which says nothing where the slip opens the stretch and those
+     * neighbours are the slip itself; the median of the whole stretch is the voice either way.
+     */
+    private fun inOneRegister(notes: FloatArray): FloatArray {
+        val voiced = notes.filterNot { it.isNaN() }.sorted()
+        if (voiced.isEmpty()) return notes
+        val register = voiced[voiced.size / 2]
+        return FloatArray(notes.size) { frame ->
+            val note = notes[frame]
+            if (note.isNaN()) return@FloatArray note
+            val octaves = ((register - note) / OCTAVE).roundToInt()
+            val folded = note + octaves * OCTAVE
+            if (octaves != 0 && abs(register - folded) < REGISTER_TOLERANCE) folded else note
+        }
+    }
+
+    /**
+     * A short reading still a leap from its neighbours after both octave passes belongs to no
+     * register of this voice: the tracker caught a harmonic that is not a whole octave away.
+     * Drawing a note there invents one, so the line breaks over it instead.
+     */
+    private fun withoutStrayLeaps(notes: FloatArray): FloatArray {
+        val stray = BooleanArray(notes.size) { isStray(notes, it) }
+        val kept = notes.copyOf()
+        var frame = 0
+        while (frame < notes.size) {
+            if (!stray[frame]) {
+                frame++
+                continue
+            }
+            var last = frame
+            while (last + 1 < notes.size && stray[last + 1]) last++
+            if ((last - frame + 1) * HOP_MS <= STRAY_MAX_MS) kept.fill(Float.NaN, frame, last + 1)
+            frame = last + 1
+        }
+        return kept
+    }
+
+    private fun isStray(notes: FloatArray, frame: Int): Boolean {
+        val note = notes[frame]
+        if (note.isNaN()) return false
+        val around = medianAround(notes, frame, OCTAVE_CHECK_FRAMES)
+        return !around.isNaN() && abs(note - around) > MAX_STEP_SEMITONES
+    }
 
     /** A reading an octave from the notes around it is the tracker's slip, not a leap. */
     private fun withoutOctaveSlips(notes: FloatArray): FloatArray = FloatArray(notes.size) { frame ->
@@ -203,10 +272,17 @@ object PitchContour {
     private const val OCTAVE = 12f
     private const val OCTAVE_CHECK_FRAMES = 25
     private const val OCTAVE_TOLERANCE = 2.5f
+
+    /** Tighter than the neighbours' check: a note this near the register once folded was a slip,
+     * while a real leap of nearly an octave lands further off and is left where it was sung. */
+    private const val REGISTER_TOLERANCE = 1.5f
     private const val MEDIAN_REACH_FRAMES = 2
     private const val MIN_RUN_FRAMES = 6
     private const val MAX_GAP_FRAMES = 3
     private const val MAX_STEP_SEMITONES = 5f
+
+    /** Longer than this and a reading away from every register is singing, not a slip. */
+    private const val STRAY_MAX_MS = 100L
     private const val RANGE_MARGIN = 1f
     private const val MARK_MARGIN_MS = 150L
     private const val MIN_KEY_FRAMES = 30

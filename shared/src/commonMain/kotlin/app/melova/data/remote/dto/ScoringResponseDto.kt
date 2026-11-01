@@ -18,7 +18,22 @@ data class ScoringResponseDto(
     @SerialName("corrections") val corrections: List<PitchCorrectionDto> = emptyList(),
     @SerialName("tahrir_comparisons") val tahrirComparisons: List<TahrirComparisonDto> = emptyList(),
     @SerialName("ornament_corrections") val ornamentCorrections: List<OrnamentCorrectionDto> = emptyList(),
+    @SerialName("pitch_lines") val pitchLines: PitchLinesDto? = null,
     @SerialName("teacher_review") val teacherReview: TeacherReviewSuggestionDto? = null
+)
+
+/** Both voices' pitch as the score read it, so the detail sheet draws those same notes. */
+@Serializable
+data class PitchLinesDto(
+    @SerialName("teacher") val teacher: PitchLineDto = PitchLineDto(),
+    @SerialName("student") val student: PitchLineDto = PitchLineDto()
+)
+
+/** One voice, frame by frame on its own recording's clock. */
+@Serializable
+data class PitchLineDto(
+    @SerialName("times_ms") val timesMs: List<Long> = emptyList(),
+    @SerialName("hz") val hz: List<Float> = emptyList()
 )
 
 /** The scorer wasn't sure of this take and suggests sending it to the teacher, free. */

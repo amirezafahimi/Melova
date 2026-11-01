@@ -1,5 +1,6 @@
 package app.melova.data.model
 
+import app.melova.audio.pitch.PitchPoint
 import app.melova.audio.scoring.ReRecordReason
 import app.melova.audio.scoring.VocalScorer
 
@@ -17,8 +18,16 @@ data class VocalScoreResult(
     val reRecordReason: ReRecordReason? = null,
     /** Set when the scorer asks for the teacher on this take; the id makes it a free referral. */
     val teacherReferral: TeacherReferral? = null,
+    /** Both voices' pitch as the score read it; null on takes scored before it was sent. */
+    val pitchLines: ScoredPitchLines? = null,
     /** The server's answer as JSON; sent with a take, it opens this same result again. */
     val sourceJson: String? = null
+)
+
+/** Both voices' pitch as the score read them, each on its own recording's clock. */
+data class ScoredPitchLines(
+    val teacher: List<PitchPoint> = emptyList(),
+    val student: List<PitchPoint> = emptyList()
 )
 
 data class TeacherReferral(

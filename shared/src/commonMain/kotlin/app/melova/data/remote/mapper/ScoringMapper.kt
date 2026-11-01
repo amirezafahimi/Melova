@@ -1,10 +1,13 @@
 package app.melova.data.remote.mapper
 
+import app.melova.audio.pitch.PitchContour
+import app.melova.audio.pitch.PitchPoint
 import app.melova.audio.playback.ExpectedSegment
 import app.melova.audio.scoring.ReRecordReason
 import app.melova.audio.scoring.VocalScorer
 import app.melova.data.model.PlaybackClip
 import app.melova.data.model.ScoreMetric
+import app.melova.data.model.ScoredPitchLines
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.TahrirKind
 import app.melova.data.model.TeacherReferral
@@ -12,6 +15,8 @@ import app.melova.data.model.VocalScoreResult
 import app.melova.data.remote.dto.ExpectedSegmentDto
 import app.melova.data.remote.dto.OrnamentCorrectionDto
 import app.melova.data.remote.dto.PitchCorrectionDto
+import app.melova.data.remote.dto.PitchLineDto
+import app.melova.data.remote.dto.PitchLinesDto
 import app.melova.data.remote.dto.PlaybackClipDto
 import app.melova.data.remote.dto.ScoreMetricDto
 import app.melova.data.remote.dto.ScoringResponseDto
@@ -38,9 +43,23 @@ fun ScoringResponseDto.toDomain(): VocalScoreResult {
         reRecordReason = reRecordReason.toDomain(),
         teacherReferral = teacherReview?.takeIf { it.suggested }?.let {
             TeacherReferral(reasons = it.reasons, referralId = it.referralId)
-        }
+        },
+        pitchLines = pitchLines?.toDomain()
     )
 }
+
+private fun PitchLinesDto.toDomain(): ScoredPitchLines? {
+    val teacherLine = teacher.toPoints()
+    val studentLine = student.toPoints()
+    if (teacherLine.isEmpty() && studentLine.isEmpty()) return null
+    return ScoredPitchLines(teacher = teacherLine, student = studentLine)
+}
+
+private fun PitchLineDto.toPoints(): List<PitchPoint> =
+    timesMs.indices.mapNotNull { index ->
+        val hz = this.hz.getOrNull(index)?.takeIf { it > 0f } ?: return@mapNotNull null
+        PitchPoint(timeMs = timesMs[index], semitone = PitchContour.semitoneOf(hz))
+    }
 
 fun ScoreMetricDto.toDomain(): ScoreMetric =
     ScoreMetric(

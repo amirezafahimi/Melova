@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import app.melova.audio.io.WavUtils
 import app.melova.audio.io.WaveformPeaksExtractor
 import app.melova.audio.pitch.PitchContour
+import app.melova.audio.pitch.PitchPoint
 import app.melova.audio.scoring.VocalScorer
 import app.melova.data.model.ErrorDetail
 import app.melova.data.model.ErrorDetailLane
@@ -672,10 +673,11 @@ class VocalTrainingViewModel(
                 val voice = studentVoice ?: DetailVoicePlayer(appContext).also { studentVoice = it }
                 voice.load(userRecordingFile, student.startMs, student.endMs, student.speed)
             }
+            val scored = _uiState.value.scoreResult?.pitchLines
             val lanes = withContext(ioDispatcher) {
-                val teacherLine = teacher?.let { lineOf(teacherPcm, it) }.orEmpty()
+                val teacherLine = teacher?.let { lineOf(teacherPcm, it, scored?.teacher) }.orEmpty()
                 val studentLine = student?.let {
-                    PitchContour.inRegisterOf(teacherLine, lineOf(studentPcm, it))
+                    PitchContour.inRegisterOf(teacherLine, lineOf(studentPcm, it, scored?.student))
                 }.orEmpty()
                 val guide = if (teacher != null && student != null) {
                     PitchContour.guide(teacherLine, studentLine, student.markStartMs..student.markEndMs) {
@@ -694,10 +696,20 @@ class VocalTrainingViewModel(
         }
     }
 
-    private suspend fun lineOf(pcm: Pair<ShortArray, Int>?, lane: ErrorDetailLane) =
-        pcm?.let { (samples, sampleRate) ->
+    /**
+     * One lane's line: the pitch the score itself was read from when it came with the score, and
+     * otherwise this device's own reading of the audio, which is the only line old takes have.
+     */
+    private suspend fun lineOf(
+        pcm: Pair<ShortArray, Int>?,
+        lane: ErrorDetailLane,
+        scored: List<PitchPoint>?
+    ): List<List<PitchPoint>> {
+        if (!scored.isNullOrEmpty()) return PitchContour.of(scored, lane.startMs, lane.endMs)
+        return pcm?.let { (samples, sampleRate) ->
             PitchContour.of(samples, sampleRate, lane.startMs, lane.endMs)
         }.orEmpty()
+    }
 
     private fun loadTeacherAudio(): Pair<ShortArray, Int>? {
         teacherAudio?.let { return it }

@@ -82,6 +82,48 @@ class PitchContourTest {
     }
 
     @Test
+    fun theScoresOwnLineIsDrawnOverTheStretchAsked() {
+        val scored = line(0, 2_000, 60f)
+
+        val drawn = PitchContour.of(scored, 500, 1_000)
+
+        assertEquals(1, drawn.size)
+        assertTrue(drawn.single().first().timeMs >= 500 && drawn.single().last().timeMs <= 1_000)
+        assertTrue(drawn.single().all { abs(it.semitone - 60f) < 0.1f })
+    }
+
+    @Test
+    fun anOctaveSlipThatOpensTheStretchIsFoldedBack() {
+        // arsham's take at 5268 ms: the tracker doubled for 200 ms right where the card starts,
+        // so every neighbour of those frames was the slip itself.
+        val slipped = line(0, 190, 69.6f) + line(200, 1_000, 57.6f)
+
+        val drawn = PitchContour.of(slipped, 0, 1_000)
+
+        assertEquals(1, drawn.size)
+        assertTrue(drawn.single().all { abs(it.semitone - 57.6f) < 1f })
+    }
+
+    @Test
+    fun aStrayLeapThatIsNoOctaveIsLeftOutOfTheLine() {
+        // Same take at 14808 ms: 60 ms some 8 semitones up, which no octave fold brings home.
+        val strayed = line(0, 740, 61.5f) + line(750, 810, 69.9f) + line(820, 1_500, 61.5f)
+
+        val notes = PitchContour.of(strayed, 0, 1_500).flatten()
+
+        assertTrue(notes.isNotEmpty() && notes.none { it.semitone > 63f })
+    }
+
+    @Test
+    fun aLeapTheVoiceHoldsIsNotTakenForASlip() {
+        val sung = line(0, 700, 60f) + line(710, 1_500, 67f)
+
+        val notes = PitchContour.of(sung, 0, 1_500).flatten().map { it.semitone }
+
+        assertTrue(notes.any { abs(it - 60f) < 0.5f } && notes.any { abs(it - 67f) < 0.5f })
+    }
+
+    @Test
     fun aStudentAnOctaveAboveTheTeacherIsMovedDownToTheTeacher() {
         val teacher = listOf(line(0, 500, 55f))
         val student = listOf(line(0, 500, 67.5f))
