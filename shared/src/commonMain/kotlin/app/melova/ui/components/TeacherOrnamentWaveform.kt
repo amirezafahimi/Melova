@@ -216,7 +216,8 @@ fun TeacherOrnamentWaveform(
         val width = size.width
         val height = size.height
         val badgeArea = 20.dp.toPx()
-        val rulerArea = 16.dp.toPx()
+        // Tall enough for a tick and its number under it, one below the other.
+        val rulerArea = 24.dp.toPx()
         val waveTop = badgeArea
         val waveHeight = height - badgeArea - rulerArea
         val centerY = waveTop + waveHeight / 2f
@@ -277,7 +278,6 @@ fun TeacherOrnamentWaveform(
                 val bars = levels.firstOrNull { waveWidth / it.size >= MIN_BAR_DP.dp.toPx() } ?: levels.last()
                 val barWidth = waveWidth / bars.size
                 val stroke = (barWidth * 0.62f).coerceAtLeast(1f)
-                val playedPoint = playheadMs.toFloat() / totalMs
                 val first = floor(left * bars.size).toInt().coerceAtLeast(0)
                 val last = ceil((left + 1f / view.zoom) * bars.size).toInt().coerceAtMost(bars.size)
                 var segment = 0
@@ -288,13 +288,9 @@ fun TeacherOrnamentWaveform(
                     val inside = ornaments.getOrNull(segment)?.takeIf { barMs >= it.startMs }
                     val barHeight = (bars[index].coerceIn(0f, 1f) * waveHeight * 0.92f).coerceAtLeast(1.5f)
                     val x = xOf(point)
-                    val played = playheadMs > 0L && point <= playedPoint
                     drawLine(
-                        color = when {
-                            inside != null -> ornamentColor(inside.kind, palette).copy(alpha = if (played) 1f else 0.8f)
-                            played -> palette.accent
-                            else -> palette.text.copy(alpha = 0.26f)
-                        },
+                        // The wave reads the same wherever the playhead is; only the line marks it.
+                        color = inside?.let { ornamentColor(it.kind, palette) } ?: palette.text.copy(alpha = 0.26f),
                         start = Offset(x, centerY - barHeight / 2f),
                         end = Offset(x, centerY + barHeight / 2f),
                         strokeWidth = stroke,
@@ -305,6 +301,13 @@ fun TeacherOrnamentWaveform(
 
             // A tick each second; with zoom, every tenth of a second too.
             val tickMs = if (waveWidth / (totalMs / 100f) >= 6.dp.toPx()) 100L else 1_000L
+            // Every tick keeps its line, but a number only where the next one has room to stand
+            // clear of it; otherwise the seconds run into one another.
+            val widest = textMeasurer.measure("${persianDigits((totalMs / 1_000).toString())}s", rulerStyle)
+            val perSecond = waveWidth / (totalMs / 1_000f)
+            val labelStepS = LABEL_STEPS_S
+                .firstOrNull { it * perSecond >= widest.size.width + 8.dp.toPx() }
+                ?: LABEL_STEPS_S.last()
             var tick = (left * totalMs).toLong() / tickMs * tickMs
             while (tick <= totalMs) {
                 val x = xOf(tick)
@@ -316,13 +319,14 @@ fun TeacherOrnamentWaveform(
                     end = Offset(x, height - rulerArea + if (isSecond) 6.dp.toPx() else 3.dp.toPx()),
                     strokeWidth = 1.dp.toPx()
                 )
-                if (isSecond && tick > 0L) {
+                if (isSecond && tick > 0L && (tick / 1_000L) % labelStepS == 0L) {
                     val text = textMeasurer.measure("${persianDigits((tick / 1_000).toString())}s", rulerStyle)
                     drawText(
                         textLayoutResult = text,
                         topLeft = Offset(
                             (x - text.size.width / 2f).coerceIn(0f, width - text.size.width),
-                            height - text.size.height - 1.dp.toPx()
+                            // Under its own tick, not over it.
+                            height - rulerArea + 8.dp.toPx()
                         )
                     )
                 }
@@ -393,3 +397,6 @@ fun ornamentColor(kind: TeacherOrnamentKind, palette: MelovaPalette): Color = wh
     TeacherOrnamentKind.VIBRATO -> palette.info
     TeacherOrnamentKind.GLIDE -> palette.teal
 }
+
+/** How many seconds a ruler number may stand for, from every one to a minute apart. */
+private val LABEL_STEPS_S = listOf(1, 2, 5, 10, 15, 30, 60)

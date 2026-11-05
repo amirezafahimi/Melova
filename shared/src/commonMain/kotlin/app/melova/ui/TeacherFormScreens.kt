@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -20,6 +21,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -35,7 +40,6 @@ import app.melova.presentation.TakePreviewPhase
 import app.melova.presentation.TakePreviewUiState
 import app.melova.presentation.TakePreviewViewModel
 import app.melova.ui.components.LetterTag
-import app.melova.ui.components.ListenButton
 import app.melova.ui.components.MelovaProgressBar
 import app.melova.ui.components.OrnamentRow
 import app.melova.ui.components.TeacherOrnamentWaveform
@@ -78,6 +82,9 @@ import app.melova.presentation.TeacherViewModel
 import app.melova.ui.components.BusyOverlay
 import app.melova.ui.components.ConfirmDialog
 import app.melova.ui.components.MelovaBackground
+import app.melova.ui.components.MelovaMediaIconButton
+import app.melova.ui.components.MelovaRowSkeleton
+import app.melova.ui.components.MelovaWaveSkeleton
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTextField
 import app.melova.ui.components.MelovaTopBar
@@ -151,6 +158,7 @@ fun SectionEditorScreen(
         subtitle = lesson?.title,
         onBack = leave,
         busyLabel = state.busyLabel,
+        uploadProgress = state.uploadProgress,
         actionLabel = if (isNew) "بارگذاری بخش" else "ذخیره‌ی تغییرات",
         actionIcon = if (isNew || take.canUpload) Icons.Outlined.CloudUpload else null,
         actionEnabled = lesson != null && title.isNotBlank() && !busy &&
@@ -354,26 +362,58 @@ private fun TakePreview(
         )
         TakePreviewPhase.FAILED -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(preview.errorMessage.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MelovaError)
-            TextButton(onClick = onRetry, modifier = Modifier.fillMaxWidth().height(MelovaDimens.CompactButtonHeight)) {
-                Text("تلاش دوباره", style = MaterialTheme.typography.labelLarge, color = MelovaAccentSoft)
+            Button(
+                onClick = onRetry,
+                modifier = Modifier.fillMaxWidth().height(MelovaDimens.ButtonHeight),
+                shape = MelovaSmallShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MelovaAccentTint,
+                    contentColor = MelovaAccentSoft
+                )
+            ) {
+                Text("تلاش دوباره")
             }
         }
         TakePreviewPhase.READY -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (preview.peaks.isNotEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ListenButton(
-                        isPlaying = preview.isPlaying && preview.playingIndex == null,
-                        isLoading = false,
+                // The same row as the performance page's: a tinted play button, the clock, the zoom.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MelovaMediaIconButton(
                         onClick = onTogglePlayback,
-                        contentDescription = if (preview.isPlaying) "توقف" else "پخش کل اجرا"
+                        icon = if (preview.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (preview.isPlaying) "توقف" else "پخش کل اجرا",
+                        containerColor = MelovaAccentTint,
+                        contentColor = MelovaAccentSoft,
+                        buttonSize = MelovaDimens.ButtonHeight
                     )
                     LtrContent {
                         Text(
                             text = "${formatPreciseClock(preview.positionMs)} / ${formatPreciseClock(preview.durationMs)}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MelovaTextMuted
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MelovaText.copy(alpha = 0.75f)
                         )
                     }
+                    Spacer(modifier = Modifier.weight(1f))
+                    MelovaMediaIconButton(
+                        onClick = { onZoomChange(preview.zoom / 2f) },
+                        enabled = preview.zoom > 1f,
+                        icon = Icons.Default.ZoomOut,
+                        contentDescription = "کوچک‌نمایی موج",
+                        containerColor = MelovaAccentTint,
+                        contentColor = MelovaAccentSoft,
+                        buttonSize = MelovaDimens.CompactButtonHeight,
+                        iconSize = 20.dp
+                    )
+                    MelovaMediaIconButton(
+                        onClick = { onZoomChange(preview.zoom * 2f) },
+                        enabled = preview.zoom < TakePreviewViewModel.MAX_ZOOM,
+                        icon = Icons.Default.ZoomIn,
+                        contentDescription = "بزرگ‌نمایی موج",
+                        containerColor = MelovaAccentTint,
+                        contentColor = MelovaAccentSoft,
+                        buttonSize = MelovaDimens.CompactButtonHeight,
+                        iconSize = 20.dp
+                    )
                 }
                 LtrContent {
                     TeacherOrnamentWaveform(
@@ -440,9 +480,13 @@ private fun OrnamentCounts(ornaments: List<TeacherOrnament>) {
     }
 }
 
+/**
+ * The take on its way: its line of progress, and under it the wave and rows standing in their
+ * places, as on the performance page, so the teacher sees the shape of what is coming.
+ */
 @Composable
 private fun PreviewProgress(label: String, progress: Float?) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = MaterialTheme.typography.bodySmall, color = MelovaText, modifier = Modifier.weight(1f))
             if (progress != null) {
@@ -464,6 +508,8 @@ private fun PreviewProgress(label: String, progress: Float?) {
                 trackColor = MelovaAccentTint
             )
         }
+        MelovaWaveSkeleton(height = 120.dp)
+        repeat(2) { MelovaRowSkeleton(modifier = Modifier.padding(vertical = 4.dp)) }
     }
 }
 
@@ -491,6 +537,7 @@ fun LessonFormScreen(
         subtitle = lesson?.title,
         onBack = onBack,
         busyLabel = state.busyLabel,
+        uploadProgress = state.uploadProgress,
         actionLabel = if (isNew) "ساختن درس" else "ذخیره",
         actionEnabled = lessonTitle.isNotBlank() && state.busyLabel == null,
         onAction = {
@@ -547,6 +594,7 @@ fun TeacherProfileScreen(state: TeacherUiState, viewModel: TeacherViewModel, onB
         subtitle = null,
         onBack = onBack,
         busyLabel = state.busyLabel,
+        uploadProgress = state.uploadProgress,
         actionLabel = "ذخیره",
         actionEnabled = changed && name.isNotBlank() && state.busyLabel == null,
         onAction = {
@@ -634,6 +682,7 @@ private fun TeacherFormPage(
     subtitle: String?,
     onBack: () -> Unit,
     busyLabel: String?,
+    uploadProgress: Float?,
     actionLabel: String,
     actionEnabled: Boolean,
     onAction: () -> Unit,
@@ -688,7 +737,7 @@ private fun TeacherFormPage(
                 }
             }
         }
-        BusyOverlay(busyLabel)
+        BusyOverlay(busyLabel, uploadProgress)
     }
 }
 
