@@ -27,9 +27,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.melova.audio.scoring.VocalScorer
-import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
+import app.melova.ui.theme.MelovaAccentTint
 import app.melova.ui.theme.MelovaSecondary
+import app.melova.ui.theme.MelovaSecondaryTint
 import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaWarning
 import app.melova.ui.theme.MelovaInfo
@@ -62,7 +63,7 @@ fun VocalTrainingCorrectionRow(
     }
 
     val backgroundColor = when {
-        isStudentSnippetPlaying || isTeacherSnippetPlaying -> MelovaSecondary.copy(alpha = 0.22f)
+        isStudentSnippetPlaying || isTeacherSnippetPlaying -> MelovaSecondaryTint
         isSelected -> MelovaText.copy(alpha = 0.12f)
         else -> MelovaText.copy(alpha = 0.06f)
     }
@@ -103,8 +104,8 @@ fun VocalTrainingCorrectionRow(
                 label = "اجرای شما",
                 icon = Icons.Outlined.Mic,
                 isPlaying = isStudentSnippetPlaying,
-                containerColor = MelovaSecondary.copy(alpha = 0.22f),
-                contentColor = MelovaAccentSoft,
+                containerColor = MelovaSecondaryTint,
+                contentColor = MelovaSecondary,
                 onClick = onPlayStudentSnippet,
                 modifier = Modifier.weight(1f)
             )
@@ -112,7 +113,7 @@ fun VocalTrainingCorrectionRow(
                 label = "نمونه استاد",
                 icon = Icons.Outlined.Hearing,
                 isPlaying = isTeacherSnippetPlaying,
-                containerColor = MelovaAccent.copy(alpha = 0.28f),
+                containerColor = MelovaAccentTint,
                 contentColor = MelovaAccentSoft,
                 onClick = onPlayTeacherSnippet,
                 modifier = Modifier.weight(1f)

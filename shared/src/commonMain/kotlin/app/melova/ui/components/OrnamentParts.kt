@@ -27,6 +27,7 @@ import app.melova.platform.pad2
 import app.melova.platform.persianDigits
 import app.melova.ui.layout.LtrContent
 import app.melova.ui.theme.LocalMelovaPalette
+import app.melova.ui.theme.MelovaDimens
 import app.melova.ui.theme.MelovaText
 
 // The teacher's ornaments as rows and marks, on the performance page and in a take's preview.
@@ -66,12 +67,15 @@ internal fun OrnamentRow(
                 )
             }
         }
+        // A tint of the ornament's own colour, so the row reads as one piece instead of a
+        // line of strong blocks down the page.
         MelovaMediaIconButton(
             onClick = onClick,
             icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
             contentDescription = if (isPlaying) "توقف" else "پخش این بازه",
-            containerColor = color,
-            buttonSize = 40.dp,
+            containerColor = color.copy(alpha = 0.18f),
+            contentColor = color,
+            buttonSize = MelovaDimens.CompactButtonHeight,
             iconSize = 18.dp
         )
     }

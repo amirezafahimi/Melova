@@ -31,9 +31,10 @@ import androidx.compose.ui.unit.dp
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.TahrirKind
 import app.melova.platform.persianDigits
-import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
+import app.melova.ui.theme.MelovaAccentTint
 import app.melova.ui.theme.MelovaSecondary
+import app.melova.ui.theme.MelovaSecondaryTint
 import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaWarning
 import app.melova.ui.theme.MelovaError
@@ -56,7 +57,7 @@ fun VocalTrainingTahrirRow(
     }
 
     val backgroundColor = when {
-        isStudentSnippetPlaying || isTeacherSnippetPlaying -> MelovaSecondary.copy(alpha = 0.22f)
+        isStudentSnippetPlaying || isTeacherSnippetPlaying -> MelovaSecondaryTint
         else -> MelovaText.copy(alpha = 0.06f)
     }
 
@@ -115,8 +116,8 @@ fun VocalTrainingTahrirRow(
                 icon = Icons.Outlined.Mic,
                 isPlaying = isStudentSnippetPlaying,
                 enabled = comparison.hasStudentRegion,
-                containerColor = MelovaSecondary.copy(alpha = 0.22f),
-                contentColor = MelovaAccentSoft,
+                containerColor = MelovaSecondaryTint,
+                contentColor = MelovaSecondary,
                 onClick = onPlayStudentSnippet,
                 modifier = Modifier.weight(1f)
             )
@@ -125,7 +126,7 @@ fun VocalTrainingTahrirRow(
                 icon = Icons.Outlined.Hearing,
                 isPlaying = isTeacherSnippetPlaying,
                 enabled = true,
-                containerColor = MelovaAccent.copy(alpha = 0.28f),
+                containerColor = MelovaAccentTint,
                 contentColor = MelovaAccentSoft,
                 onClick = onPlayTeacherSnippet,
                 modifier = Modifier.weight(1f)

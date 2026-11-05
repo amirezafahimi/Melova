@@ -64,7 +64,11 @@ import app.melova.presentation.VocalTrainingMode
 import app.melova.presentation.VocalTrainingUiState
 import app.melova.presentation.VocalTrainingViewModel
 import app.melova.audio.scoring.ReRecordReason
+import androidx.compose.foundation.shape.CircleShape
 import app.melova.ui.components.MelovaBackground
+import app.melova.ui.components.MelovaSkeleton
+import app.melova.ui.components.MelovaSurfaceCard
+import app.melova.ui.components.MelovaWaveSkeleton
 import app.melova.ui.components.MelovaChip
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
@@ -83,11 +87,13 @@ import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
+import app.melova.ui.theme.MelovaAccentTint
 import app.melova.ui.theme.MelovaBackgroundEnd
 import app.melova.ui.theme.MelovaBackgroundStart
 import app.melova.ui.theme.MelovaCard
 import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaSecondary
+import app.melova.ui.theme.MelovaSecondaryTint
 import app.melova.ui.theme.MelovaCardElevated
 import app.melova.ui.theme.MelovaWarning
 import app.melova.ui.theme.MelovaInfo
@@ -160,6 +166,8 @@ fun VocalTrainingScreen(
                     )
 
                     LessonCard(uiState, onRetry = viewModel::loadLesson)
+
+                    if (!uiState.isLessonReady && !uiState.lessonLoadFailed) TeacherReferenceSkeleton()
 
                     if (uiState.isLessonReady) {
                         TeacherReferenceSection(
@@ -333,6 +341,34 @@ private fun LessonCard(uiState: VocalTrainingUiState, onRetry: () -> Unit) {
     }
 }
 
+/**
+ * The teacher's sample card before its audio is here: the same card with its wave, its name line
+ * and its button standing in place, so the student sees what is coming instead of a blank page.
+ */
+@Composable
+private fun TeacherReferenceSkeleton() {
+    MelovaSurfaceCard {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MelovaSkeleton(Modifier.size(MelovaDimens.Icon), CircleShape)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    MelovaSkeleton(Modifier.width(96.dp).height(14.dp))
+                    MelovaSkeleton(Modifier.width(140.dp).height(10.dp))
+                }
+                MelovaSkeleton(Modifier.size(MelovaDimens.CompactButtonHeight))
+            }
+            MelovaWaveSkeleton(height = 72.dp)
+            MelovaSkeleton(Modifier.fillMaxWidth().height(MelovaDimens.CompactButtonHeight))
+        }
+    }
+}
+
 @Composable
 private fun TeacherReferenceSection(
     teacherName: String,
@@ -407,16 +443,19 @@ private fun TeacherReferenceSection(
                             onClick = onStopPlayback,
                             icon = Icons.Default.Stop,
                             contentDescription = "توقف پخش استاد",
-                            containerColor = MelovaAccent.copy(alpha = 0.28f),
-                            contentColor = MelovaAccentSoft
+                            containerColor = MelovaSecondaryTint,
+                            contentColor = MelovaSecondary
                         )
                     } else {
+                        // A tint, like the detail page's: the card reads as one piece, and the
+                        // student's own record button stays the only strong colour on the page.
                         MelovaMediaIconButton(
                             onClick = onTogglePlayback,
                             enabled = enabled,
                             icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "توقف موقت" else "پخش نمونه استاد",
-                            containerColor = MelovaSecondary
+                            containerColor = MelovaSecondaryTint,
+                            contentColor = MelovaSecondary
                         )
                     }
                 }
@@ -456,7 +495,7 @@ private fun TeacherReferenceSection(
                 shape = MelovaSmallShape,
                 contentPadding = PaddingValues(horizontal = 12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MelovaSecondary.copy(alpha = 0.14f),
+                    containerColor = MelovaSecondaryTint,
                     contentColor = MelovaSecondary
                 )
             ) {
@@ -1171,7 +1210,7 @@ private fun UserRecordingSection(
                         onClick = onStopPlayback,
                         icon = Icons.Default.Stop,
                         contentDescription = "توقف پخش",
-                        containerColor = MelovaAccent.copy(alpha = 0.28f),
+                        containerColor = MelovaAccentTint,
                         contentColor = MelovaAccentSoft
                     )
                 } else {
@@ -1179,7 +1218,8 @@ private fun UserRecordingSection(
                         onClick = onTogglePlayback,
                         icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "توقف موقت" else "پخش اجرای من",
-                        containerColor = MelovaSecondary
+                        containerColor = MelovaAccentTint,
+                        contentColor = MelovaAccentSoft
                     )
                 }
             }

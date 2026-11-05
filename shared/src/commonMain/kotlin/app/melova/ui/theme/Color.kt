@@ -100,6 +100,10 @@ val MelovaAccent: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalet
 val MelovaAccentTint: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.accent.copy(alpha = 0.14f)
 val MelovaAccentSoft: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.accentSoft
 val MelovaSecondary: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.secondary
+
+/** The teacher's own colour as a light fill; what sits on it is [MelovaSecondary] itself. */
+val MelovaSecondaryTint: Color
+    @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.secondary.copy(alpha = 0.14f)
 val MelovaGold: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.gold
 val MelovaSuccess: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.success
 val MelovaWarning: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.warning

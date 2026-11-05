@@ -21,7 +21,9 @@ rule, say so and update this file in the same change.
 
 - Colours come from `ui/theme`. Borders and dividers use `MelovaOutline` as it is, never faded with `.copy(alpha)`: a faded one vanishes on the light theme. A literal `Color(0x…)` is only for a third party's brand (Google
   button) and the lesson cover gradients.
-- Solid accent fill takes white content; `MelovaAccentTint` takes `MelovaAccentSoft`.
+- Solid accent fill takes white content; `MelovaAccentTint` takes `MelovaAccentSoft`, and
+  `MelovaSecondaryTint` takes `MelovaSecondary`. A page keeps a solid fill for its one main
+  action (record, upload, send); the media and side buttons around it take a tint.
 - Reuse before writing: `MelovaSurfaceCard`, `MelovaTopBar`, `MelovaNavRow` for a row that opens
   something, `SectionHeader`, `ConfirmDialog`, `MelovaBackground`, `RtlContent`.
 - A new page is `MelovaBackground { RtlContent { LazyColumn … } }` with system bar insets and
