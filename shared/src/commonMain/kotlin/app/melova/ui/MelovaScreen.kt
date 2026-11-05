@@ -124,7 +124,7 @@ fun MelovaScreen(
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .verticalScroll(rememberScrollState())
                     .padding(PagePadding),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 MelovaTopBar(
                     title = "گام و سلفژ",
@@ -204,10 +204,10 @@ private fun ExerciseCard(uiState: MelovaUiState) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MelovaCard),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
@@ -240,10 +240,10 @@ private fun ProgressSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MelovaCard.copy(alpha = 0.85f)),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
@@ -293,7 +293,7 @@ private fun ProgressSection(
             if (uiState.mode == SessionMode.ANALYZING) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
@@ -317,11 +317,11 @@ private fun HeadphoneHintBanner() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(MelovaCardElevated)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Icon(
             imageVector = Icons.Outlined.Headphones,
@@ -359,14 +359,14 @@ private fun ActionButtons(
             uiState.mode == SessionMode.MATCHING ||
             uiState.mode == SessionMode.ANALYZING
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = onListen,
             enabled = !isBusy,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp),
-            shape = RoundedCornerShape(16.dp),
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MelovaSecondary,
                 disabledContainerColor = MelovaSecondary.copy(alpha = 0.4f)
@@ -382,8 +382,8 @@ private fun ActionButtons(
             enabled = !isBusy,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp),
-            shape = RoundedCornerShape(16.dp),
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MelovaAccent,
                 disabledContainerColor = MelovaAccent.copy(alpha = 0.4f)
@@ -398,7 +398,7 @@ private fun ActionButtons(
             OutlinedButton(
                 onClick = onStop,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(Icons.Default.Stop, contentDescription = null, tint = MelovaText)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -416,11 +416,11 @@ private fun ScoreResultCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MelovaCard),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = "نتیجه تحلیل",
@@ -433,7 +433,7 @@ private fun ScoreResultCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(MelovaAccent.copy(alpha = 0.15f))
                     .padding(12.dp),
                 contentAlignment = Alignment.Center
@@ -483,7 +483,7 @@ private fun ScoreResultCard(
             OutlinedButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text("تلاش دوباره", color = MelovaText)
             }
@@ -500,7 +500,7 @@ private fun ScoreRow(label: String, score: Int, ltrSuffix: String? = null) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f)
         ) {
             Text(

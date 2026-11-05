@@ -1,5 +1,10 @@
 package app.melova.ui
 
+import app.melova.ui.components.ForwardArrow
+import app.melova.ui.theme.MelovaDimens
+import app.melova.ui.theme.MelovaSmallShape
+import app.melova.ui.components.MelovaGroupRow
+import app.melova.ui.components.MelovaNavGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +25,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.CoPresent
 import androidx.compose.material.icons.outlined.Edit
@@ -41,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.melova.platform.appVersionName
@@ -95,10 +100,9 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.statusBars),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = BottomBarContentPadding),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = BottomBarContentPadding),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item { Text(text = "پروفایل", style = MaterialTheme.typography.headlineSmall, color = MelovaText) }
                 item {
                     if (studentState.needsLogin) {
                         LoginCard(onLogin = onLogin)
@@ -107,36 +111,37 @@ fun ProfileScreen(
                     }
                 }
                 // A teacher signs in like anyone else; only then can they say they teach.
-                if (teacherState.isSignedIn || !studentState.needsLogin) {
+                val showTeacher = teacherState.isSignedIn || !studentState.needsLogin
+                if (showTeacher || canChat || !studentState.needsLogin) {
                     item {
-                        TeacherPanelCard(
-                            state = teacherState,
-                            onSignIn = { showTeacherSignIn = true },
-                            onOpenPanel = onOpenTeacherPanel
+                        MelovaNavGroup(
+                            if (showTeacher) {
+                                { TeacherPanelRow(state = teacherState, onSignIn = { showTeacherSignIn = true }, onOpenPanel = onOpenTeacherPanel) }
+                            } else null,
+                            if (canChat) {
+                                { ChatsEntryRow(unread = unreadChats, onClick = onOpenChats) }
+                            } else null,
+                            if (!studentState.needsLogin) {
+                                { FollowedTeachersRow(count = catalogState.followedTeachers.size, onClick = onOpenFollowedTeachers) }
+                            } else null
                         )
                     }
                 }
-
-                if (canChat) {
-                    item { ChatsEntryRow(unread = unreadChats, onClick = onOpenChats) }
-                }
-                if (!studentState.needsLogin) {
-                    item { FollowedTeachersRow(count = catalogState.followedTeachers.size, onClick = onOpenFollowedTeachers) }
-                }
-
-                item { MelovaNavRow(icon = Icons.Outlined.Settings, title = "تنظیمات", onClick = onOpenSettings) }
                 item {
-                    MelovaNavRow(icon = Icons.AutoMirrored.Outlined.HelpOutline, title = "پرسش و پاسخ", onClick = onOpenFaq)
-                }
-                if (install != null) {
-                    item {
-                        MelovaNavRow(
-                            icon = Icons.Outlined.InstallMobile,
-                            title = "نصب ملووا",
-                            subtitle = "مثل یک اپ، با لوگوی خودش باز می‌شود",
-                            onClick = install
-                        )
-                    }
+                    MelovaNavGroup(
+                        { MelovaGroupRow(icon = Icons.Outlined.Settings, title = "تنظیمات", onClick = onOpenSettings) },
+                        { MelovaGroupRow(icon = Icons.AutoMirrored.Outlined.HelpOutline, title = "پرسش و پاسخ", onClick = onOpenFaq) },
+                        install?.let { onInstall ->
+                            {
+                                MelovaGroupRow(
+                                    icon = Icons.Outlined.InstallMobile,
+                                    title = "نصب ملووا",
+                                    subtitle = "مثل یک اپ، با لوگوی خودش باز می‌شود",
+                                    onClick = onInstall
+                                )
+                            }
+                        }
+                    )
                 }
                 item {
                     Text(
@@ -183,13 +188,14 @@ private fun IdentityCard(state: StudentUiState, onEdit: () -> Unit) {
     MelovaSurfaceCard(onClick = onEdit, enabled = account != null) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            StudentAvatar(name, state.photo, size = 72.dp)
+            StudentAvatar(name, state.photo, size = 64.dp)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = name.ifBlank { "هنرجوی ملووا" },
                     style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                     color = MelovaText,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -211,67 +217,42 @@ private fun IdentityCard(state: StudentUiState, onEdit: () -> Unit) {
 @Composable
 private fun LoginCard(onLogin: () -> Unit) {
     MelovaSurfaceCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("هنوز وارد نشده‌اید", style = MaterialTheme.typography.titleLarge, color = MelovaText)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("هنوز وارد نشده‌اید", style = MaterialTheme.typography.titleMedium, color = MelovaText)
             Text(
                 text = "بدون ورود هم می‌توانید تمرین کنید. برای فرستادن تمرین برای استاد باید وارد شوید.",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MelovaTextMuted
             )
             Button(
                 onClick = onLogin,
-                shape = RoundedCornerShape(14.dp),
+                shape = MelovaSmallShape,
                 colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                modifier = Modifier.fillMaxWidth().height(46.dp)
+                modifier = Modifier.fillMaxWidth().height(MelovaDimens.ButtonHeight)
             ) { Text("ورود یا ثبت‌نام") }
         }
     }
 }
 
 @Composable
-private fun TeacherPanelCard(state: TeacherUiState, onSignIn: () -> Unit, onOpenPanel: () -> Unit) {
-    MelovaSurfaceCard(
+private fun TeacherPanelRow(state: TeacherUiState, onSignIn: () -> Unit, onOpenPanel: () -> Unit) {
+    MelovaGroupRow(
+        icon = Icons.Outlined.CoPresent,
+        title = if (state.isSignedIn) "پنل استاد" else "استاد هستید؟",
+        subtitle = when {
+            !state.isSignedIn -> "ورود با کد استاد"
+            else -> state.profile?.let { persianDigits("${it.lessons.size} درس، ${it.lessons.count { l -> l.published }} منتشرشده") }
+                ?: "در حال بارگذاری…"
+        },
         onClick = if (state.isSignedIn) onOpenPanel else onSignIn,
         enabled = state.isSignedIn || state.busyLabel == null,
-        contentPadding = 14.dp
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(MelovaGold.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Outlined.CoPresent, contentDescription = null, tint = MelovaGold)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (state.isSignedIn) "پنل استاد" else "استاد هستید؟",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MelovaText
-                )
-                Text(
-                    text = when {
-                        !state.isSignedIn -> "ورود با کد استاد"
-                        else -> state.profile?.let { persianDigits("${it.lessons.size} درس، ${it.lessons.count { l -> l.published }} منتشرشده") }
-                            ?: "در حال بارگذاری…"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MelovaTextMuted
-                )
-            }
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
-        }
-    }
+        iconTint = MelovaGold
+    )
 }
 
 @Composable
 private fun FollowedTeachersRow(count: Int, onClick: () -> Unit) {
-    MelovaNavRow(
+    MelovaGroupRow(
         icon = Icons.Outlined.Groups,
         title = "استادهایی که دنبال می‌کنید",
         subtitle = if (count == 0) "هنوز استادی را دنبال نکرده‌اید" else "${formatPersianInteger(count.toLong())} استاد",
@@ -295,12 +276,12 @@ fun FollowedTeachersScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
                 contentPadding = PagePadding,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item { MelovaTopBar(title = "استادهایی که دنبال می‌کنید", onBack = onBack) }
                 if (state.followedTeachers.isEmpty()) {
                     item {
-                        MelovaSurfaceCard(onClick = onExploreClick, contentPadding = 14.dp) {
+                        MelovaSurfaceCard(onClick = onExploreClick, contentPadding = 12.dp) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text(
                                     text = "هنوز استادی را دنبال نکرده‌اید. در «جستجو» پیدایشان کنید.",
@@ -308,7 +289,7 @@ fun FollowedTeachersScreen(
                                     color = MelovaTextMuted,
                                     modifier = Modifier.weight(1f)
                                 )
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
+                                ForwardArrow(tint = MelovaTextMuted)
                             }
                         }
                     }

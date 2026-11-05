@@ -71,6 +71,7 @@ import app.melova.presentation.LoginGate
 import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaMark
 import app.melova.ui.components.MelovaSegmentedControl
+import app.melova.ui.theme.MelovaDimens
 import app.melova.ui.components.MelovaTextField
 import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.layout.LtrContent
@@ -149,21 +150,20 @@ fun LoginScreen(
                     .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(PagePadding),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 MelovaTopBar(title = "ورود", onBack = if (onCodeStep) viewModel::backToAddress else onBack)
-                Spacer(Modifier.height(12.dp))
-                MelovaMark(size = 72.dp, modifier = Modifier.align(Alignment.CenterHorizontally))
+                MelovaMark(size = 56.dp, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Text(
                     text = "ورود یا ثبت‌نام",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MelovaText,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
                     text = reason.message,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MelovaTextMuted,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
@@ -255,9 +255,9 @@ private fun AddressStep(
         Button(
             onClick = onSubmit,
             enabled = !state.isBusy && state.address.isNotBlank(),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-            modifier = Modifier.fillMaxWidth().height(50.dp)
+            modifier = Modifier.fillMaxWidth().height(MelovaDimens.PrimaryButtonHeight)
         ) {
             if (state.isBusy) {
                 CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
@@ -295,7 +295,7 @@ private fun CodeStep(
     CodeField(code = state.code, onCodeChange = onCodeChange, enabled = !state.isBusy)
     if (state.isBusy) {
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(strokeWidth = 2.dp, color = MelovaAccent, modifier = Modifier.size(22.dp))
+            CircularProgressIndicator(strokeWidth = 2.dp, color = MelovaAccent, modifier = Modifier.size(20.dp))
         }
     }
     Row(
@@ -357,7 +357,7 @@ private fun CodeField(code: String, onCodeChange: (String) -> Unit, enabled: Boo
 
 @Composable
 private fun CodeCell(digit: Char?, isNext: Boolean, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(12.dp)
     val borderColor by animateColorAsState(if (isNext) MelovaAccent else MelovaOutline)
     Box(
         modifier = modifier
@@ -390,10 +390,10 @@ private fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White, contentColor = Color(0xFF1F1F1F)),
         border = BorderStroke(1.dp, Color(0xFF747775)),
-        modifier = Modifier.fillMaxWidth().height(50.dp)
+        modifier = Modifier.fillMaxWidth().height(MelovaDimens.PrimaryButtonHeight)
     ) {
         GoogleMark(size = 20.dp)
         Spacer(Modifier.width(10.dp))

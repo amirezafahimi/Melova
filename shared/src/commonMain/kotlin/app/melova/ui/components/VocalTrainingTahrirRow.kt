@@ -72,7 +72,7 @@ fun VocalTrainingTahrirRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(
@@ -81,7 +81,7 @@ fun VocalTrainingTahrirRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "$kindLabel • زمان ‎${formatTahrirClock(comparison.refStartMs)}‏",
+                text = listOfNotNull(kindLabel, wordLabel(comparison.word), "زمان ‎${formatTahrirClock(comparison.refStartMs)}‏").joinToString(" • "),
                 style = MaterialTheme.typography.labelMedium,
                 color = MelovaText.copy(alpha = 0.7f),
                 textAlign = TextAlign.Start,
@@ -160,14 +160,14 @@ private fun TahrirSnippetButton(
         onClick = { if (enabled) onClick() },
         enabled = enabled,
         modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         color = effectiveContainer,
         contentColor = effectiveContent
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {

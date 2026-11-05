@@ -68,9 +68,9 @@ private fun FontFamily.typography(fontFeatures: String?): Typography {
         titleSmall = style(14.sp, 22.sp, FontWeight.Medium),
         bodyLarge = style(16.sp, 28.sp),
         bodyMedium = style(14.sp, 25.sp),
-        bodySmall = style(12.5.sp, 22.sp),
+        bodySmall = style(13.sp, 22.sp),
         labelLarge = style(14.sp, 20.sp, FontWeight.Medium),
         labelMedium = style(12.sp, 18.sp, FontWeight.Medium),
-        labelSmall = style(11.sp, 16.sp, FontWeight.Medium)
+        labelSmall = style(12.sp, 17.sp, FontWeight.Medium)
     )
 }

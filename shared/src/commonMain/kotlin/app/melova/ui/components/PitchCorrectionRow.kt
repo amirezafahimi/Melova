@@ -36,7 +36,7 @@ fun PitchCorrectionRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 if (isSelected) MelovaText.copy(alpha = 0.12f)
                 else MelovaText.copy(alpha = 0.06f)
@@ -45,11 +45,11 @@ fun PitchCorrectionRow(
                 if (onClick != null) Modifier.clickable(onClick = onClick)
                 else Modifier
             )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = "زمان \u200E${correction.timeLabel}\u200F • نت هدف: ${correction.expectedNote}",
+            text = correctionHeader(correction),
             style = MaterialTheme.typography.labelMedium,
             color = MelovaText.copy(alpha = 0.7f),
             textAlign = TextAlign.Start

@@ -78,7 +78,7 @@ fun EditProfileScreen(
                     .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(PagePadding),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 MelovaTopBar(title = "ویرایش پروفایل", onBack = onBack)
                 Box(
@@ -94,7 +94,7 @@ fun EditProfileScreen(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .height(36.dp)
+                            .height(40.dp)
                             .background(Color.Black.copy(alpha = 0.45f)),
                         contentAlignment = Alignment.Center
                     ) {
@@ -114,7 +114,7 @@ fun EditProfileScreen(
                     color = MelovaTextMuted
                 )
                 account?.signedInAs?.let { identity ->
-                    MelovaSurfaceCard(contentPadding = 14.dp) {
+                    MelovaSurfaceCard(contentPadding = 12.dp) {
                         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text("ورود با", style = MaterialTheme.typography.labelMedium, color = MelovaTextMuted)
                             LtrContent {
@@ -133,7 +133,7 @@ fun EditProfileScreen(
                         onBack()
                     },
                     enabled = account != null && name.isNotBlank(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
                     modifier = Modifier.fillMaxWidth().height(50.dp)
                 ) { Text("ذخیره") }

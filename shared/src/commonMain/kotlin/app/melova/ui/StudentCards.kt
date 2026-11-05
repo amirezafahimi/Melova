@@ -75,7 +75,7 @@ internal fun AskTeacherCard(
     val startComposing = rememberLoginGated(loginGate, onLogin) { composing = true }
 
     MelovaSurfaceCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(
                     imageVector = if (state.isSent) Icons.Outlined.CheckCircle else Icons.Outlined.SupportAgent,
@@ -119,9 +119,9 @@ internal fun AskTeacherCard(
             if (state.isSent && state.chatId != null) {
                 Button(
                     onClick = { onOpenChat(state.chatId) },
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
                     Text("باز کردن گفتگو با استاد")
                 }
@@ -130,9 +130,9 @@ internal fun AskTeacherCard(
                 Button(
                     onClick = startComposing,
                     enabled = !state.isSending,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (isReferral) MelovaGold else MelovaAccent),
-                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
                     if (state.isSending) {
                         CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
@@ -186,7 +186,7 @@ internal fun LessonPurchaseCard(
     val loginRequired = loginGate == LoginGate.SIGN_IN
     val status = lesson.purchaseStatus
     MelovaSurfaceCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(
                     imageVector = if (status == LessonPurchaseStatus.PENDING) Icons.Outlined.HourglassTop else Icons.Outlined.ShoppingBag,
@@ -223,16 +223,16 @@ internal fun LessonPurchaseCard(
                 status == LessonPurchaseStatus.PENDING -> Unit
                 loginRequired -> Button(
                     onClick = startPaying,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) { Text("ورود برای خرید درس") }
                 lesson.payment != null -> Button(
                     onClick = startPaying,
                     enabled = !isBusy,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) { Text(if (status == LessonPurchaseStatus.REJECTED) "ثبت دوباره‌ی پرداخت" else "خرید درس") }
             }
         }
@@ -306,7 +306,7 @@ private fun CardNumberRow(cardNumber: String) {
             },
             shape = RoundedCornerShape(999.dp),
             contentPadding = PaddingValues(horizontal = 12.dp),
-            modifier = Modifier.height(34.dp)
+            modifier = Modifier.height(40.dp)
         ) {
             Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
             Text(if (copied) " کپی شد" else " کپی", style = MaterialTheme.typography.labelMedium)
@@ -318,7 +318,7 @@ private fun CardNumberRow(cardNumber: String) {
 @Composable
 internal fun FreeLessonCard(isBusy: Boolean, onAdd: () -> Unit) {
     MelovaSurfaceCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("این درس رایگان است", style = MaterialTheme.typography.titleMedium, color = MelovaText)
             Text(
                 text = "اضافه کنید تا در صفحه‌ی تمرین بماند.",
@@ -328,9 +328,9 @@ internal fun FreeLessonCard(isBusy: Boolean, onAdd: () -> Unit) {
             Button(
                 onClick = onAdd,
                 enabled = !isBusy,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                modifier = Modifier.fillMaxWidth().height(46.dp)
+                modifier = Modifier.fillMaxWidth().height(48.dp)
             ) { Text("افزودن به درس‌های من") }
         }
     }

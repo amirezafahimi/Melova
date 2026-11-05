@@ -1,5 +1,11 @@
 package app.melova.ui
 
+import app.melova.ui.components.ForwardArrow
+import app.melova.ui.theme.MelovaCardShape
+import app.melova.data.model.LessonSection
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import app.melova.ui.theme.MelovaDimens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +25,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
@@ -46,6 +51,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
 import app.melova.data.model.Lesson
 import app.melova.platform.formatPersianInteger
 import app.melova.platform.persianDigits
@@ -61,7 +71,6 @@ import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaGold
-import app.melova.ui.theme.MelovaSecondary
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
 
@@ -85,6 +94,8 @@ fun HomeScreen(
     onRefresh: () -> Unit,
     onAppear: () -> Unit,
     onLessonClick: (String) -> Unit,
+    /** Straight into a section's practice, for the card that says what to sing next. */
+    onSectionClick: (lessonId: String, sectionId: String) -> Unit,
     onSolfegeClick: () -> Unit,
     onExploreClick: () -> Unit,
     unreadChats: Int = 0,
@@ -110,27 +121,41 @@ fun HomeScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = 20.dp,
-                        end = 20.dp,
+                        start = 16.dp,
+                        end = 16.dp,
                         top = 16.dp,
                         bottom = BottomBarContentPadding
                     ),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item { HomeHeader(unreadChats, onChatsClick) }
 
                     val myLessons = state.myLessons
                     if (state.totalSections > 0) {
                         item(key = "continue") {
+                            val next = state.nextLesson
+                            val nextSection = next?.let { state.nextSection(it) }
                             ContinueCard(
-                                lesson = state.nextLesson,
-                                practicedInLesson = state.nextLesson?.let { state.practicedSections(it) } ?: 0,
+                                lesson = next,
+                                section = nextSection,
+                                sectionNumber = next?.sections?.indexOf(nextSection)?.plus(1) ?: 0,
+                                practicedInLesson = next?.let { state.practicedSections(it) } ?: 0,
                                 practiced = state.totalPracticed,
                                 total = state.totalSections,
-                                onClick = onLessonClick
+                                onClick = {
+                                    when {
+                                        next == null -> Unit
+                                        nextSection != null -> onSectionClick(next.id, nextSection.id)
+                                        else -> onLessonClick(next.id)
+                                    }
+                                }
                             )
                         }
                     }
+
+                    // A newcomer's first step is finding a lesson, so that card comes before free practice.
+                    val noLessons = state.hasContent && myLessons.isEmpty()
+                    if (noLessons) item(key = "no-lessons") { NoLessonsCard(onExploreClick) }
 
                     item(key = "free") { FreePracticeStrip(freePractice) }
 
@@ -150,7 +175,7 @@ fun HomeScreen(
                                 message = "هنوز استادی درس منتشر نکرده است. به‌زودی برمی‌گردیم!"
                             )
                         }
-                        myLessons.isEmpty() -> item(key = "no-lessons") { NoLessonsCard(onExploreClick) }
+                        noLessons -> Unit
                         else -> {
                             item(key = "lessons-header") {
                                 SectionHeader(title = "درس‌های من", trailing = persianDigits("${myLessons.size} درس"))
@@ -175,11 +200,11 @@ private fun HomeHeader(unreadChats: Int, onChatsClick: (() -> Unit)?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
+            .padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        MelovaMark(size = 44.dp)
+        MelovaMark(size = 40.dp)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Melova",
@@ -200,14 +225,17 @@ private fun HomeHeader(unreadChats: Int, onChatsClick: (() -> Unit)?) {
 @Composable
 private fun ContinueCard(
     lesson: Lesson?,
+    /** The section one tap sings; null when the lesson has none left, and the tap opens the lesson. */
+    section: LessonSection?,
+    sectionNumber: Int,
     practicedInLesson: Int,
     practiced: Int,
     total: Int,
-    onClick: (String) -> Unit
+    onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(26.dp)
+    val shape = MelovaCardShape
     Surface(
-        onClick = { lesson?.let { onClick(it.id) } },
+        onClick = onClick,
         enabled = lesson != null,
         shape = shape,
         color = Color.Transparent,
@@ -216,13 +244,22 @@ private fun ContinueCard(
         Column(
             modifier = Modifier
                 .clip(shape)
-                .background(
-                    Brush.linearGradient(listOf(MelovaAccent.copy(alpha = 0.92f), MelovaSecondary.copy(alpha = 0.88f)))
-                )
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                // One violet deepening to night, with a soft light in the top corner: the app's own
+                // colour, not a second hue beside it.
+                .background(Brush.linearGradient(listOf(MelovaAccent, lerp(MelovaAccent, Color.Black, 0.25f))))
+                .drawBehind {
+                    drawRect(
+                        Brush.radialGradient(
+                            colors = listOf(Color.White.copy(alpha = 0.18f), Color.Transparent),
+                            center = Offset(if (layoutDirection == LayoutDirection.Rtl) size.width else 0f, 0f),
+                            radius = size.width * 0.7f
+                        )
+                    )
+                }
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = when {
@@ -230,12 +267,13 @@ private fun ContinueCard(
                             practicedInLesson > 0 -> "ادامه‌ی تمرین"
                             else -> "درس بعدی"
                         },
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.85f)
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.7f)
                     )
                     Text(
                         text = lesson?.title ?: "برای نمره‌ی بهتر دوباره بخوانید!",
                         style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
                         color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -243,7 +281,12 @@ private fun ContinueCard(
                     if (lesson != null) {
                         val left = lesson.availableSections - practicedInLesson
                         Text(
-                            text = "${lesson.teacher}، ${formatPersianInteger(left.toLong())} بخش مانده",
+                            text = if (section != null) {
+                                // What one tap opens: the section itself, not the lesson page.
+                                persianDigits("بخش $sectionNumber") + " • " + section.title
+                            } else {
+                                "${lesson.teacher}، ${formatPersianInteger(left.toLong())} بخش مانده"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f),
                             maxLines = 1,
@@ -253,31 +296,32 @@ private fun ContinueCard(
                 }
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.22f)),
+                        .background(Color.White),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (lesson != null) Icons.Default.PlayArrow else Icons.Outlined.EmojiEvents,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(30.dp)
+                        tint = MelovaAccent,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MelovaProgressBar(
                     progress = practiced.toFloat() / total,
                     modifier = Modifier.weight(1f),
                     color = Color.White,
-                    trackColor = Color.White.copy(alpha = 0.28f),
-                    followLayoutDirection = true
+                    trackColor = Color.White.copy(alpha = 0.22f),
+                    followLayoutDirection = true,
+                    thickness = 4.dp
                 )
                 Text(
                     text = persianDigits("$practiced از $total بخش"),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.9f)
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.75f)
                 )
             }
         }
@@ -287,8 +331,8 @@ private fun ContinueCard(
 @Composable
 private fun FreePracticeStrip(tools: List<FreePractice>) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("تمرین آزاد", style = MaterialTheme.typography.titleMedium, color = MelovaText)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(title = "تمرین آزاد")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             tools.forEach { tool ->
                 MelovaSurfaceCard(onClick = tool.onClick, contentPadding = 12.dp, modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -311,7 +355,7 @@ private fun FreePracticeStrip(tools: List<FreePractice>) {
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
+                        ForwardArrow(tint = MelovaTextMuted)
                     }
                 }
             }
@@ -325,7 +369,7 @@ private fun NoLessonsCard(onExploreClick: () -> Unit) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(Icons.Outlined.LibraryMusic, contentDescription = null, tint = MelovaAccentSoft, modifier = Modifier.size(36.dp))
             Text("هنوز درسی ندارید", style = MaterialTheme.typography.titleMedium, color = MelovaText)
@@ -337,12 +381,13 @@ private fun NoLessonsCard(onExploreClick: () -> Unit) {
             )
             Button(
                 onClick = onExploreClick,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                modifier = Modifier.fillMaxWidth().height(46.dp)
+                modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
-                Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("  جستجوی درس‌ها و استادها")
+                Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(MelovaDimens.Icon))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("جستجوی درس‌ها و استادها")
             }
         }
     }
@@ -354,10 +399,10 @@ internal fun LoadingCard() {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             CircularProgressIndicator(
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(20.dp),
                 color = MelovaAccent,
                 strokeWidth = 2.dp
             )
@@ -393,7 +438,7 @@ internal fun MessageCard(
             if (actionLabel != null) {
                 Button(
                     onClick = onAction,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
                 ) { Text(actionLabel) }
             }

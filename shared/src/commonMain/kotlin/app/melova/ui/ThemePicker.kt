@@ -46,7 +46,7 @@ import app.melova.ui.theme.ThemeMode
 /** Each theme as a tiny app screen in its own colors, so the choice shows what it does. */
 @Composable
 internal fun ThemePicker(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
-    Row(modifier = Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(modifier = Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ThemeTile(
             label = "خودکار",
             selected = themeMode == ThemeMode.SYSTEM,
@@ -79,7 +79,7 @@ private fun ThemeTile(
     modifier: Modifier = Modifier,
     preview: DrawScope.() -> Unit
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(20.dp)
     val borderColor by animateColorAsState(if (selected) MelovaAccent else MelovaOutline)
     Column(
         modifier = modifier
@@ -94,7 +94,7 @@ private fun ThemeTile(
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(92.dp)
+                .height(72.dp)
                 .clip(RoundedCornerShape(12.dp)),
             onDraw = preview
         )

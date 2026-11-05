@@ -1,5 +1,10 @@
 package app.melova.ui
 
+import app.melova.ui.theme.MelovaOutline
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.clickable
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -114,13 +118,26 @@ fun FaqScreen(onBack: () -> Unit) {
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
                 contentPadding = PagePadding,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item { MelovaTopBar(title = "پرسش و پاسخ", onBack = onBack) }
                 FAQ.forEach { group ->
                     item(key = group.title) { SectionHeader(title = group.title) }
-                    items(group.entries, key = { it.first }) { (question, answer) -> FaqRow(question, answer) }
+                    item(key = group.title + "-entries") { FaqGroupCard(group) }
                 }
+            }
+        }
+    }
+}
+
+/** A topic's questions in one card, each answer opening under its own question. */
+@Composable
+private fun FaqGroupCard(group: FaqGroup) {
+    MelovaSurfaceCard(contentPadding = 0.dp) {
+        Column {
+            group.entries.forEachIndexed { index, (question, answer) ->
+                if (index > 0) HorizontalDivider(thickness = 1.dp, color = MelovaOutline)
+                FaqRow(question, answer)
             }
         }
     }
@@ -129,24 +146,29 @@ fun FaqScreen(onBack: () -> Unit) {
 @Composable
 private fun FaqRow(question: String, answer: String) {
     var isOpen by rememberSaveable(question) { mutableStateOf(false) }
-    MelovaSurfaceCard(onClick = { isOpen = !isOpen }, contentPadding = 14.dp) {
-        Column(modifier = Modifier.animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = question,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MelovaText,
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    imageVector = if (isOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = if (isOpen) MelovaAccentSoft else MelovaTextMuted
-                )
-            }
-            if (isOpen) {
-                Text(text = answer, style = MaterialTheme.typography.bodyMedium, color = MelovaTextMuted)
-            }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { isOpen = !isOpen }
+            .padding(12.dp)
+            .animateContentSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = question,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (isOpen) MelovaAccentSoft else MelovaText,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = if (isOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = null,
+                tint = if (isOpen) MelovaAccentSoft else MelovaTextMuted
+            )
+        }
+        if (isOpen) {
+            Text(text = answer, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
         }
     }
 }

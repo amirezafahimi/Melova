@@ -1,5 +1,7 @@
 package app.melova.ui
 
+import app.melova.ui.theme.MelovaDimens
+import app.melova.ui.theme.MelovaSmallShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,12 +16,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridScope
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
@@ -43,7 +43,7 @@ import app.melova.platform.persianDigits
 import app.melova.presentation.CatalogUiState
 import app.melova.ui.components.BottomBarContentPadding
 import app.melova.ui.components.FollowButton
-import app.melova.ui.components.LessonGridTile
+import app.melova.ui.components.LessonSearchRow
 import app.melova.ui.components.LessonRowCard
 import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaSurfaceCard
@@ -60,7 +60,7 @@ import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
 
 /**
- * The explore tab, the way to every lesson: a grid of lessons, and one search over lessons and
+ * The explore tab, the way to every lesson: a list of lessons, and one search over lessons and
  * teachers, since ten teachers may offer a lesson of the same name.
  */
 @Composable
@@ -77,20 +77,21 @@ fun ExploreScreen(
     val teachers = if (searching) state.searchTeachers(query) else emptyList()
     MelovaBackground {
         RtlContent {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(150.dp),
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.statusBars),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = BottomBarContentPadding),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = BottomBarContentPadding),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                fullWidth("title") {
-                    Text(text = "جستجو", style = MaterialTheme.typography.headlineSmall, color = MelovaText)
-                }
                 fullWidth("search") {
-                    MelovaTextField(value = query, onValueChange = { query = it }, label = "جستجوی درس یا استاد")
+                    MelovaTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        label = null,
+                        placeholder = "جستجوی درس یا استاد",
+                        leadingIcon = Icons.Outlined.Search
+                    )
                 }
                 when {
                     !state.hasContent && state.isLoading -> fullWidth("loading") { LoadingCard() }
@@ -106,7 +107,7 @@ fun ExploreScreen(
                     else -> {
                         if (teachers.isNotEmpty()) {
                             fullWidth("teachers") { SectionHeader(title = "استادها") }
-                            items(teachers, key = { "teacher-" + it.id }, span = { GridItemSpan(maxLineSpan) }) { teacher ->
+                            items(teachers, key = { "teacher-" + it.id }) { teacher ->
                                 TeacherCard(
                                     teacher = teacher,
                                     lessonCount = state.lessonsOf(teacher.id).size,
@@ -120,7 +121,7 @@ fun ExploreScreen(
                             fullWidth("lessons") { SectionHeader(title = "درس‌ها", trailing = persianDigits("${lessons.size} درس")) }
                         }
                         items(lessons, key = { "lesson-" + it.id }) { lesson ->
-                            LessonGridTile(lesson = lesson, onClick = { onLessonClick(lesson.id) })
+                            LessonSearchRow(lesson = lesson, onClick = { onLessonClick(lesson.id) })
                         }
                     }
                 }
@@ -134,9 +135,9 @@ private fun MessageTeacherButton(isBusy: Boolean, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         enabled = !isBusy,
-        shape = RoundedCornerShape(14.dp),
+        shape = MelovaSmallShape,
         border = BorderStroke(1.dp, MelovaOutline),
-        modifier = Modifier.fillMaxWidth().height(46.dp)
+        modifier = Modifier.fillMaxWidth().height(MelovaDimens.CompactButtonHeight)
     ) {
         if (isBusy) {
             CircularProgressIndicator(strokeWidth = 2.dp, color = MelovaAccentSoft, modifier = Modifier.size(18.dp))
@@ -152,8 +153,8 @@ private fun MessageTeacherButton(isBusy: Boolean, onClick: () -> Unit) {
     }
 }
 
-private fun LazyGridScope.fullWidth(key: String, content: @Composable () -> Unit) {
-    item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
+private fun LazyListScope.fullWidth(key: String, content: @Composable () -> Unit) {
+    item(key = key) { content() }
 }
 
 /** A teacher's page: who they are, ways to follow and write to them, and all their lessons. */
@@ -176,7 +177,7 @@ fun TeacherPageScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
                 contentPadding = PagePadding,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item { MelovaTopBar(title = teacher?.name ?: "استاد", subtitle = "صفحه‌ی استاد", onBack = onBack) }
                 if (teacher == null) {
@@ -189,32 +190,21 @@ fun TeacherPageScreen(
                 item {
                     MelovaSurfaceCard {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                TeacherAvatar(teacher.name, size = 60.dp)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                TeacherAvatar(teacher.name, size = 48.dp, teacherId = teacher.id, photoVersion = teacher.photoVersion)
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(teacher.name, style = MaterialTheme.typography.titleLarge, color = MelovaText)
+                                    Text(teacher.name, style = MaterialTheme.typography.titleMedium, color = MelovaText)
                                     Text(
                                         text = persianDigits("${lessons.size} درس، ${state.availableSections(teacherId)} بخش"),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MelovaAccentSoft
                                     )
                                 }
+                                // Following sits beside the name, where it is expected, instead of a line of its own.
+                                FollowButton(isFollowed = state.isFollowed(teacherId), onFollowChange = onFollowChange)
                             }
                             if (teacher.bio.isNotBlank()) {
-                                Text(teacher.bio, style = MaterialTheme.typography.bodyMedium, color = MelovaTextMuted)
-                            }
-                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = if (state.isFollowed(teacherId)) {
-                                        "این استاد در پروفایل شماست و درس‌هایش اول «جستجو» می‌آید."
-                                    } else {
-                                        "دنبال کنید تا این استاد در پروفایل شما بماند."
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MelovaTextMuted,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                FollowButton(isFollowed = state.isFollowed(teacherId), onFollowChange = onFollowChange)
+                                Text(teacher.bio, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
                             }
                             onMessage?.let { MessageTeacherButton(isBusy = isOpeningChat, onClick = it) }
                         }

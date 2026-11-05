@@ -15,3 +15,6 @@
 local.properties
 backend
 /shared/build
+
+# Kotlin build output
+.kotlin

@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.melova.ui.layout.LtrContent
 
@@ -20,13 +21,14 @@ fun MelovaProgressBar(
     color: Color,
     trackColor: Color,
     /** False keeps the timeline-style left-to-right fill; true fills from the start side (RTL in Persian). */
-    followLayoutDirection: Boolean = false
+    followLayoutDirection: Boolean = false,
+    thickness: Dp = 8.dp
 ) {
     val fraction = progress.coerceIn(0f, 1f)
     val bar: @Composable () -> Unit = {
         Box(
             modifier = modifier
-                .height(8.dp)
+                .height(thickness)
                 .clip(RoundedCornerShape(999.dp))
                 .background(trackColor)
         ) {

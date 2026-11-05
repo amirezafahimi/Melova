@@ -55,7 +55,7 @@ fun ChooseNameScreen(isSaving: Boolean, onSave: (String) -> Unit, onSignOut: () 
                     .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(PagePadding),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Spacer(Modifier.height(64.dp))
                 MelovaMark(size = 72.dp, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -78,7 +78,7 @@ fun ChooseNameScreen(isSaving: Boolean, onSave: (String) -> Unit, onSignOut: () 
                 Button(
                     onClick = { onSave(name) },
                     enabled = name.isNotBlank(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
                     modifier = Modifier.fillMaxWidth().height(50.dp)
                 ) { Text("ادامه") }

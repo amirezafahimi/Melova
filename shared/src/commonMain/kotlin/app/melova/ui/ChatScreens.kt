@@ -1,5 +1,9 @@
 package app.melova.ui
 
+import app.melova.ui.components.ForwardArrow
+import app.melova.ui.components.MelovaGroupRow
+import app.melova.ui.theme.MelovaCardShape
+import app.melova.ui.components.MelovaTextField
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,7 +33,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
@@ -148,7 +151,7 @@ fun ChatListScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
                 contentPadding = PagePadding,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item { MelovaTopBar(title = "گفتگوها", onBack = onBack) }
                 when {
@@ -208,12 +211,12 @@ private fun ChatRow(chat: Chat, onClick: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 modifier = Modifier
-                    .size(46.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
                     .background(MelovaAccent.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(chat.peerName.take(1), style = MaterialTheme.typography.titleMedium, color = MelovaAccentSoft)
+                Text(chat.peerName.take(1), style = MaterialTheme.typography.titleSmall, color = MelovaAccentSoft)
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
@@ -269,7 +272,7 @@ private fun RowScope.SeenMark(isSeen: Boolean) {
         imageVector = if (isSeen) Icons.Filled.DoneAll else Icons.Filled.Done,
         contentDescription = if (isSeen) "دیده شد" else "ارسال شد",
         tint = if (isSeen) MelovaAccentSoft else MelovaTextMuted,
-        modifier = iconOnBaseline(TICK_BOTTOM_UNIT).size(15.dp)
+        modifier = iconOnBaseline(TICK_BOTTOM_UNIT).size(16.dp)
     )
 }
 
@@ -280,7 +283,7 @@ internal fun UnreadBadge(count: Int, modifier: Modifier = Modifier) {
             .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
             .clip(CircleShape)
             .background(MelovaAccent)
-            .padding(horizontal = 5.dp),
+            .padding(horizontal = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(formatPersianInteger(count.toLong()), style = MaterialTheme.typography.labelSmall, color = Color.White)
@@ -308,10 +311,10 @@ internal fun ChatsIconButton(unread: Int, onClick: () -> Unit) {
 /** The way into the chats from Profile. */
 @Composable
 internal fun ChatsEntryRow(unread: Int, onClick: () -> Unit) {
-    MelovaNavRow(
+    MelovaGroupRow(
         icon = Icons.Outlined.ChatBubbleOutline,
         title = "گفتگوها",
-        subtitle = "پاسخ استادها و نتیجه‌ی تمرین‌هایی که فرستاده‌اید",
+        subtitle = "پاسخ استادها به تمرین‌هایتان",
         onClick = onClick,
         trailing = { if (unread > 0) UnreadBadge(unread) }
     )
@@ -341,7 +344,7 @@ fun ChatScreen(
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .imePadding()
             ) {
-                Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     MelovaTopBar(
                         title = chat?.peerName?.ifBlank { null } ?: "گفتگو",
                         subtitle = chat?.let { if (it.side == ChatSide.STUDENT) "استاد" else "هنرجو" },
@@ -425,7 +428,7 @@ private fun Messages(
         itemsIndexed(newestFirst, key = { _, message -> message.id }) { index, message ->
             val isMine = message.sender == side
             // Part of the row, so the newest message stays item 0 for the checks above.
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val day = localDay(message.createdAtMs)
                 val older = newestFirst.getOrNull(index + 1)
                 if (older == null || localDay(older.createdAtMs) != day) DayHeading(message.createdAtMs)
@@ -433,7 +436,7 @@ private fun Messages(
                     modifier = Modifier.fillMaxWidth(),
                     // The screen is RTL, so the person's own messages sit on the right.
                     horizontalAlignment = if (isMine) Alignment.Start else Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     when (message.kind) {
                         ChatMessageKind.TEXT -> TextBubble(message.text, isMine)
@@ -451,7 +454,7 @@ private fun Messages(
                     // Only the day's last message carries the time and the tick.
                     val newer = newestFirst.getOrNull(index - 1)
                     if (newer == null || localDay(newer.createdAtMs) != day) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
                                 text = formatTimeOfDay(message.createdAtMs),
                                 style = MaterialTheme.typography.labelSmall,
@@ -489,7 +492,7 @@ private fun bubbleColor(isMine: Boolean) = if (isMine) MelovaAccent.copy(alpha =
 @Composable
 private fun TextBubble(text: String, isMine: Boolean) {
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         color = bubbleColor(isMine),
         modifier = Modifier.widthIn(max = 300.dp)
     ) {
@@ -497,7 +500,7 @@ private fun TextBubble(text: String, isMine: Boolean) {
             text = text,
             style = MaterialTheme.typography.bodyMedium,
             color = MelovaText,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         )
     }
 }
@@ -516,7 +519,7 @@ private fun VoiceBubble(
     val totalMs = if (isActive && state.voiceDurationMs > 0L) state.voiceDurationMs else message.durationMs ?: 0L
 
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         color = bubbleColor(isMine),
         modifier = Modifier.widthIn(max = 280.dp).fillMaxWidth()
     ) {
@@ -525,7 +528,7 @@ private fun VoiceBubble(
             Row(
                 modifier = Modifier.padding(start = 8.dp, end = 14.dp, top = 8.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Surface(
                     onClick = onToggle,
@@ -554,7 +557,7 @@ private fun VoiceBubble(
                         onTap = { fraction ->
                             if (!isActive) onToggle() else if (!isLoading) onSeek(fraction)
                         },
-                        modifier = Modifier.fillMaxWidth().height(34.dp)
+                        modifier = Modifier.fillMaxWidth().height(40.dp)
                     )
                     Text(
                         text = formatClock(if (isActive) state.voicePositionMs else totalMs),
@@ -601,7 +604,7 @@ private fun VoiceWave(peaks: List<Float>, progress: Float, onTap: (Float) -> Uni
 /** A take the student sent; tapping it opens the page the student saw. */
 @Composable
 private fun PracticeBubble(practice: PracticeResultLink, note: String, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(20.dp)
     Surface(
         onClick = onClick,
         shape = shape,
@@ -612,7 +615,7 @@ private fun PracticeBubble(practice: PracticeResultLink, note: String, onClick: 
             .border(1.dp, MelovaAccent.copy(alpha = 0.55f), shape)
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val score = practice.score
                 if (score != null) {
                     ScoreBadge(score = score)
@@ -621,7 +624,7 @@ private fun PracticeBubble(practice: PracticeResultLink, note: String, onClick: 
                         modifier = Modifier
                             .size(46.dp)
                             .clip(CircleShape)
-                            .background(MelovaOutline.copy(alpha = 0.4f)),
+                            .background(MelovaOutline),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = MelovaTextMuted)
@@ -662,12 +665,7 @@ private fun PracticeBubble(practice: PracticeResultLink, note: String, onClick: 
                         color = MelovaAccentSoft,
                         modifier = Modifier.alignByBaseline()
                     )
-                    Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = MelovaAccentSoft,
-                        modifier = iconOnBaseline(ARROW_LINE_UNIT).size(20.dp)
-                    )
+                    ForwardArrow(tint = MelovaAccentSoft, modifier = iconOnBaseline(ARROW_LINE_UNIT))
                 }
             }
         }
@@ -774,20 +772,14 @@ private fun ChatComposer(
 
 @Composable
 private fun MessageField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    OutlinedTextField(
+    MelovaTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text("پیام", color = MelovaTextMuted) },
+        label = null,
+        placeholder = "پیام",
+        singleLine = false,
         maxLines = 4,
-        shape = RoundedCornerShape(24.dp),
-        textStyle = MaterialTheme.typography.bodyMedium,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MelovaAccent,
-            unfocusedBorderColor = MelovaControl,
-            cursorColor = MelovaAccent,
-            focusedTextColor = MelovaText,
-            unfocusedTextColor = MelovaText
-        ),
+        shape = MelovaCardShape,
         modifier = modifier
     )
 }
@@ -796,11 +788,11 @@ private fun MessageField(value: String, onValueChange: (String) -> Unit, modifie
 private fun TakeStatus(text: String, isRecording: Boolean, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(MelovaCardElevated)
-            .padding(horizontal = 16.dp, vertical = 15.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (isRecording) {
             Box(

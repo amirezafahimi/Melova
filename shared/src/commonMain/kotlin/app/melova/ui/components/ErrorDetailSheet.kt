@@ -141,7 +141,7 @@ fun ErrorDetailSheet(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -157,6 +157,10 @@ fun ErrorDetailSheet(
                     )
                     val timeMs = comparison?.refStartMs ?: correction?.startMs ?: 0L
                     DetailPill(text = "زمان ‎${formatDetailClock(timeMs)}‏", color = MelovaText)
+                }
+
+                wordLabel(comparison?.word ?: correction?.word)?.let { word ->
+                    DetailPill(text = word, color = MelovaAccent)
                 }
 
                 Text(
@@ -209,7 +213,7 @@ fun ErrorDetailSheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("بستن", color = MelovaText)
                 }
@@ -245,7 +249,7 @@ private fun DetailPill(text: String, color: Color) {
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
     )
 }
 
@@ -268,7 +272,7 @@ private fun DetailLaneCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(laneColor.copy(alpha = 0.08f))
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -441,7 +445,7 @@ private fun PitchLane(
         modifier = Modifier
             .fillMaxWidth()
             .height(136.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .pointerInput(lane.startMs, lane.endMs) {
                 detectTapGestures { offset -> currentOnTap(msAt(offset.x, size.width)) }
             }
@@ -646,10 +650,10 @@ fun ShowDetailsButton(onClick: () -> Unit) {
         contentColor = MelovaAccentSoft
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Outlined.GraphicEq, contentDescription = null, modifier = Modifier.size(15.dp))
+            Icon(Icons.Outlined.GraphicEq, contentDescription = null, modifier = Modifier.size(16.dp))
             Text(
                 text = "دیدن جزییات",
                 style = MaterialTheme.typography.labelSmall,

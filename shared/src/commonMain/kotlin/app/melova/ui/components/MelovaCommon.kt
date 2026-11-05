@@ -1,5 +1,16 @@
 package app.melova.ui.components
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.style.LineHeightStyle
+import app.melova.ui.theme.MelovaDimens
+import app.melova.ui.theme.MelovaSmallShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.melova.platform.PlatformBackHandler
 import app.melova.platform.persianDigits
+import app.melova.ui.theme.LocalMelovaPalette
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaAccentTint
@@ -47,6 +58,8 @@ import app.melova.ui.theme.MelovaSecondary
 import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaTextMuted
 import app.melova.ui.theme.MelovaWarning
+import app.melova.ui.theme.MelovaCardShape
+import app.melova.ui.theme.MelovaPillShape
 import app.melova.ui.theme.MelovaText
 import app.melova.platform.pad2
 
@@ -59,7 +72,8 @@ fun MelovaBackground(content: @Composable BoxScope.() -> Unit) {
             .background(Brush.verticalGradient(listOf(MelovaBackgroundStart, MelovaBackgroundEnd)))
             .background(
                 Brush.radialGradient(
-                    colors = listOf(MelovaAccent.copy(alpha = 0.22f), Color.Transparent),
+                    // Softer on the light theme, where a strong glow hides the top bar's line.
+                    colors = listOf(MelovaAccent.copy(alpha = if (LocalMelovaPalette.current.isDark) 0.22f else 0.12f), Color.Transparent),
                     center = Offset(900f, -120f),
                     radius = 1100f
                 )
@@ -74,12 +88,17 @@ fun MelovaSurfaceCard(
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
     contentPadding: Dp = 16.dp,
+    /** Marks the card the student should open next with an accent edge. */
+    highlighted: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(22.dp)
+    val shape = MelovaCardShape
     val cardModifier = modifier
         .fillMaxWidth()
-        .border(1.dp, MelovaOutline.copy(alpha = 0.6f), shape)
+        .then(
+            if (highlighted) Modifier.border(1.5.dp, MelovaAccent, shape)
+            else Modifier.border(1.dp, MelovaOutline, shape)
+        )
     if (onClick != null) {
         Surface(
             onClick = onClick,
@@ -95,6 +114,14 @@ fun MelovaSurfaceCard(
     }
 }
 
+/**
+ * The top of every inner page: a back button, the title, and a thin line that closes it off, so
+ * what follows starts below a clear edge instead of crowding the title.
+ */
+/**
+ * The top of every inner page: a back button, the title, and a thin line that closes it off, so
+ * what follows starts below a clear edge instead of crowding the title.
+ */
 @Composable
 fun MelovaTopBar(
     title: String,
@@ -103,43 +130,50 @@ fun MelovaTopBar(
 ) {
     // Back from the system or the browser does exactly what this page's button does.
     PlatformBackHandler(onBack = onBack)
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Surface(
-            onClick = onBack,
-            shape = CircleShape,
-            color = MelovaAccentTint,
-            modifier = Modifier.size(42.dp)
+    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "بازگشت",
-                    tint = MelovaAccentSoft
-                )
+            Surface(
+                onClick = onBack,
+                shape = CircleShape,
+                color = Color.Transparent,
+                border = BorderStroke(1.dp, MelovaOutline),
+                modifier = Modifier.size(MelovaDimens.CompactButtonHeight)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "بازگشت",
+                        tint = MelovaText,
+                        modifier = Modifier.size(MelovaDimens.Icon)
+                    )
+                }
             }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MelovaText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (!subtitle.isNullOrBlank()) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MelovaTextMuted,
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MelovaText,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MelovaTextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
+        Spacer(Modifier.height(8.dp))
+        HorizontalDivider(thickness = 1.dp, color = MelovaOutline)
     }
 }
 
@@ -153,7 +187,8 @@ fun SectionHeader(title: String, trailing: String? = null) {
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
             color = MelovaText,
             modifier = Modifier.weight(1f)
         )
@@ -162,6 +197,12 @@ fun SectionHeader(title: String, trailing: String? = null) {
         }
     }
 }
+
+/**
+ * The Persian font leaves more room above its letters than below, so a single line beside an
+ * icon or avatar looks high; this trims the line to its letters and centres them.
+ */
+val CenteredLine = LineHeightStyle(alignment = LineHeightStyle.Alignment.Center, trim = LineHeightStyle.Trim.Both)
 
 @Composable
 fun MelovaChip(
@@ -174,9 +215,9 @@ fun MelovaChip(
         style = MaterialTheme.typography.labelMedium,
         color = color,
         modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
+            .clip(MelovaPillShape)
             .background(color.copy(alpha = 0.16f))
-            .padding(horizontal = 10.dp, vertical = 3.dp)
+            .padding(horizontal = 10.dp, vertical = 4.dp)
     )
 }
 
@@ -227,7 +268,7 @@ fun MelovaSegmentedControl(
             .fillMaxWidth()
             .clip(RoundedCornerShape(999.dp))
             .background(MelovaCard)
-            .border(1.dp, MelovaOutline.copy(alpha = 0.6f), RoundedCornerShape(999.dp))
+            .border(1.dp, MelovaOutline, RoundedCornerShape(999.dp))
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -237,26 +278,52 @@ fun MelovaSegmentedControl(
                 onClick = { onSelect(index) },
                 enabled = enabled && !selected,
                 shape = RoundedCornerShape(999.dp),
-                color = if (selected) MelovaAccent else Color.Transparent,
+                // A soft tint marks the choice; a solid fill would compete with the page's main button.
+                color = if (selected) MelovaAccentTint else Color.Transparent,
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
                     color = when {
-                        selected -> Color.White
-                        enabled -> MelovaText
+                        selected -> MelovaAccentSoft
+                        enabled -> MelovaTextMuted
                         else -> MelovaTextMuted
                     },
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 10.dp)
+                    modifier = Modifier.padding(vertical = 8.dp)
                 )
             }
         }
     }
 }
 
-/** A row that opens something, as in Profile: icon, title, a line under it if any, then an arrow. */
+/**
+ * The ‹ after something that opens a page. Its own drawing that never mirrors: Compose's mirrored
+ * arrow came out flipped one way in some rows and the other way in others.
+ */
+@Composable
+fun ForwardArrow(tint: Color, modifier: Modifier = Modifier) {
+    Icon(ForwardChevron, contentDescription = null, tint = tint, modifier = modifier.size(MelovaDimens.Icon))
+}
+
+private val ForwardChevron: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "ForwardChevron",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+        autoMirror = false
+    ).apply {
+        addPath(
+            pathData = addPathNodes("M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"),
+            fill = SolidColor(Color.Black)
+        )
+    }.build()
+}
+
+/** A row that opens something, alone in its own card. */
 @Composable
 fun MelovaNavRow(
     icon: ImageVector,
@@ -264,19 +331,73 @@ fun MelovaNavRow(
     subtitle: String? = null,
     onClick: () -> Unit,
     showArrow: Boolean = true,
+    iconTint: Color = MelovaAccentSoft,
     trailing: @Composable () -> Unit = {}
 ) {
-    MelovaSurfaceCard(onClick = onClick, contentPadding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(icon, contentDescription = null, tint = MelovaAccentSoft)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = MelovaText)
-                subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted) }
+    MelovaNavGroup({ MelovaGroupRow(icon, title, subtitle, onClick, showArrow, iconTint, trailing) })
+}
+
+/**
+ * Rows that belong together in one card, split by thin lines, like a phone's settings list; a null
+ * row is left out, so rows shown only sometimes can be passed as they are.
+ */
+@Composable
+fun MelovaNavGroup(vararg rows: (@Composable () -> Unit)?) {
+    val shown = rows.filterNotNull()
+    if (shown.isEmpty()) return
+    MelovaSurfaceCard(contentPadding = 0.dp) {
+        Column {
+            shown.forEachIndexed { index, row ->
+                if (index > 0) {
+                    // Starts after the icon, so the icons read as one column.
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 1.dp,
+                        color = MelovaOutline
+                    )
+                }
+                row()
             }
-            trailing()
-            if (showArrow) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
-            }
+        }
+    }
+}
+
+/** One row of a [MelovaNavGroup]: an icon in a tinted square, a title, a line under it. */
+@Composable
+fun MelovaGroupRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    onClick: () -> Unit,
+    showArrow: Boolean = true,
+    iconTint: Color = MelovaAccentSoft,
+    trailing: @Composable () -> Unit = {},
+    enabled: Boolean = true
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(MelovaSmallShape)
+                .background(iconTint.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(MelovaDimens.Icon))
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = MelovaText)
+            subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted) }
+        }
+        trailing()
+        if (showArrow) {
+            ForwardArrow(tint = MelovaTextMuted)
         }
     }
 }

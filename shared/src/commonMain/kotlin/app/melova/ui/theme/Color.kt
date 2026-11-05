@@ -27,6 +27,8 @@ data class MelovaPalette(
     val warning: Color,
     val error: Color,
     val info: Color,
+    /** Glides on the teacher's wave, kept apart from the violet accent and the blue of vibrato. */
+    val teal: Color,
     val text: Color,
     val textMuted: Color,
     /** The note at the end of the logo's melody line. */
@@ -50,6 +52,7 @@ val DarkPalette = MelovaPalette(
     warning = Color(0xFFFFB74D),
     error = Color(0xFFFF7A8A),
     info = Color(0xFF81D4FA),
+    teal = Color(0xFF4DD4C0),
     text = Color(0xFFF4F0FF),
     textMuted = Color(0xFFB4ABC9),
     logoDot = Color(0xFFF3C969)
@@ -58,7 +61,7 @@ val DarkPalette = MelovaPalette(
 val LightPalette = MelovaPalette(
     isDark = false,
     backgroundStart = Color(0xFFF7F4FF),
-    backgroundEnd = Color(0xFFEDE7FF),
+    backgroundEnd = Color(0xFFF0EBFF),
     card = Color(0xFFFFFFFF),
     cardElevated = Color(0xFFF1ECFF),
     bubbleReceived = Color(0xFFFFFFFF),
@@ -72,6 +75,7 @@ val LightPalette = MelovaPalette(
     warning = Color(0xFFB45A00),
     error = Color(0xFFC73A52),
     info = Color(0xFF1C6FA8),
+    teal = Color(0xFF0E7C70),
     text = Color(0xFF1B1230),
     textMuted = Color(0xFF5F5675),
     logoDot = Color(0xFFE8A93A)
@@ -84,6 +88,10 @@ val MelovaBackgroundEnd: Color @Composable @ReadOnlyComposable get() = LocalMelo
 val MelovaCard: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.card
 val MelovaCardElevated: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.cardElevated
 val MelovaBubbleReceived: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.bubbleReceived
+/**
+ * The one colour for borders, dividers and outlined controls. Use it as it is, never faded with
+ * `.copy(alpha = …)`: on the light theme a faded outline vanishes into the white cards.
+ */
 val MelovaOutline: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.outline
 val MelovaControl: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.control
 val MelovaAccent: Color @Composable @ReadOnlyComposable get() = LocalMelovaPalette.current.accent

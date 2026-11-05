@@ -35,6 +35,14 @@ import app.melova.ui.theme.MelovaWarning
 import app.melova.ui.theme.MelovaInfo
 import app.melova.ui.theme.MelovaText
 
+/** «کلمه‌ی «قربونت»», or nothing when the mistake has no word. */
+fun wordLabel(word: String?): String? = word?.takeIf { it.isNotBlank() }?.let { "کلمه‌ی «$it»" }
+
+fun correctionHeader(correction: VocalScorer.PitchCorrection): String = listOfNotNull(
+    wordLabel(correction.word),
+    "زمان \u200E${correction.timeLabel}\u200F"
+).joinToString(" • ")
+
 @Composable
 fun VocalTrainingCorrectionRow(
     correction: VocalScorer.PitchCorrection,
@@ -44,7 +52,7 @@ fun VocalTrainingCorrectionRow(
     onPlayStudentSnippet: () -> Unit,
     onPlayTeacherSnippet: () -> Unit,
     onShowDetails: (() -> Unit)? = null,
-    header: String = "زمان \u200E${correction.timeLabel}\u200F • نت هدف: ${correction.expectedNote}",
+    header: String = correctionHeader(correction),
     accentColor: Color? = null
 ) {
     val accent = accentColor ?: when (correction.direction) {
@@ -64,7 +72,7 @@ fun VocalTrainingCorrectionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(
@@ -126,14 +134,14 @@ private fun CorrectionSnippetButton(
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         color = if (isPlaying) containerColor.copy(alpha = 0.95f) else containerColor,
         contentColor = if (isPlaying) Color.White else contentColor
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
