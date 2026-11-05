@@ -93,6 +93,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -1323,8 +1324,12 @@ private fun ChatComposer(
                 onCancel = onCancelReply
             )
         }
-        when (take.phase) {
-            TakePhase.EMPTY -> Row(
+        // The field stays under the recorder rather than leaving: a field that leaves takes the
+        // keyboard with it, and the person is often only a word away from typing again.
+        val isRecording = take.phase != TakePhase.EMPTY
+        Box(contentAlignment = Alignment.BottomCenter) {
+            Row(
+                modifier = Modifier.alpha(if (isRecording) 0f else 1f),
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -1349,7 +1354,7 @@ private fun ChatComposer(
                     }
                 }
             }
-            else -> RecordingBar(take = take, onSend = take::finish)
+            if (isRecording) RecordingBar(take = take, onSend = take::finish)
         }
     }
 }
@@ -1449,6 +1454,7 @@ private fun RecordingBar(take: TakeController, onSend: () -> Unit) {
                 )
                 MelovaMediaIconButton(
                     onClick = take::togglePause,
+                    modifier = Modifier.focusProperties { canFocus = false },
                     enabled = !isWorking,
                     icon = if (isPaused) Icons.Filled.Mic else Icons.Filled.Pause,
                     contentDescription = if (isPaused) "ادامه‌ی ضبط" else "مکث",
@@ -1499,7 +1505,8 @@ private fun RoundAction(
         enabled = enabled && !isBusy,
         shape = CircleShape,
         color = if (isQuiet) MelovaAccentTint else MelovaAccent,
-        modifier = Modifier.size(size)
+        // Never takes focus from the field beside it, so the keyboard stays up while it is pressed.
+        modifier = Modifier.focusProperties { canFocus = false }.size(size)
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (isBusy) {

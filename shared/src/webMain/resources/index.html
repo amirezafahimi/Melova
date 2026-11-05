@@ -62,6 +62,19 @@
             };
         })();
     </script>
+    <script>
+        // The app draws on one canvas that can take focus, so any tap on it — a send button, the
+        // microphone — took focus from the hidden box Compose types into. The keyboard went down,
+        // the page jumped under the finger, and the tap missed. While that box has focus, a tap
+        // leaves it there; Compose still hears the tap, and still moves focus itself when it means to.
+        (function () {
+            window.addEventListener('mousedown', function (event) {
+                var root = document.body && document.body.shadowRoot;
+                var active = (root && root.activeElement) || document.activeElement;
+                if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) event.preventDefault();
+            }, true);
+        })();
+    </script>
     <script src="melova-audio.js"></script>
     <script type="application/javascript" src="melova.js"></script>
     <script>
