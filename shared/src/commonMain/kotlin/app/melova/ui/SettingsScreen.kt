@@ -1,5 +1,6 @@
 package app.melova.ui
 
+import app.melova.ui.theme.MelovaError
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,9 +10,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,12 +25,12 @@ import app.melova.presentation.ChatViewModel
 import app.melova.ui.components.ConfirmDialog
 import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaNavRow
+import app.melova.ui.components.MelovaSwitch
 import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.SectionHeader
 import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
-import app.melova.ui.theme.MelovaAccentTint
 import app.melova.ui.theme.ThemeMode
 
 /** Theme, notifications and leaving the account, opened from Profile. */
@@ -56,7 +54,7 @@ fun SettingsScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
                 contentPadding = PagePadding,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item { MelovaTopBar(title = "تنظیمات", onBack = onBack) }
                 item { ThemePicker(themeMode = themeMode, onThemeModeChange = onThemeModeChange) }
@@ -71,7 +69,8 @@ fun SettingsScreen(
                             icon = Icons.AutoMirrored.Outlined.Logout,
                             title = "خروج از حساب",
                             onClick = { confirmingSignOut = true },
-                            showArrow = false
+                            showArrow = false,
+                            iconTint = MelovaError
                         )
                     }
                 }
@@ -123,15 +122,7 @@ private fun NotificationsRow(state: NotificationState, viewModel: ChatViewModel)
         showArrow = false,
         trailing = {
             if (canToggle) {
-                Switch(
-                    checked = isOn,
-                    onCheckedChange = null,
-                    colors = SwitchDefaults.colors(
-                        checkedTrackColor = MelovaAccent,
-                        uncheckedTrackColor = MelovaAccentTint,
-                        uncheckedBorderColor = MaterialTheme.colorScheme.outline
-                    )
-                )
+                MelovaSwitch(checked = isOn, onCheckedChange = null)
             }
         }
     )
