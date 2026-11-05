@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import app.melova.ui.components.MelovaRowSkeleton
 import app.melova.ui.components.MelovaSegmentedControl
+import app.melova.ui.components.MelovaShimmerVeil
 import app.melova.ui.components.MelovaSkeleton
 import app.melova.ui.components.MelovaWaveSkeleton
 import app.melova.ui.theme.MelovaDimens
@@ -166,19 +167,24 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
             )
         }
 
-        LtrContent {
-            TeacherOrnamentWaveform(
-                peaks = uiState.peaks,
-                durationMs = uiState.durationMs,
-                playheadMs = uiState.positionMs,
-                ornaments = uiState.ornaments,
-                selectedIndex = uiState.playingIndex ?: uiState.selectedIndex,
-                zoom = uiState.zoom,
-                maxZoom = TeacherPerformanceViewModel.MAX_ZOOM,
-                onZoomChange = viewModel::setZoom,
-                onSeekToMs = viewModel::playAt,
-                onOrnamentClick = viewModel::playSegment
-            )
+        // The wave arrives before its ornaments do. It plays from the first moment, and the light
+        // over it says the tahrirs and vibratos are still being read, instead of a bare wave.
+        Box {
+            LtrContent {
+                TeacherOrnamentWaveform(
+                    peaks = uiState.peaks,
+                    durationMs = uiState.durationMs,
+                    playheadMs = uiState.positionMs,
+                    ornaments = uiState.ornaments,
+                    selectedIndex = uiState.playingIndex ?: uiState.selectedIndex,
+                    zoom = uiState.zoom,
+                    maxZoom = TeacherPerformanceViewModel.MAX_ZOOM,
+                    onZoomChange = viewModel::setZoom,
+                    onSeekToMs = viewModel::playAt,
+                    onOrnamentClick = viewModel::playSegment
+                )
+            }
+            if (uiState.isOrnamentsLoading) MelovaShimmerVeil(Modifier.matchParentSize())
         }
 
         Row(
@@ -209,7 +215,11 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
             }
         }
         Text(
-            text = "روی هر بازه بزنید تا همان مصوت پخش شود؛ با دو انگشت بزرگ‌نمایی کنید.",
+            text = if (uiState.isOrnamentsLoading) {
+                "اجرا آماده‌ی شنیدن است؛ تحریرها و ویبراتوها همین حالا روی موج می‌آیند."
+            } else {
+                "روی هر بازه بزنید تا همان مصوت پخش شود؛ با دو انگشت بزرگ‌نمایی کنید."
+            },
             style = MaterialTheme.typography.labelSmall,
             color = MelovaText.copy(alpha = 0.45f),
             textAlign = TextAlign.Start

@@ -138,3 +138,19 @@ fun MelovaRowSkeleton(modifier: Modifier = Modifier, showLead: Boolean = true) {
         MelovaSkeleton(Modifier.width(44.dp).height(MelovaDimens.IconLarge))
     }
 }
+
+/**
+ * A light passing over something already drawn that is not finished yet — the wave while its
+ * ornaments are still being read. What is under it stays visible, and stays playable: the veil
+ * takes no touches of its own.
+ */
+@Composable
+fun MelovaShimmerVeil(modifier: Modifier = Modifier, shape: Shape = MelovaSmallShape) {
+    val sweep = shimmer()
+    val crest = MelovaAccent.copy(alpha = 0.16f)
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .drawBehind { drawRect(shimmerBrush(sweep, size.width, Color.Transparent, crest)) }
+    )
+}
