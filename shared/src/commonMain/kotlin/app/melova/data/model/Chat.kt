@@ -50,6 +50,8 @@ data class ChatMessage(
     /** The bars of a voice message's wave, from 0 to 1; empty when the server couldn't read it. */
     val peaks: List<Float>,
     val createdAtMs: Long,
+    /** When the sender rewrote it; null for one that stands as it was written. */
+    val editedAtMs: Long?,
     val practice: PracticeResultLink?
 )
 
@@ -70,8 +72,11 @@ data class ChatInbox(val chats: List<Chat>, val unread: Int)
 
 data class ChatThread(val chat: Chat, val messages: List<ChatMessage>)
 
-/** A chat as it now stands, with the messages that are new or different. */
-data class ChatUpdate(val chat: Chat, val messages: List<ChatMessage>)
+/**
+ * A chat as it now stands, with the messages that are new or different and the ids of any the
+ * sender took back.
+ */
+data class ChatUpdate(val chat: Chat, val messages: List<ChatMessage>, val removed: List<Long> = emptyList())
 
 /** A take as the student saw it, opened from its message. */
 data class SharedTake(

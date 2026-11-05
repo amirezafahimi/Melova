@@ -24,7 +24,8 @@ data class ChatDto(
 @Serializable
 data class ChatThreadDto(
     @SerialName("chat") val chat: ChatDto? = null,
-    @SerialName("messages") val messages: List<ChatMessageDto>? = null
+    @SerialName("messages") val messages: List<ChatMessageDto>? = null,
+    @SerialName("removed") val removed: List<Long>? = null
 )
 
 /** What arrives on the socket: ``ready``, ``heartbeat``, or ``chat`` with an update. */
@@ -32,7 +33,8 @@ data class ChatThreadDto(
 data class ChatEventDto(
     @SerialName("type") val type: String? = null,
     @SerialName("chat") val chat: ChatDto? = null,
-    @SerialName("messages") val messages: List<ChatMessageDto>? = null
+    @SerialName("messages") val messages: List<ChatMessageDto>? = null,
+    @SerialName("removed") val removed: List<Long>? = null
 )
 
 /** The first frame on the socket, where a browser can't set headers. */
@@ -52,6 +54,7 @@ data class ChatMessageDto(
     @SerialName("audio_extension") val audioExtension: String? = null,
     @SerialName("peaks") val peaks: List<Float>? = null,
     @SerialName("created_at") val createdAt: Double? = null,
+    @SerialName("edited_at") val editedAt: Double? = null,
     @SerialName("practice") val practice: PracticeResultLinkDto? = null
 )
 

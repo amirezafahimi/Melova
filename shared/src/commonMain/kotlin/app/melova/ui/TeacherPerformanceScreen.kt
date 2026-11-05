@@ -135,7 +135,8 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
                 contentDescription = if (uiState.isPlaying) "توقف موقت" else "پخش اجرای استاد",
                 containerColor = MelovaAccentTint,
                 contentColor = MelovaAccentSoft,
-                buttonSize = MelovaDimens.ButtonHeight
+                buttonSize = MelovaDimens.CompactButtonHeight,
+                iconSize = 20.dp
             )
             LtrContent {
                 Text(
@@ -361,7 +362,7 @@ private fun LoadingSkeleton() {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            MelovaSkeleton(Modifier.size(MelovaDimens.ButtonHeight))
+            MelovaSkeleton(Modifier.size(MelovaDimens.CompactButtonHeight))
             MelovaSkeleton(Modifier.width(80.dp).height(14.dp))
             Spacer(modifier = Modifier.weight(1f))
             MelovaSkeleton(Modifier.size(MelovaDimens.CompactButtonHeight))

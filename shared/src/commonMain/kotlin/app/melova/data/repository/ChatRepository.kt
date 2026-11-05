@@ -51,7 +51,7 @@ class ChatRepository(
 
     /** The person has the chat on screen up to this message. */
     suspend fun markRead(chatId: String, messageId: Long): ChatUpdate =
-        apiCall { api.read(session.token, chatId, messageId) }.run { toUpdate(chat, messages) }
+        apiCall { api.read(session.token, chatId, messageId) }.run { toUpdate(chat, messages, removed) }
 
     /** The key a browser needs before it gives out a push address. */
     suspend fun pushKey(): String = apiCall { api.pushKey() }.key ?: throw IOException("اعلان روشن نشد.")
@@ -66,29 +66,67 @@ class ChatRepository(
         api.listen(session.token) { event ->
             when (event.type) {
                 "ready" -> onReady()
-                "chat" -> onUpdate(toUpdate(event.chat, event.messages))
+                "chat" -> onUpdate(toUpdate(event.chat, event.messages, event.removed))
             }
         }
     }
 
     suspend fun sendText(chatId: String, text: String): ChatUpdate =
         apiCall { api.send(session.token, chatId, text.trim(), durationMs = null, audio = null) }
-            .run { toUpdate(chat, messages) }
+            .run { toUpdate(chat, messages, removed) }
 
-    suspend fun sendVoice(chatId: String, voice: LocalFile, durationMs: Long): ChatUpdate = apiCall {
+    /** [onProgress] follows the voice on its way out, from 0 to 1. */
+    suspend fun sendVoice(
+        chatId: String,
+        voice: LocalFile,
+        durationMs: Long,
+        onProgress: (Float) -> Unit
+    ): ChatUpdate = apiCall {
         if (!voice.exists()) throw IOException("فایل پیام صوتی باز نشد.")
         val audio = FilePart("audio", voice.name, mediaTypeFor(voice.name), voice.readBytes())
-        api.send(session.token, chatId, "", durationMs, audio)
-    }.run { toUpdate(chat, messages) }
+        api.sendVoice(session.token, chatId, durationMs, audio, onProgress)
+    }.run { toUpdate(chat, messages, removed) }
 
-    /** A voice message, downloaded once. */
-    suspend fun voice(chatId: String, message: ChatMessage): LocalFile = apiCall {
-        val dir = LocalFile(cacheDir(context), "chat_voices").apply { mkdirs() }
-        val target = LocalFile(dir, "${message.id}.${message.audioExtension}")
+    suspend fun editText(chatId: String, messageId: Long, text: String): ChatUpdate =
+        apiCall { api.edit(session.token, chatId, messageId, text.trim()) }.run { toUpdate(chat, messages, removed) }
+
+    suspend fun deleteMessage(chatId: String, messageId: Long): ChatUpdate =
+        apiCall { api.delete(session.token, chatId, messageId) }.run { toUpdate(chat, messages, removed) }
+
+    /** Whether this voice is already here, so it plays without waiting for the network. */
+    fun hasVoice(message: ChatMessage): Boolean = voiceFile(message).let { it.exists() && it.length() > 0L }
+
+    /** A voice message, downloaded once; [onProgress] follows it in, from 0 to 1. */
+    suspend fun voice(chatId: String, message: ChatMessage, onProgress: (Float) -> Unit): LocalFile = apiCall {
+        val target = voiceFile(message)
         if (!target.exists() || target.length() == 0L) {
-            api.voice(session.token, chatId, message.id).writeAtomically(target)
+            api.voice(session.token, chatId, message.id, onProgress).writeAtomically(target)
         }
         target
+    }
+
+    /**
+     * A copy of a recording, kept until its message has gone. The recorder is given back as soon
+     * as the take is sent, so the file it wrote is no longer there to read — or to send again.
+     */
+    fun keepForSending(localId: Long, voice: LocalFile): LocalFile {
+        val dir = LocalFile(cacheDir(context), OUTBOX).apply { mkdirs() }
+        return voice.copyTo(LocalFile(dir, "$localId.${voice.extension.ifEmpty { "m4a" }}"), overwrite = true)
+    }
+
+    /** The kept copy of a voice that has gone out, or that the person dropped. */
+    fun dropOutgoing(voice: LocalFile?) {
+        voice?.takeIf { it.path.contains("/$OUTBOX/") }?.delete()
+    }
+
+    /** A voice that has just gone out is already here: it plays without being fetched back. */
+    fun keepSentVoice(message: ChatMessage, voice: LocalFile) {
+        voice.copyTo(voiceFile(message), overwrite = true)
+    }
+
+    private fun voiceFile(message: ChatMessage): LocalFile {
+        val dir = LocalFile(cacheDir(context), "chat_voices").apply { mkdirs() }
+        return LocalFile(dir, "${message.id}.${message.audioExtension}")
     }
 
     /** Looking at a take as its teacher starts its clock on the server, as in the queue. */
@@ -110,12 +148,16 @@ class ChatRepository(
         }
         target
     }
+
+    private companion object {
+        const val OUTBOX = "chat_outbox"
+    }
 }
 
 private fun ChatDto?.required(): Chat = this?.toDomain() ?: throw IOException("این گفتگو باز نشد.")
 
-private fun toUpdate(chat: ChatDto?, messages: List<ChatMessageDto>?): ChatUpdate =
-    ChatUpdate(chat.required(), messages.orEmpty().mapNotNull { it.toDomain() })
+private fun toUpdate(chat: ChatDto?, messages: List<ChatMessageDto>?, removed: List<Long>?): ChatUpdate =
+    ChatUpdate(chat.required(), messages.orEmpty().mapNotNull { it.toDomain() }, removed.orEmpty())
 
 private fun ChatDto.toDomain(): Chat? {
     val chatId = id?.takeIf { it.isNotBlank() } ?: return null
@@ -141,6 +183,7 @@ private fun ChatMessageDto.toDomain(): ChatMessage? {
         audioExtension = audioExtension.orEmpty().ifBlank { "m4a" },
         peaks = peaks.orEmpty(),
         createdAtMs = ((createdAt ?: 0.0) * 1000).toLong(),
+        editedAtMs = editedAt?.let { (it * 1000).toLong() },
         practice = practice?.toDomain()
     )
 }

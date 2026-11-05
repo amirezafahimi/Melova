@@ -69,7 +69,10 @@ rule, say so and update this file in the same change.
 ## Backend
 
 - Routes in `api/`, logic and data in `melova_scoring/`. `student_store` is the only code that
-  touches SQLite; tables are added to `_SCHEMA` with `CREATE TABLE IF NOT EXISTS`.
+  touches SQLite; tables are added to `_SCHEMA` with `CREATE TABLE IF NOT EXISTS`. A new column
+  goes in `_SCHEMA` and nowhere else: `_add_new_columns` reads the schema and gives a database
+  made before it whatever it is missing. Such a column can't be `NOT NULL`, so give it a
+  default or let it stay empty for the rows that are already there.
 - One uvicorn worker: the sockets and in-process state depend on it.
 - A new endpoint checks who is asking (`require_student`, `_who`, `_require_lesson_access`). The
   one exception is the labelling panel from loopback with `MELOVA_LABEL_OPEN=1`, which only

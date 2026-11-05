@@ -32,6 +32,12 @@ external interface UploadAnswerJs : JsAny {
     val body: String
 }
 
+/** What melova-audio.js's download resolves to; the body is empty on a status that isn't 200. */
+external interface DownloadAnswerJs : JsAny {
+    val status: Int
+    val bytes: Int8Array
+}
+
 external interface GoogleAnswerJs : JsAny {
     val credential: String?
     val cancelled: Boolean
@@ -72,6 +78,7 @@ private external object MelovaAudioGlobal : JsAny {
         bytes: Int8Array,
         progress: (Double) -> Unit
     ): Promise<JsAny?>
+    fun download(url: String, headersJson: String, progress: (Double) -> Unit): Promise<JsAny?>
     fun apiBaseUrl(): String
     fun canInstall(): Boolean
     fun watchInstall(changed: () -> Unit)
@@ -119,6 +126,10 @@ object MelovaAudioJs {
         progress: (Double) -> Unit
     ): Promise<JsAny?> =
         MelovaAudioGlobal.upload(method, url, headersJson, fieldsJson, fileField, fileName, mimeType, bytes, progress)
+
+    /** Resolves to a [DownloadAnswerJs]; rejects when the request never got an answer. */
+    fun download(url: String, headersJson: String, progress: (Double) -> Unit): Promise<JsAny?> =
+        MelovaAudioGlobal.download(url, headersJson, progress)
 
     /** MELOVA_API_BASE_URL from the page, or empty. */
     fun apiBaseUrl(): String = MelovaAudioGlobal.apiBaseUrl()

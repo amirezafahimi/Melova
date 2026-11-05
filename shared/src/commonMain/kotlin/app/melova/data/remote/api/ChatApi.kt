@@ -14,6 +14,8 @@ import app.melova.data.remote.dto.ChatsDto
 import app.melova.data.remote.dto.PushKeyDto
 import app.melova.data.remote.dto.SharedTakeDto
 import app.melova.data.remote.multipartBody
+import app.melova.data.remote.receiveWithProgress
+import app.melova.data.remote.sendWithProgress
 import app.melova.platform.PushAddress
 import app.melova.platform.apiBaseUrl
 import io.ktor.client.HttpClient
@@ -96,10 +98,50 @@ class ChatApi(private val client: HttpClient, private val socketClient: HttpClie
         )
     }.decode()
 
-    suspend fun voice(teacherToken: String?, chatId: String, messageId: Long): ByteArray =
-        client.call(HttpMethod.Get, "api/v1/chats/${segment(chatId)}/messages/$messageId/audio") {
+    /** A voice message, with the share of it that has gone reported as it goes. */
+    suspend fun sendVoice(
+        teacherToken: String?,
+        chatId: String,
+        durationMs: Long,
+        audio: FilePart,
+        onProgress: (Float) -> Unit
+    ): ChatThreadDto = MelovaNetwork.json.decodeFromString(
+        sendWithProgress(
+            HttpMethod.Post,
+            "api/v1/chats/${segment(chatId)}/messages",
+            headerMap(teacherToken),
+            mapOf("text" to "", "duration_ms" to durationMs.toString()),
+            audio,
+            onProgress
+        )
+    )
+
+    suspend fun edit(teacherToken: String?, chatId: String, messageId: Long, text: String): ChatThreadDto =
+        client.call(HttpMethod.Patch, "api/v1/chats/${segment(chatId)}/messages/$messageId") {
             header(TEACHER_TOKEN, teacherToken)
-        }.bodyAsBytes()
+            jsonBody(JsonObject(mapOf("text" to JsonPrimitive(text))))
+        }.decode()
+
+    suspend fun delete(teacherToken: String?, chatId: String, messageId: Long): ChatThreadDto =
+        client.call(HttpMethod.Delete, "api/v1/chats/${segment(chatId)}/messages/$messageId") {
+            header(TEACHER_TOKEN, teacherToken)
+        }.decode()
+
+    /** A voice message, with the share of it that has arrived reported as it comes. */
+    suspend fun voice(
+        teacherToken: String?,
+        chatId: String,
+        messageId: Long,
+        onProgress: (Float) -> Unit
+    ): ByteArray = receiveWithProgress(
+        "api/v1/chats/${segment(chatId)}/messages/$messageId/audio",
+        headerMap(teacherToken),
+        onProgress
+    )
+
+    /** The teacher's token only when there is one; these calls take their headers as a map. */
+    private fun headerMap(teacherToken: String?): Map<String, String> =
+        teacherToken?.let { mapOf(TEACHER_TOKEN to it) }.orEmpty()
 
     suspend fun take(teacherToken: String?, reviewId: String): SharedTakeDto =
         client.call(HttpMethod.Get, "api/v1/reviews/${segment(reviewId)}") { header(TEACHER_TOKEN, teacherToken) }.decode()

@@ -72,6 +72,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -805,10 +806,10 @@ private fun NoticeRow(icon: ImageVector, text: String, color: Color) {
 
 /** Live input meter: the newest level enters on the right, like a scrolling waveform. */
 @Composable
-private fun LiveLevelBars(levels: List<Float>, dimmed: Boolean) {
+fun LiveLevelBars(levels: List<Float>, dimmed: Boolean, height: Dp = 56.dp) {
     val active = if (dimmed) MelovaTextMuted else MelovaAccent
     val idle = MelovaOutline
-    Canvas(modifier = Modifier.fillMaxWidth().height(56.dp)) {
+    Canvas(modifier = Modifier.fillMaxWidth().height(height)) {
         val slot = size.width / LIVE_BAR_COUNT
         val barWidth = slot * 0.6f
         val centerY = size.height / 2f

@@ -384,7 +384,8 @@ private fun TakePreview(
                         contentDescription = if (preview.isPlaying) "توقف" else "پخش کل اجرا",
                         containerColor = MelovaAccentTint,
                         contentColor = MelovaAccentSoft,
-                        buttonSize = MelovaDimens.ButtonHeight
+                        buttonSize = MelovaDimens.CompactButtonHeight,
+                        iconSize = 20.dp
                     )
                     LtrContent {
                         Text(

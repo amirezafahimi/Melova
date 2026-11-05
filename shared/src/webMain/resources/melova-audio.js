@@ -199,6 +199,26 @@
     });
   }
 
+  // The other way round: how much of a file has arrived, which fetch can't tell us either.
+  function download(url, headersJson, progress) {
+    return new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open('GET', url);
+      const headers = JSON.parse(headersJson);
+      for (const name of Object.keys(headers)) request.setRequestHeader(name, headers[name]);
+      request.responseType = 'arraybuffer';
+      request.timeout = 300000;
+      request.onprogress = (event) => { if (event.lengthComputable && event.total > 0) progress(event.loaded / event.total); };
+      request.onload = () => resolve({
+        status: request.status,
+        bytes: new Int8Array(request.response || new ArrayBuffer(0)),
+      });
+      request.onerror = () => reject(new Error('download failed'));
+      request.ontimeout = () => reject(new Error('download timed out'));
+      request.send();
+    });
+  }
+
   let googleScript;
 
   function loadGoogleScript() {
@@ -360,7 +380,7 @@
   }
 
   // pickAudioFile is for the JS app, which a quick web build keeps from the last --legacy build.
-  globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickFile, googleSignIn, upload,
+  globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickFile, googleSignIn, upload, download,
     pickAudioFile: () => pickFile('audio/*'), apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || ''),
     canInstall: () => installOffer !== null, watchInstall: (changed) => { onInstallChange = changed; }, install,
     pushState, pushAddress: async () => addressOf(await pushSubscription()), pushSubscribe, pushUnsubscribe, askNotifications, watchChatLinks,
