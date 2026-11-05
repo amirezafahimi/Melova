@@ -22,9 +22,14 @@ actual class VocalRecorder actual constructor(
     @Volatile
     private var stopRequested = false
 
+    @Volatile
+    private var lastLevel = 0f
+
     actual fun requestStop() {
         stopRequested = true
     }
+
+    actual fun level(): Float = lastLevel
 
     actual suspend fun recordFor(durationMs: Long, outputFile: LocalFile): Long = withContext(Dispatchers.IO) {
         recordInternal(
@@ -109,6 +114,9 @@ actual class VocalRecorder actual constructor(
                         val toCopy = minOf(read, maxSamples - written)
                         readBuffer.copyInto(samples, written, 0, toCopy)
                         written += toCopy
+                        var peak = 0
+                        for (i in 0 until read) peak = maxOf(peak, abs(readBuffer[i].toInt()))
+                        lastLevel = peak / 32768f
                     }
                     read == AudioRecord.ERROR_INVALID_OPERATION ||
                         read == AudioRecord.ERROR_BAD_VALUE -> {
@@ -134,6 +142,7 @@ actual class VocalRecorder actual constructor(
             }
             recorder.release()
             audioRecord = null
+            lastLevel = 0f
         }
 
         val recordedSamples = samples.copyOf(written)

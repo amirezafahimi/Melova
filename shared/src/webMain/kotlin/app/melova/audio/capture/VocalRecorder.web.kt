@@ -17,6 +17,8 @@ actual class VocalRecorder actual constructor(context: PlatformContext) {
         stopRequested = true
     }
 
+    actual fun level(): Float = take?.level()?.toFloat() ?: 0f
+
     actual suspend fun recordFor(durationMs: Long, outputFile: LocalFile): Long =
         record(outputFile, durationMs, stopWhenRequested = false)
 

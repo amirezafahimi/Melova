@@ -1,15 +1,17 @@
 package app.melova.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -42,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -61,13 +65,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -443,7 +448,7 @@ fun TeacherAudioSlot(
         if (permission.isGranted()) controller.record() else permission.request()
     }
 
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         AnimatedContent(
             targetState = controller.phase.let { if (it == TakePhase.PAUSED) TakePhase.RECORDING else it },
             modifier = Modifier.fillMaxWidth(),
@@ -452,7 +457,7 @@ fun TeacherAudioSlot(
         ) { phase ->
             when (phase) {
                 TakePhase.EMPTY -> SourceChoice(controller.kind, enabled, onRecord = record, onPick = pickFile)
-                TakePhase.COUNT_IN -> CountInPanel(controller.countIn, onCancel = controller::clear)
+                TakePhase.COUNT_IN -> CountInPanel(controller.countIn, controller.kind.countInSeconds, onCancel = controller::clear)
                 TakePhase.RECORDING, TakePhase.PAUSED -> RecordingPanel(controller)
                 TakePhase.PROCESSING -> ProcessingPanel(controller.kind)
                 TakePhase.READY -> ReviewPanel(controller, enabled, onRecordAgain = record, onPickAnother = pickFile)
@@ -466,7 +471,7 @@ fun TeacherAudioSlot(
 
 @Composable
 private fun SourceChoice(kind: TakeKind, enabled: Boolean, onRecord: () -> Unit, onPick: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         SourceTile(
             icon = Icons.Filled.Mic,
             title = "ضبط همین‌جا",
@@ -498,7 +503,7 @@ private fun SourceTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(20.dp)
     Surface(
         onClick = onClick,
         enabled = enabled,
@@ -507,9 +512,9 @@ private fun SourceTile(
         modifier = modifier.border(1.dp, if (highlighted) MelovaAccent.copy(alpha = 0.55f) else MelovaOutline, shape)
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 16.dp, horizontal = 10.dp),
+            modifier = Modifier.padding(vertical = 16.dp, horizontal = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -539,34 +544,67 @@ private fun SourceTile(
     }
 }
 
+/**
+ * A ring that empties once a second around the beat's number, and a dot per beat. Nothing grows
+ * past its own box, so the panel stays the same size from the first beat to the last.
+ */
 @Composable
-private fun CountInPanel(countIn: Int, onCancel: () -> Unit) {
+private fun CountInPanel(countIn: Int, total: Int, onCancel: () -> Unit) {
+    val ring = remember { Animatable(1f) }
+    LaunchedEffect(countIn) {
+        ring.snapTo(1f)
+        ring.animateTo(0f, tween(durationMillis = 1_000, easing = LinearEasing))
+    }
+    val track = MelovaOutline
+    val accent = MelovaAccent
     PanelSurface {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("آماده شوید…", style = MaterialTheme.typography.bodyMedium, color = MelovaTextMuted)
-            AnimatedContent(
-                targetState = countIn,
-                transitionSpec = { (scaleIn(initialScale = 1.6f) + fadeIn()) togetherWith fadeOut() },
-                label = "count-in"
-            ) { value ->
-                Box(
-                    modifier = Modifier
-                        .size(76.dp)
-                        .clip(CircleShape)
-                        .background(Brush.linearGradient(listOf(MelovaAccent, MelovaSecondary))),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(persianDigits(value.toString()), fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val stroke = 4.dp.toPx()
+                    val inset = stroke / 2
+                    val arcSize = Size(size.width - stroke, size.height - stroke)
+                    drawCircle(color = track, radius = (size.minDimension - stroke) / 2, style = Stroke(stroke))
+                    drawArc(
+                        color = accent,
+                        startAngle = -90f,
+                        sweepAngle = 360f * ring.value,
+                        useCenter = false,
+                        topLeft = Offset(inset, inset),
+                        size = arcSize,
+                        style = Stroke(stroke, cap = StrokeCap.Round)
+                    )
+                }
+                Crossfade(targetState = countIn, animationSpec = tween(180), label = "count-in") { value ->
+                    Text(
+                        text = persianDigits(value.toString()),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MelovaText
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Beats already counted fill in, from the first.
+                for (beat in total downTo 1) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (beat >= countIn) MelovaAccent else track)
+                    )
                 }
             }
             Text(
                 text = "بعد از شمارش، از اول همان قسمت بخوانید.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MelovaTextMuted
+                color = MelovaTextMuted,
+                textAlign = TextAlign.Center
             )
             TextButton(onClick = onCancel) { Text("لغو", color = MelovaTextMuted) }
         }
@@ -660,7 +698,7 @@ private fun RecordingPanel(controller: TakeController) {
 private fun ProcessingPanel(kind: TakeKind) {
     PanelSurface {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CircularProgressIndicator(modifier = Modifier.size(22.dp), color = MelovaAccent, strokeWidth = 2.5.dp)
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MelovaAccent, strokeWidth = 2.5.dp)
             Text(
                 text = if (kind == TakeKind.SECTION) "در حال حذف سکوت ابتدا و انتها…" else "در حال ذخیره‌ی ضبط…",
                 style = MaterialTheme.typography.bodyMedium,
@@ -679,7 +717,7 @@ private fun ReviewPanel(
 ) {
     val recordedHere = controller.pickedName == null
     PanelSurface {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MelovaMediaIconButton(
                     onClick = controller::togglePlayback,
@@ -749,11 +787,11 @@ private fun ReviewPanel(
 @Composable
 private fun PanelSurface(content: @Composable () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         color = MelovaCardElevated,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Box(Modifier.padding(14.dp)) { content() }
+        Box(Modifier.padding(16.dp)) { content() }
     }
 }
 

@@ -7,6 +7,9 @@ import app.melova.platform.PlatformContext
 expect class VocalRecorder(context: PlatformContext) {
     fun requestStop()
 
+    /** The loudest sample of the latest stretch the microphone gave, 0 to 1; 0 when not recording. */
+    fun level(): Float
+
     /** Records exactly [durationMs]; returns the recorded length. */
     suspend fun recordFor(durationMs: Long, outputFile: LocalFile): Long
 
