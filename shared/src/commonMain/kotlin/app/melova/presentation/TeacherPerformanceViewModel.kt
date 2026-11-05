@@ -2,10 +2,8 @@ package app.melova.presentation
 
 import androidx.lifecycle.ViewModel
 import app.melova.platform.appContext
-import app.melova.platform.cacheDir
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import app.melova.audio.io.WavUtils
 import app.melova.audio.io.WaveformPeaksExtractor
 import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.playback.TeacherVocalGenerator
@@ -45,24 +43,12 @@ class TeacherPerformanceViewModel(
     private var lesson: Lesson? = null
     private var section: LessonSection? = null
     private var progressJob: Job? = null
-    private var playJob: Job? = null
 
     private var slowJob: Job? = null
 
     /** What the player reads from: the teacher's file, or a slower copy once one is here. */
     private var voice: Voice? = null
     private val voices = mutableMapOf<Float, Voice>()
-
-    /**
-     * A segment plays from its own cut of the audio, so it ends where the
-     * vowel ends. Pausing at the end position instead lets the audio already
-     * queued for the output (tens of ms on a speaker, far more on Bluetooth)
-     * run into the next syllable.
-     */
-    private val segmentFile = LocalFile(cacheDir(appContext), SEGMENT_FILE_NAME)
-
-    /** Where in the teacher's file the loaded segment starts; null while the whole file is loaded. */
-    private var loadedClipStartMs: Long? = null
 
     init {
         load()
@@ -90,10 +76,9 @@ class TeacherPerformanceViewModel(
                 val peaks = withContext(ioDispatcher) {
                     WaveformPeaksExtractor.fromWavFile(file, barCount)
                 }
-                val (samples, rate) = withContext(ioDispatcher) { WavUtils.readPcm16Samples(file) }
                 lesson = remoteLesson
                 section = remoteSection
-                voice = Voice(file, samples, rate, speed = 1f).also { voices[1f] = it }
+                voice = Voice(file, speed = 1f).also { voices[1f] = it }
                 loadWholeFile()
                 _uiState.update {
                     it.copy(
@@ -144,10 +129,12 @@ class TeacherPerformanceViewModel(
             return
         }
         val state = _uiState.value
-        if (state.playingIndex != null && player.canResume) {
+        val segment = state.playingIndex?.let { state.ornaments.getOrNull(it) }
+        if (segment != null && player.canResume) {
             player.play()
             _uiState.update { it.copy(isPlaying = true) }
-            startProgressPolling()
+            // Still a segment: it must stop at its own vowel's end, not run into the next one.
+            watchSegment(segment)
             return
         }
         // After a segment ends, «play» continues the whole performance from there.
@@ -168,25 +155,41 @@ class TeacherPerformanceViewModel(
         if (!_uiState.value.isReady) return
         val ornament = _uiState.value.ornaments.getOrNull(index) ?: return
         val startMs = (fromMs ?: ornament.startMs).coerceIn(ornament.startMs, ornament.endMs)
-        stopProgressPolling()
-        // Released before the segment file is rewritten under it; marked as
-        // not holding the whole file, so playing the whole file reloads it.
-        player.stop()
-        loadedClipStartMs = ornament.startMs
+        // The whole voice is already in the player: the vowel starts the moment it is tapped,
+        // with nothing to cut or load first, and its end is kept by watching the playhead.
+        applySpeed()
+        player.setLooping(false)
+        player.playFrom((startMs / (voice?.speed ?: 1f)).toLong())
         _uiState.update {
             it.copy(selectedIndex = index, playingIndex = index, isPlaying = true, positionMs = startMs)
         }
-        playJob?.cancel()
-        playJob = viewModelScope.launch {
-            // A slower copy on its way would take over mid-vowel and start it again; a short
-            // tahrir is better heard once, from the clean copy, than stretched by the player first.
-            slowJob?.join()
-            withContext(ioDispatcher) { writeSegment(ornament.startMs, ornament.endMs) }
-            player.prepare(segmentFile, onFinished = ::onPlaybackFinished)
-            player.setLooping(_uiState.value.loopSegment)
-            applySpeed()
-            player.playFrom(((startMs - ornament.startMs) / (voice?.speed ?: 1f)).toLong())
-            startProgressPolling()
+        watchSegment(ornament)
+    }
+
+    /**
+     * Keeps a segment inside its own vowel: the playhead is read often enough to stop within a
+     * few milliseconds of its end, and to take it back to the start while the loop is on.
+     */
+    private fun watchSegment(ornament: TeacherOrnament) {
+        stopProgressPolling()
+        progressJob = viewModelScope.launch {
+            while (isActive) {
+                val position = playheadMs()
+                _uiState.update { it.copy(positionMs = position.coerceAtMost(ornament.endMs)) }
+                if (position >= ornament.endMs) {
+                    if (_uiState.value.loopSegment) {
+                        player.playFrom((ornament.startMs / (voice?.speed ?: 1f)).toLong())
+                    } else {
+                        player.pause()
+                        progressJob = null
+                        _uiState.update {
+                            it.copy(isPlaying = false, playingIndex = null, positionMs = ornament.endMs)
+                        }
+                        return@launch
+                    }
+                }
+                delay(SEGMENT_TICK_MS)
+            }
         }
     }
 
@@ -208,8 +211,7 @@ class TeacherPerformanceViewModel(
         val currentSection = section ?: return null
         return runCatching {
             val file = lessonRepository.sectionSlowAudioFile(appContext, currentLesson, currentSection, speed)
-            val (samples, rate) = withContext(ioDispatcher) { WavUtils.readPcm16Samples(file) }
-            Voice(file, samples, rate, speed).also { voices[speed] = it }
+            Voice(file, speed).also { voices[speed] = it }
         }.getOrNull()
     }
 
@@ -217,21 +219,13 @@ class TeacherPerformanceViewModel(
         val wasPlaying = player.isPlaying
         val positionMs = playheadMs()
         val segment = _uiState.value.playingIndex
-        // A segment waiting for this copy picks it up itself once it is here.
-        val segmentWaiting = segment != null && playJob?.isActive == true
         voice = next
+        loadWholeFile()
         when {
-            segmentWaiting -> Unit
             // Carries on from the same moment instead of going back to the vowel's start.
             segment != null && wasPlaying -> playSegment(segment, fromMs = positionMs)
-            wasPlaying -> {
-                loadWholeFile()
-                player.playFrom((positionMs / next.speed).toLong())
-            }
-            else -> {
-                loadWholeFile()
-                _uiState.update { it.copy(playingIndex = null) }
-            }
+            wasPlaying -> player.playFrom((positionMs / next.speed).toLong())
+            else -> _uiState.update { it.copy(playingIndex = null) }
         }
     }
 
@@ -241,7 +235,6 @@ class TeacherPerformanceViewModel(
 
     fun toggleLoop() {
         _uiState.update { it.copy(loopSegment = !it.loopSegment) }
-        if (_uiState.value.playingIndex != null) player.setLooping(_uiState.value.loopSegment)
     }
 
     fun zoomIn() {
@@ -265,8 +258,6 @@ class TeacherPerformanceViewModel(
     private fun playWholeFrom(positionMs: Long) {
         val totalMs = _uiState.value.durationMs.coerceAtLeast(1L)
         val startMs = positionMs.coerceIn(0L, totalMs)
-        playJob?.cancel()
-        if (loadedClipStartMs != null) loadWholeFile()
         applySpeed()
         player.playFrom((startMs / (voice?.speed ?: 1f)).toLong())
         _uiState.update {
@@ -279,29 +270,11 @@ class TeacherPerformanceViewModel(
         val file = voice?.file ?: return
         player.prepare(file, onFinished = ::onPlaybackFinished)
         applySpeed()
-        loadedClipStartMs = null
     }
 
     /** Where in the teacher's own time the player is; a slow copy runs longer than that. */
     private fun playheadMs(): Long =
-        (loadedClipStartMs ?: 0L) + (player.currentPositionMs() * (voice?.speed ?: 1f)).toLong()
-
-    /** The segment's own samples, with a few ms fade at each edge so the cut does not click. */
-    private fun writeSegment(startMs: Long, endMs: Long) {
-        val source = voice ?: return
-        val samplesPerMs = source.sampleRate / source.speed / 1000f
-        val from = (startMs * samplesPerMs).toInt().coerceIn(0, source.samples.size)
-        val to = (endMs * samplesPerMs).toInt().coerceIn(from, source.samples.size)
-        val clip = source.samples.copyOfRange(from, to)
-        val fade = minOf(clip.size / 4, source.sampleRate * EDGE_FADE_MS / 1000)
-        for (index in 0 until fade) {
-            val gain = index.toFloat() / fade
-            clip[index] = (clip[index] * gain).toInt().toShort()
-            val tail = clip.size - 1 - index
-            clip[tail] = (clip[tail] * gain).toInt().toShort()
-        }
-        WavUtils.writePcm16Wav(segmentFile, clip, source.sampleRate)
-    }
+        (player.currentPositionMs() * (voice?.speed ?: 1f)).toLong()
 
     private fun startProgressPolling() {
         progressJob?.cancel()
@@ -341,13 +314,13 @@ class TeacherPerformanceViewModel(
         private const val MS_PER_BAR = 10L
         private const val MAX_BARS = 12_000
         private const val PROGRESS_TICK_MS = 33L
-        private const val EDGE_FADE_MS = 4
-        private const val SEGMENT_FILE_NAME = "teacher_segment.wav"
+        /** A segment's end is a moment in the voice, so its playhead is read more often. */
+        private const val SEGMENT_TICK_MS = 8L
     }
 }
 
 /** The teacher's voice at [speed], which is 1 for their own file. */
-private class Voice(val file: LocalFile, val samples: ShortArray, val sampleRate: Int, val speed: Float)
+private class Voice(val file: LocalFile, val speed: Float)
 
 data class TeacherPerformanceUiState(
     val title: String = "",
