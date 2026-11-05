@@ -4,7 +4,9 @@ package app.melova.data.model
 data class Teacher(
     val id: String,
     val name: String,
-    val bio: String
+    val bio: String,
+    /** Null while the teacher has no photo; changes whenever it does. */
+    val photoVersion: Long? = null
 )
 
 /** Everything the student side shows: teachers with lessons, and those lessons. */
@@ -23,7 +25,8 @@ data class TeacherProfile(
     /** Where students pay for this teacher's lessons; empty until they set it. */
     val cardNumber: String,
     val cardHolder: String,
-    val lessons: List<Lesson>
+    val lessons: List<Lesson>,
+    val photoVersion: Long? = null
 )
 
 /** A card payment the student reported for a lesson, until the teacher confirms it. */
@@ -50,6 +53,7 @@ data class Lesson(
     val teacherId: String,
     /** The teacher's display name. */
     val teacher: String,
+    val teacherPhotoVersion: Long? = null,
     val title: String,
     val subtitle: String,
     val description: String,

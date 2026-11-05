@@ -14,7 +14,8 @@ data class CatalogResponseDto(
 data class TeacherDto(
     @SerialName("id") val id: String?,
     @SerialName("name") val name: String?,
-    @SerialName("bio") val bio: String?
+    @SerialName("bio") val bio: String?,
+    @SerialName("photo_version") val photoVersion: Long? = null
 )
 
 @Serializable
@@ -24,6 +25,7 @@ data class TeacherProfileDto(
     @SerialName("bio") val bio: String?,
     @SerialName("card_number") val cardNumber: String? = null,
     @SerialName("card_holder") val cardHolder: String? = null,
+    @SerialName("photo_version") val photoVersion: Long? = null,
     @SerialName("lessons") val lessons: List<LessonDto>?
 )
 
@@ -32,6 +34,7 @@ data class LessonDto(
     @SerialName("id") val id: String?,
     @SerialName("teacher_id") val teacherId: String?,
     @SerialName("teacher") val teacher: String?,
+    @SerialName("teacher_photo_version") val teacherPhotoVersion: Long? = null,
     @SerialName("title") val title: String?,
     @SerialName("subtitle") val subtitle: String?,
     @SerialName("description") val description: String?,
