@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -25,9 +24,6 @@ import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,7 +44,19 @@ import app.melova.data.model.TeacherOrnamentKind
 import app.melova.platform.persianDigits
 import app.melova.presentation.TeacherPerformanceUiState
 import app.melova.presentation.TeacherPerformanceViewModel
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import app.melova.ui.components.MelovaRowSkeleton
+import app.melova.ui.components.MelovaSegmentedControl
+import app.melova.ui.components.MelovaSkeleton
+import app.melova.ui.components.MelovaWaveSkeleton
+import app.melova.ui.theme.MelovaDimens
+import app.melova.ui.theme.MelovaOutline
+import app.melova.ui.theme.MelovaSmallShape
+import app.melova.ui.theme.MelovaTextMuted
 import app.melova.ui.components.MelovaBackground
+import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.LetterTag
 import app.melova.ui.components.MelovaMediaIconButton
 import app.melova.ui.components.OrnamentRow
@@ -61,11 +69,8 @@ import app.melova.ui.layout.LtrContent
 import app.melova.ui.layout.PagePadding
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.LocalMelovaPalette
-import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaAccentTint
-import app.melova.ui.theme.MelovaCard
-import app.melova.ui.theme.MelovaSecondary
 import app.melova.ui.theme.MelovaText
 import app.melova.platform.formatFixed
 import app.melova.platform.pad2
@@ -100,7 +105,7 @@ fun TeacherPerformanceScreen(
                 )
 
                 when {
-                    uiState.isLoading -> LoadingCard("در حال آماده‌سازی اجرای استاد…")
+                    uiState.isLoading -> LoadingSkeleton()
                     uiState.errorMessage != null -> MessageCard(
                         message = uiState.errorMessage.orEmpty(),
                         onRetry = viewModel::load
@@ -127,7 +132,9 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
                 onClick = viewModel::togglePlayback,
                 icon = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = if (uiState.isPlaying) "توقف موقت" else "پخش اجرای استاد",
-                containerColor = MelovaSecondary
+                containerColor = MelovaAccentTint,
+                contentColor = MelovaAccentSoft,
+                buttonSize = MelovaDimens.ButtonHeight
             )
             LtrContent {
                 Text(
@@ -219,19 +226,12 @@ private fun PlaybackControlsCard(uiState: TeacherPerformanceUiState, viewModel: 
             fontWeight = FontWeight.SemiBold,
             color = MelovaText
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            TeacherPerformanceViewModel.SPEEDS.forEach { speed ->
-                ChoicePill(
-                    text = formatSpeed(speed),
-                    selected = uiState.speed == speed,
-                    onClick = { viewModel.setSpeed(speed) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
+        val speeds = TeacherPerformanceViewModel.SPEEDS
+        MelovaSegmentedControl(
+            options = speeds.map(::formatSpeed),
+            selectedIndex = speeds.indexOfFirst { it == uiState.speed }.coerceAtLeast(0),
+            onSelect = { viewModel.setSpeed(speeds[it]) }
+        )
         ChoicePill(
             text = if (uiState.loopSegment) "تکرار بازه: روشن" else "تکرار بازه: خاموش",
             selected = uiState.loopSegment,
@@ -252,16 +252,14 @@ private fun OrnamentListCard(uiState: TeacherPerformanceUiState, viewModel: Teac
             color = MelovaText
         )
         when {
-            uiState.isOrnamentsLoading -> Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MelovaAccent, strokeWidth = 2.dp)
+            // The rows take their places while the analysis runs, so the wait has the page's own shape.
+            uiState.isOrnamentsLoading -> {
                 Text(
                     text = "در حال تحلیل اجرای استاد… (بار اول کمی طول می‌کشد)",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MelovaText.copy(alpha = 0.8f)
+                    color = MelovaTextMuted
                 )
+                repeat(3) { MelovaRowSkeleton(modifier = Modifier.padding(vertical = 6.dp)) }
             }
             uiState.ornamentsError != null -> {
                 Text(
@@ -308,59 +306,76 @@ private fun ChoicePill(
     modifier: Modifier = Modifier,
     leadingIcon: Boolean = false
 ) {
+    // A tint marks the choice and an outline marks the rest: a solid fill here shouted over the wave.
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) MelovaAccent else MelovaAccentTint)
+            .clip(MelovaSmallShape)
+            .background(if (selected) MelovaAccentTint else Color.Transparent)
+            .border(1.dp, MelovaOutline, MelovaSmallShape)
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp, horizontal = 8.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val content = if (selected) MelovaAccentSoft else MelovaTextMuted
         if (leadingIcon) {
             Icon(
                 imageVector = Icons.Default.Repeat,
                 contentDescription = null,
-                tint = if (selected) Color.White else MelovaAccentSoft,
+                tint = content,
                 modifier = Modifier.size(18.dp).padding(end = 4.dp)
             )
         }
         LtrContent {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) Color.White else MelovaAccentSoft
-            )
+            Text(text = text, style = MaterialTheme.typography.labelLarge, color = content)
         }
     }
 }
 
 @Composable
 private fun SectionCard(content: @Composable () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MelovaCard),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            content()
-        }
+    MelovaSurfaceCard {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
     }
 }
 
+/**
+ * The page while the teacher's audio is on its way: its own cards, with the wave, the speeds and
+ * the rows standing in their places, so nothing jumps when the real performance arrives.
+ */
 @Composable
-private fun LoadingCard(message: String) {
+private fun LoadingSkeleton() {
     SectionCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            MelovaSkeleton(Modifier.size(MelovaDimens.ButtonHeight))
+            MelovaSkeleton(Modifier.width(80.dp).height(14.dp))
+            Spacer(modifier = Modifier.weight(1f))
+            MelovaSkeleton(Modifier.size(MelovaDimens.CompactButtonHeight))
+            MelovaSkeleton(Modifier.size(MelovaDimens.CompactButtonHeight))
+        }
+        MelovaWaveSkeleton()
+        Text(
+            text = "در حال آماده‌سازی اجرای استاد…",
+            style = MaterialTheme.typography.bodySmall,
+            color = MelovaTextMuted
+        )
+    }
+    SectionCard {
+        MelovaSkeleton(Modifier.width(72.dp).height(14.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MelovaAccent, strokeWidth = 2.dp)
-            Text(text = message, style = MaterialTheme.typography.bodySmall, color = MelovaText)
+            repeat(4) { MelovaSkeleton(Modifier.weight(1f).height(MelovaDimens.CompactButtonHeight)) }
         }
+    }
+    SectionCard {
+        MelovaSkeleton(Modifier.width(160.dp).height(14.dp))
+        repeat(3) { MelovaRowSkeleton(modifier = Modifier.padding(vertical = 6.dp)) }
     }
 }
 
@@ -376,9 +391,9 @@ private fun MessageCard(message: String, onRetry: () -> Unit) {
 private fun RetryButton(onClick: () -> Unit) {
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+        modifier = Modifier.fillMaxWidth().height(MelovaDimens.ButtonHeight),
+        shape = MelovaSmallShape,
+        colors = ButtonDefaults.buttonColors(containerColor = MelovaAccentTint, contentColor = MelovaAccentSoft)
     ) {
         Text("تلاش دوباره")
     }
