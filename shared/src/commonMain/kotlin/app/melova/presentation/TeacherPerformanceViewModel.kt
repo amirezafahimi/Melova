@@ -161,25 +161,31 @@ class TeacherPerformanceViewModel(
         playWholeFrom(positionMs)
     }
 
-    /** Plays just this segment, from the start of its vowel to the end. */
-    fun playSegment(index: Int) {
+    /** Plays just this segment, from the start of its vowel (or [fromMs] in it) to the end. */
+    fun playSegment(index: Int) = playSegment(index, fromMs = null)
+
+    private fun playSegment(index: Int, fromMs: Long?) {
         if (!_uiState.value.isReady) return
         val ornament = _uiState.value.ornaments.getOrNull(index) ?: return
+        val startMs = (fromMs ?: ornament.startMs).coerceIn(ornament.startMs, ornament.endMs)
         stopProgressPolling()
         // Released before the segment file is rewritten under it; marked as
         // not holding the whole file, so playing the whole file reloads it.
         player.stop()
         loadedClipStartMs = ornament.startMs
         _uiState.update {
-            it.copy(selectedIndex = index, playingIndex = index, isPlaying = true, positionMs = ornament.startMs)
+            it.copy(selectedIndex = index, playingIndex = index, isPlaying = true, positionMs = startMs)
         }
         playJob?.cancel()
         playJob = viewModelScope.launch {
+            // A slower copy on its way would take over mid-vowel and start it again; a short
+            // tahrir is better heard once, from the clean copy, than stretched by the player first.
+            slowJob?.join()
             withContext(ioDispatcher) { writeSegment(ornament.startMs, ornament.endMs) }
             player.prepare(segmentFile, onFinished = ::onPlaybackFinished)
             player.setLooping(_uiState.value.loopSegment)
             applySpeed()
-            player.playFrom(0L)
+            player.playFrom(((startMs - ornament.startMs) / (voice?.speed ?: 1f)).toLong())
             startProgressPolling()
         }
     }
@@ -211,9 +217,13 @@ class TeacherPerformanceViewModel(
         val wasPlaying = player.isPlaying
         val positionMs = playheadMs()
         val segment = _uiState.value.playingIndex
+        // A segment waiting for this copy picks it up itself once it is here.
+        val segmentWaiting = segment != null && playJob?.isActive == true
         voice = next
         when {
-            segment != null && wasPlaying -> playSegment(segment)
+            segmentWaiting -> Unit
+            // Carries on from the same moment instead of going back to the vowel's start.
+            segment != null && wasPlaying -> playSegment(segment, fromMs = positionMs)
             wasPlaying -> {
                 loadWholeFile()
                 player.playFrom((positionMs / next.speed).toLong())

@@ -33,7 +33,9 @@ class VocalScorer {
         val referenceEndMs: Long? = null,
         /** The stretch of this mistake that plays slowly, in the student's and the teacher's voice. */
         val studentClip: PlaybackClip? = null,
-        val teacherClip: PlaybackClip? = null
+        val teacherClip: PlaybackClip? = null,
+        /** The word of the poem this mistake falls on, when the server knew it. */
+        val word: String? = null
     )
 
     enum class CorrectionDirection {

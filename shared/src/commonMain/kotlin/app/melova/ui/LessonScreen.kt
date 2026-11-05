@@ -1,5 +1,24 @@
 package app.melova.ui
 
+import app.melova.ui.components.ForwardArrow
+import app.melova.ui.theme.MelovaAccentTint
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.Canvas
+import app.melova.ui.components.CenteredLine
+import androidx.compose.material.icons.filled.Mic
+import app.melova.ui.components.TeacherAvatar
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.width
+import app.melova.ui.theme.MelovaPillShape
+import app.melova.ui.theme.MelovaSmallShape
+import app.melova.ui.theme.MelovaDimens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +39,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Forward10
@@ -66,6 +84,7 @@ import app.melova.presentation.LessonIntroUiState
 import app.melova.presentation.LessonIntroViewModel
 import app.melova.presentation.LoginGate
 import app.melova.ui.components.MelovaBackground
+import app.melova.ui.components.SeekLine
 import app.melova.ui.components.MelovaChip
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTopBar
@@ -120,7 +139,7 @@ fun LessonScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
                 contentPadding = PagePadding,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item { MelovaTopBar(title = lesson?.title ?: "درس", onBack = onBack) }
 
@@ -160,6 +179,18 @@ fun LessonScreen(
                         onSkip = introViewModel::skipBy
                     )
                 }
+                // Hidden while the page asks to add or buy the lesson, so it keeps one main action.
+                val offersAdd = locked || (lesson.isFree && lesson.isOwned != true && !isOwnTeacher)
+                val next = catalogState.nextSection(lesson).takeUnless { locked }
+                if (next != null && !offersAdd) {
+                    item {
+                        StartPracticeButton(
+                            number = lesson.sections.indexOf(next) + 1,
+                            isFirst = catalogState.practicedSections(lesson) == 0,
+                            onClick = { onSectionClick(next.id) }
+                        )
+                    }
+                }
                 item {
                     SectionHeader(
                         title = "بخش‌های تمرین",
@@ -172,6 +203,7 @@ fun LessonScreen(
                         section = section,
                         bestScore = catalogState.bestScore(lesson.id, section.id),
                         locked = locked,
+                        isNext = section.id == next?.id,
                         onClick = { onSectionClick(section.id) }
                     )
                 }
@@ -182,54 +214,83 @@ fun LessonScreen(
     }
 }
 
+/** Who teaches the lesson, its level and size on one line, then what it is about. */
 @Composable
 private fun LessonHero(lesson: Lesson, onTeacherClick: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (lesson.teacher.isNotBlank()) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(MelovaPillShape)
+                        .clickable(onClick = onTeacherClick)
+                        .padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TeacherAvatar(lesson.teacher, size = 28.dp, teacherId = lesson.teacherId, photoVersion = lesson.teacherPhotoVersion)
+                    Text(
+                        text = lesson.teacher,
+                        // Trimmed to the letters, so the name sits level with the avatar and arrow.
+                        style = MaterialTheme.typography.labelLarge.copy(lineHeightStyle = CenteredLine),
+                        color = MelovaAccentSoft,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    ForwardArrow(tint = MelovaAccentSoft)
+                }
+            }
             if (lesson.level.isNotBlank()) MelovaChip(text = lesson.level)
             MelovaChip(text = persianDigits("${lesson.sections.size} بخش"), color = MelovaAccentSoft)
         }
+        // The singer the lesson is about; the stored field is still called "subtitle".
         if (lesson.subtitle.isNotBlank()) {
-            Text(
-                text = lesson.subtitle,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MelovaText
-            )
-        }
-        if (lesson.teacher.isNotBlank()) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(onClick = onTeacherClick)
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    Icons.Outlined.Person,
-                    contentDescription = null,
-                    tint = MelovaAccentSoft,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(text = lesson.teacher, style = MaterialTheme.typography.labelLarge, color = MelovaAccentSoft)
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MelovaAccentSoft,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            MelovaChip(text = "خواننده: ${lesson.subtitle}", color = MelovaGold)
         }
         if (lesson.description.isNotBlank()) {
+            // Two lines until tapped, so the sections stay near the top.
             Text(
                 text = lesson.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MelovaTextMuted
+                style = MaterialTheme.typography.bodySmall,
+                color = MelovaTextMuted,
+                maxLines = if (expanded) Int.MAX_VALUE else 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable { expanded = !expanded }
             )
         }
     }
 }
 
+/** The one thing to do on this page: sing the next section. */
+@Composable
+private fun StartPracticeButton(number: Int, isFirst: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(MelovaDimens.PrimaryButtonHeight),
+        shape = MelovaSmallShape,
+        colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+    ) {
+        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(MelovaDimens.Icon))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            // The number only: section titles often start with «بخش» themselves.
+            text = (if (isFirst) "شروع تمرین" else "ادامه تمرین") + persianDigits(" • بخش $number"),
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/**
+ * The teacher's spoken introduction as one row like the others on the page: a play button, what it
+ * is, and once it plays the time and a thin seek line under it.
+ */
 @Composable
 private fun IntroPlayerCard(
     state: LessonIntroUiState,
@@ -239,114 +300,86 @@ private fun IntroPlayerCard(
     onSkip: (Long) -> Unit
 ) {
     val isUnavailable = state.status == IntroStatus.UNAVAILABLE
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(MelovaAccent, MelovaSecondary)
-                )
-            )
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Surface(
-                onClick = onToggle,
-                enabled = !isUnavailable && state.status != IntroStatus.LOADING,
-                shape = CircleShape,
-                color = if (isUnavailable) Color.White.copy(alpha = 0.12f) else Color.White,
-                modifier = Modifier.size(58.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    when {
-                        state.status == IntroStatus.LOADING -> CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MelovaAccent,
-                            strokeWidth = 2.5.dp
-                        )
-                        isUnavailable -> Icon(
-                            Icons.Outlined.RecordVoiceOver,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.6f)
-                        )
-                        else -> Icon(
-                            imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (state.isPlaying) "توقف آموزش" else "پخش آموزش",
-                            tint = LocalMelovaPalette.current.accent,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "آموزش کلی درس",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White
-                )
-                Text(
-                    text = when (state.status) {
-                        IntroStatus.UNAVAILABLE -> "آموزش صوتی این درس به‌زودی اضافه می‌شود."
-                        IntroStatus.LOADING -> "در حال آماده‌سازی صدا…"
-                        IntroStatus.ERROR -> state.errorMessage ?: "پخش ممکن نشد؛ دوباره بزنید."
-                        else -> if (teacher.isNotBlank()) {
-                            "$teacher کل درس را توضیح می‌دهد؛ قبل از تمرین گوش دهید."
-                        } else {
-                            "قبل از تمرین بخش‌ها، توضیح کامل درس را گوش دهید."
-                        }
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.78f)
-                )
-            }
-        }
-
-        if (state.status == IntroStatus.READY) {
-            var dragFraction by remember { mutableStateOf<Float?>(null) }
-            LtrContent {
-                Slider(
-                    value = dragFraction ?: state.progress,
-                    onValueChange = { dragFraction = it },
-                    onValueChangeFinished = {
-                        dragFraction?.let(onSeek)
-                        dragFraction = null
-                    },
-                    colors = SliderDefaults.colors(
-                        thumbColor = Color.White,
-                        activeTrackColor = Color.White,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.25f)
-                    )
-                )
-            }
-            LtrContent {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+    val isReady = state.status == IntroStatus.READY
+    MelovaSurfaceCard(contentPadding = 12.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    onClick = onToggle,
+                    enabled = !isUnavailable && state.status != IntroStatus.LOADING,
+                    shape = CircleShape,
+                    color = if (isUnavailable) MelovaAccentTint else MelovaAccent,
+                    modifier = Modifier.size(MelovaDimens.ListLead)
                 ) {
-                    Text(
-                        text = formatClock(state.positionMs),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { onSkip(-10_000L) }) {
-                        Icon(Icons.Default.Replay10, contentDescription = "۱۰ ثانیه عقب", tint = Color.White)
+                    Box(contentAlignment = Alignment.Center) {
+                        when {
+                            state.status == IntroStatus.LOADING -> CircularProgressIndicator(
+                                modifier = Modifier.size(MelovaDimens.IconSmall),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            isUnavailable -> Icon(
+                                Icons.Outlined.RecordVoiceOver,
+                                contentDescription = null,
+                                tint = MelovaAccentSoft,
+                                modifier = Modifier.size(MelovaDimens.Icon)
+                            )
+                            else -> Icon(
+                                imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (state.isPlaying) "توقف آموزش" else "پخش آموزش",
+                                tint = Color.White,
+                                modifier = Modifier.size(MelovaDimens.IconLarge)
+                            )
+                        }
                     }
-                    IconButton(onClick = { onSkip(10_000L) }) {
-                        Icon(Icons.Default.Forward10, contentDescription = "۱۰ ثانیه جلو", tint = Color.White)
-                    }
-                    Spacer(Modifier.weight(1f))
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(text = "آموزش کلی درس", style = MaterialTheme.typography.titleSmall, color = MelovaText)
                     Text(
-                        text = formatClock(state.durationMs),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.8f)
+                        text = when (state.status) {
+                            IntroStatus.UNAVAILABLE -> "به‌زودی اضافه می‌شود"
+                            IntroStatus.LOADING -> "در حال آماده‌سازی صدا…"
+                            IntroStatus.ERROR -> state.errorMessage ?: "پخش ممکن نشد؛ دوباره بزنید."
+                            else -> if (state.positionMs > 0 || state.isPlaying) {
+                                formatClock(state.positionMs) + " از " + formatClock(state.durationMs)
+                            } else if (teacher.isNotBlank()) {
+                                "توضیح $teacher، پیش از تمرین"
+                            } else {
+                                "توضیح درس، پیش از تمرین"
+                            }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MelovaTextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+                if (isReady) {
+                    // Audio time runs left to right, even on a right-to-left page.
+                    LtrContent {
+                        Row {
+                            IconButton(onClick = { onSkip(-10_000L) }, modifier = Modifier.size(MelovaDimens.CompactButtonHeight)) {
+                                Icon(
+                                    Icons.Default.Replay10,
+                                    contentDescription = "۱۰ ثانیه عقب",
+                                    tint = MelovaTextMuted,
+                                    modifier = Modifier.size(MelovaDimens.Icon)
+                                )
+                            }
+                            IconButton(onClick = { onSkip(10_000L) }, modifier = Modifier.size(MelovaDimens.CompactButtonHeight)) {
+                                Icon(
+                                    Icons.Default.Forward10,
+                                    contentDescription = "۱۰ ثانیه جلو",
+                                    tint = MelovaTextMuted,
+                                    modifier = Modifier.size(MelovaDimens.Icon)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            if (isReady) {
+                LtrContent { SeekLine(progress = state.progress, onSeek = onSeek) }
             }
         }
     }
@@ -358,24 +391,27 @@ private fun SectionCard(
     section: LessonSection,
     bestScore: Int?,
     locked: Boolean,
+    isNext: Boolean,
     onClick: () -> Unit
 ) {
     val enabled = section.isAvailable && !locked
     MelovaSurfaceCard(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.alpha(if (enabled) 1f else 0.55f)
+        highlighted = isNext,
+        modifier = Modifier.alpha(if (enabled) 1f else 0.55f),
+        contentPadding = 12.dp
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (bestScore != null) {
-                ScoreBadge(score = bestScore)
+                ScoreBadge(score = bestScore, size = 40.dp)
             } else {
                 Box(
                     modifier = Modifier
-                        .size(46.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
                         .background(MelovaCardElevated),
                     contentAlignment = Alignment.Center
@@ -396,33 +432,17 @@ private fun SectionCard(
                     }
                 }
             }
+            // Two lines: the badge already says practiced, scored or locked, so no status chip below.
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = section.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MelovaText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (section.description.isNotBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = section.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MelovaTextMuted,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        text = section.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MelovaText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    when {
-                        !section.isAvailable -> MelovaChip(text = "به‌زودی", color = MelovaTextMuted)
-                        bestScore != null -> MelovaChip(text = "بهترین نمره", color = MelovaGold)
-                        else -> MelovaChip(text = "تمرین نشده", color = MelovaAccentSoft)
-                    }
                     if (section.durationMs > 0L) {
                         Text(
                             text = persianDigits("${(section.durationMs + 999) / 1000} ثانیه"),
@@ -431,13 +451,28 @@ private fun SectionCard(
                         )
                     }
                 }
-            }
-            if (section.isAvailable) {
-                Icon(
-                    imageVector = if (bestScore != null) Icons.Default.Check else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MelovaTextMuted
+                val line = when {
+                    !section.isAvailable -> "به‌زودی"
+                    section.description.isNotBlank() -> section.description
+                    bestScore != null -> "بهترین نمره‌ی شما"
+                    else -> "هنوز تمرین نشده"
+                }
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MelovaTextMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+            }
+            if (isNext) {
+                MelovaChip(text = "بعدی", color = MelovaAccentSoft)
+            } else if (section.isAvailable) {
+                if (bestScore != null) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = MelovaTextMuted)
+                } else {
+                    ForwardArrow(tint = MelovaTextMuted)
+                }
             }
         }
     }
@@ -448,9 +483,9 @@ private fun PracticeTipCard() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(MelovaSmallShape)
             .background(MelovaGold.copy(alpha = 0.10f))
-            .padding(14.dp),
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {

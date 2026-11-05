@@ -7,6 +7,7 @@ import app.melova.data.local.FollowStore
 import app.melova.data.local.PracticeProgressStore
 import app.melova.data.model.Catalog
 import app.melova.data.model.Lesson
+import app.melova.data.model.LessonSection
 import app.melova.data.model.Teacher
 import app.melova.data.repository.LessonRepository
 import app.melova.data.repository.RemoteLessonRepository
@@ -175,6 +176,14 @@ data class CatalogUiState(
             playable.firstOrNull { it.id == lastLessonId && !isDone(it) }?.let { return it }
             return playable.firstOrNull { !isDone(it) }
         }
+
+    /** The section to sing next in [lesson]: the first ready one not yet practiced; null once all are. */
+    fun nextSection(lesson: Lesson): LessonSection? =
+        lesson.sections.firstOrNull { it.isAvailable && bestScore(lesson.id, it.id) == null }
+
+    /** The ready section after [sectionId] in [lesson], for going on straight from a practice. */
+    fun sectionAfter(lesson: Lesson, sectionId: String): LessonSection? =
+        lesson.sections.dropWhile { it.id != sectionId }.drop(1).firstOrNull { it.isAvailable }
 
     /** Every word of [query] has to appear, in any order, so «مرداب گوگوش» finds either way round. */
     fun searchLessons(query: String): List<Lesson> = exploreLessons.filter { lesson ->

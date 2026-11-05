@@ -1135,10 +1135,18 @@ class VocalTrainingViewModel(
         val startedAt = currentTimeMillis()
         progressJob?.cancel()
         progressJob = viewModelScope.launch {
+            _uiState.update { it.copy(liveLevels = emptyList(), recordingElapsedMs = 0L) }
             while (isActive && _uiState.value.mode == VocalTrainingMode.RECORDING) {
                 val elapsed = currentTimeMillis() - startedAt
                 val progress = (elapsed.toFloat() / maxRecordingMs).coerceIn(0f, 1f)
-                _uiState.update { it.copy(progress = progress) }
+                val level = recorder.level()
+                _uiState.update {
+                    it.copy(
+                        progress = progress,
+                        recordingElapsedMs = elapsed,
+                        liveLevels = (it.liveLevels + level).takeLast(LIVE_LEVEL_COUNT)
+                    )
+                }
                 delay(50)
             }
         }
@@ -1169,6 +1177,8 @@ class VocalTrainingViewModel(
         /** How often the speed updates, so that its ramp sounds smooth. */
         private const val SPEED_TICK_MS = 20L
         private const val DETAIL_CONTEXT_MS = 1_000L
+        /** The live wave while recording: the last few seconds, one bar per poll. */
+        const val LIVE_LEVEL_COUNT = 60
     }
 }
 
@@ -1191,6 +1201,9 @@ data class VocalTrainingUiState(
     val lessonLoadFailed: Boolean = false,
     val mode: VocalTrainingMode = VocalTrainingMode.IDLE,
     val progress: Float = 0f,
+    /** While recording: the microphone's latest levels, oldest first, and the time so far. */
+    val liveLevels: List<Float> = emptyList(),
+    val recordingElapsedMs: Long = 0L,
     val isPlaying: Boolean = false,
     val playbackTarget: PlaybackTarget = PlaybackTarget.NONE,
     val userRecordingDurationSeconds: Int = 0,

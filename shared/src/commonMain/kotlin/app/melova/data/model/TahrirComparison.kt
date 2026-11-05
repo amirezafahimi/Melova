@@ -14,7 +14,9 @@ data class TahrirComparison(
     val vowelCount: Int,
     val message: String,
     val studentClip: PlaybackClip? = null,
-    val teacherClip: PlaybackClip? = null
+    val teacherClip: PlaybackClip? = null,
+    /** The word of the poem this falls on, when the server knew it. */
+    val word: String? = null
 ) {
     /** A stable id, to tell which row is playing. */
     val key: Long get() = refStartMs

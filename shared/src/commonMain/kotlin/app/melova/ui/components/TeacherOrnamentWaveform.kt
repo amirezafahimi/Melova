@@ -24,6 +24,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -72,10 +73,15 @@ fun TeacherOrnamentWaveform(
     val textMeasurer = rememberTextMeasurer()
     val totalMs = durationMs.coerceAtLeast(1L)
     val badgeStyle = remember(palette) {
-        TextStyle(color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        // On the pill: the dark theme's ornament colours are light, the light theme's are deep.
+        TextStyle(
+            color = if (palette.isDark) palette.backgroundStart else Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
     val rulerStyle = remember(palette) {
-        TextStyle(color = palette.text.copy(alpha = 0.5f), fontSize = 9.sp)
+        TextStyle(color = palette.text.copy(alpha = 0.55f), fontSize = 10.sp)
     }
     val levels = remember(peaks) { peakLevels(peaks) }
     val view = remember { WaveView(zoom.coerceAtLeast(1f)) }
@@ -209,7 +215,7 @@ fun TeacherOrnamentWaveform(
     ) {
         val width = size.width
         val height = size.height
-        val badgeArea = 16.dp.toPx()
+        val badgeArea = 20.dp.toPx()
         val rulerArea = 16.dp.toPx()
         val waveTop = badgeArea
         val waveHeight = height - badgeArea - rulerArea
@@ -232,36 +238,37 @@ fun TeacherOrnamentWaveform(
                 if (endX < 0f || startX > width) return@forEachIndexed
                 val color = ornamentColor(ornament.kind, palette)
                 val selected = index == selectedIndex
-                drawRect(
-                    color = color.copy(alpha = if (selected) 0.30f else 0.14f),
+                val bandWidth = (endX - startX).coerceAtLeast(2.dp.toPx())
+                // A soft rounded band; the bars inside already carry the colour, so no hard edges.
+                drawRoundRect(
+                    color = color.copy(alpha = if (selected) 0.22f else 0.09f),
                     topLeft = Offset(startX, waveTop),
-                    size = Size((endX - startX).coerceAtLeast(1f), waveHeight)
+                    size = Size(bandWidth, waveHeight),
+                    cornerRadius = CornerRadius(6.dp.toPx())
                 )
-                val edgeWidth = if (selected) 2.dp.toPx() else 1.dp.toPx()
-                drawLine(
-                    color = color.copy(alpha = 0.9f),
-                    start = Offset(endX, waveTop),
-                    end = Offset(endX, waveTop + waveHeight),
-                    strokeWidth = edgeWidth
-                )
-
-                drawLine(
-                    color = color.copy(alpha = 0.9f),
-                    start = Offset(startX, waveTop),
-                    end = Offset(startX, waveTop + waveHeight),
-                    strokeWidth = edgeWidth
+                drawRoundRect(
+                    color = color.copy(alpha = if (selected) 1f else 0.7f),
+                    topLeft = Offset(startX, waveTop),
+                    size = Size(bandWidth, 3.dp.toPx()),
+                    cornerRadius = CornerRadius(1.5.dp.toPx())
                 )
 
-                // Just the letter, in the ornament's colour, over the band.
-                val label = textMeasurer.measure(
-                    ornament.kind.letter,
-                    badgeStyle.copy(color = if (selected) color else color.copy(alpha = 0.8f))
+                // The letter in a small pill of the ornament's colour, over the band.
+                val label = textMeasurer.measure(ornament.kind.letter, badgeStyle)
+                val pillWidth = label.size.width + 10.dp.toPx()
+                val pillHeight = label.size.height.toFloat()
+                val pillLeft = ((startX + endX) / 2f - pillWidth / 2f)
+                    .coerceIn(0f, (width - pillWidth).coerceAtLeast(0f))
+                val pillTop = ((badgeArea - pillHeight) / 2f - 1.dp.toPx()).coerceAtLeast(0f)
+                drawRoundRect(
+                    color = color.copy(alpha = if (selected) 1f else 0.85f),
+                    topLeft = Offset(pillLeft, pillTop),
+                    size = Size(pillWidth, pillHeight),
+                    cornerRadius = CornerRadius(pillHeight / 2f)
                 )
-                val labelLeft = ((startX + endX) / 2f - label.size.width / 2f)
-                    .coerceIn(0f, (width - label.size.width).coerceAtLeast(0f))
                 drawText(
                     textLayoutResult = label,
-                    topLeft = Offset(labelLeft, (badgeArea - label.size.height) / 2f)
+                    topLeft = Offset(pillLeft + 5.dp.toPx(), pillTop)
                 )
             }
 
@@ -269,7 +276,8 @@ fun TeacherOrnamentWaveform(
                 // Bars keep their place on the wave while the zoom changes, so nothing shimmers.
                 val bars = levels.firstOrNull { waveWidth / it.size >= MIN_BAR_DP.dp.toPx() } ?: levels.last()
                 val barWidth = waveWidth / bars.size
-                val stroke = (barWidth * 0.7f).coerceAtLeast(1f)
+                val stroke = (barWidth * 0.62f).coerceAtLeast(1f)
+                val playedPoint = playheadMs.toFloat() / totalMs
                 val first = floor(left * bars.size).toInt().coerceAtLeast(0)
                 val last = ceil((left + 1f / view.zoom) * bars.size).toInt().coerceAtMost(bars.size)
                 var segment = 0
@@ -280,12 +288,17 @@ fun TeacherOrnamentWaveform(
                     val inside = ornaments.getOrNull(segment)?.takeIf { barMs >= it.startMs }
                     val barHeight = (bars[index].coerceIn(0f, 1f) * waveHeight * 0.92f).coerceAtLeast(1.5f)
                     val x = xOf(point)
+                    val played = playheadMs > 0L && point <= playedPoint
                     drawLine(
-                        color = inside?.let { ornamentColor(it.kind, palette) }
-                            ?: palette.text.copy(alpha = 0.32f),
+                        color = when {
+                            inside != null -> ornamentColor(inside.kind, palette).copy(alpha = if (played) 1f else 0.8f)
+                            played -> palette.accent
+                            else -> palette.text.copy(alpha = 0.26f)
+                        },
                         start = Offset(x, centerY - barHeight / 2f),
                         end = Offset(x, centerY + barHeight / 2f),
-                        strokeWidth = stroke
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round
                     )
                 }
             }
@@ -318,11 +331,13 @@ fun TeacherOrnamentWaveform(
 
             val playheadX = xOf(playheadMs.coerceIn(0L, totalMs))
             drawLine(
-                color = palette.warning,
-                start = Offset(playheadX, waveTop - 2.dp.toPx()),
+                color = palette.text.copy(alpha = 0.9f),
+                start = Offset(playheadX, waveTop),
                 end = Offset(playheadX, waveTop + waveHeight),
-                strokeWidth = 2.dp.toPx()
+                strokeWidth = 2.dp.toPx(),
+                cap = StrokeCap.Round
             )
+            drawCircle(color = palette.text, radius = 3.5.dp.toPx(), center = Offset(playheadX, waveTop))
         }
     }
 }
@@ -376,5 +391,5 @@ private const val MIN_BAR_DP = 2
 fun ornamentColor(kind: TeacherOrnamentKind, palette: MelovaPalette): Color = when (kind) {
     TeacherOrnamentKind.TAHRIR -> palette.gold
     TeacherOrnamentKind.VIBRATO -> palette.info
-    TeacherOrnamentKind.GLIDE -> palette.secondary
+    TeacherOrnamentKind.GLIDE -> palette.teal
 }

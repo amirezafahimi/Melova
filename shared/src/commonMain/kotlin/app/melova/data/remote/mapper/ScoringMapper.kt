@@ -95,7 +95,8 @@ fun PitchCorrectionDto.toDomain(): VocalScorer.PitchCorrection =
         referenceStartMs = referenceStartMs,
         referenceEndMs = referenceEndMs,
         studentClip = studentClip?.toDomain(),
-        teacherClip = teacherClip?.toDomain()
+        teacherClip = teacherClip?.toDomain(),
+        word = word
     )
 
 fun OrnamentCorrectionDto.toDomain(): VocalScorer.PitchCorrection =
@@ -125,7 +126,8 @@ fun TahrirComparisonDto.toDomain(): TahrirComparison =
         vowelCount = vowelCount,
         message = persianDigits(message),
         studentClip = studentClip?.toDomain(),
-        teacherClip = teacherClip?.toDomain()
+        teacherClip = teacherClip?.toDomain(),
+        word = word
     )
 
 fun PlaybackClipDto.toDomain(): PlaybackClip? =

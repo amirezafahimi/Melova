@@ -1,12 +1,13 @@
 package app.melova.ui
 
+import androidx.compose.material3.LocalContentColor
+import app.melova.ui.components.ForwardArrow
 import app.melova.platform.persianDigits
 import app.melova.platform.rememberMicPermission
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +31,6 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Hearing
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -95,6 +95,27 @@ import app.melova.ui.theme.MelovaTextMuted
 import app.melova.ui.theme.MelovaText
 import app.melova.platform.pad2
 import kotlinx.coroutines.launch
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import app.melova.ui.theme.MelovaDimens
+import app.melova.ui.theme.MelovaSmallShape
+import app.melova.ui.theme.MelovaPillShape
+import app.melova.ui.theme.MelovaError
+import kotlin.math.sqrt
 
 @Composable
 fun VocalTrainingScreen(
@@ -104,6 +125,9 @@ fun VocalTrainingScreen(
     loginGate: LoginGate = LoginGate.OPEN,
     onLogin: () -> Unit = {},
     onOpenChat: (chatId: String) -> Unit = {},
+    /** The lesson's next ready section, offered once a take is scored; null on the last one. */
+    nextSectionTitle: String? = null,
+    onNextSection: (() -> Unit)? = null,
     viewModel: VocalTrainingViewModel = viewModel { VocalTrainingViewModel(createSavedStateHandle()) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -126,7 +150,7 @@ fun VocalTrainingScreen(
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .verticalScroll(scrollState)
                     .padding(PagePadding),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 RtlContent {
                     MelovaTopBar(
@@ -202,6 +226,8 @@ fun VocalTrainingScreen(
                                 onShowCorrectionDetail = viewModel::showCorrectionDetail,
                                 onShowTahrirDetail = viewModel::showTahrirDetail,
                                 onRetryRecording = viewModel::retryRecording,
+                                nextSectionTitle = nextSectionTitle,
+                                onNextSection = onNextSection,
                                 onDismiss = {
                                     viewModel.dismissResults()
                                     scope.launch { scrollState.animateScrollTo(0) }
@@ -243,57 +269,39 @@ private fun LessonCard(uiState: VocalTrainingUiState, onRetry: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MelovaCard),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Person,
-                    contentDescription = null,
-                    tint = MelovaSecondary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = uiState.teacherName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MelovaSecondary,
-                    textAlign = TextAlign.Start
-                )
-                if (uiState.durationSeconds > 0) {
+            // The teacher's name and length sit on the sample card below, so they aren't repeated here.
+            if (uiState.lessonDescription.isNotBlank() || uiState.bestScore != null) {
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
-                        text = persianDigits("• ${uiState.durationSeconds} ثانیه"),
+                        text = uiState.lessonDescription,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MelovaText.copy(alpha = 0.6f),
-                        textAlign = TextAlign.Start
+                        color = MelovaText.copy(alpha = 0.85f),
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier.weight(1f)
                     )
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                uiState.bestScore?.let { best ->
-                    MelovaChip(text = persianDigits("بهترین نمره: $best"), color = MelovaGold)
+                    uiState.bestScore?.let { best ->
+                        MelovaChip(text = persianDigits("بهترین نمره: $best"), color = MelovaGold)
+                    }
                 }
             }
-
-            Text(
-                text = uiState.lessonDescription,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MelovaText.copy(alpha = 0.85f),
-                textAlign = TextAlign.Start
-            )
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MelovaSecondary.copy(alpha = 0.15f))
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .clip(MelovaSmallShape)
+                    .background(MelovaSecondary.copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (uiState.isLessonLoading) {
                     CircularProgressIndicator(
@@ -315,7 +323,7 @@ private fun LessonCard(uiState: VocalTrainingUiState, onRetry: () -> Unit) {
                 Button(
                     onClick = onRetry,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
                 ) {
                     Text("تلاش دوباره")
@@ -352,10 +360,10 @@ private fun TeacherReferenceSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MelovaCard),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
@@ -366,7 +374,7 @@ private fun TeacherReferenceSection(
                     imageVector = Icons.Outlined.Hearing,
                     contentDescription = null,
                     tint = MelovaSecondary,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -377,12 +385,7 @@ private fun TeacherReferenceSection(
                         textAlign = TextAlign.Start
                     )
                     Text(
-                        text = buildString {
-                            append(teacherName)
-                            append(" • ")
-                            append(durationSeconds.coerceAtLeast(1))
-                            append(" ثانیه")
-                        },
+                        text = "$teacherName • " + persianDigits("${durationSeconds.coerceAtLeast(1)} ثانیه"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MelovaText.copy(alpha = 0.65f),
                         textAlign = TextAlign.Start
@@ -398,7 +401,7 @@ private fun TeacherReferenceSection(
                         }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isPlaybackActive) {
                         MelovaMediaIconButton(
                             onClick = onStopPlayback,
@@ -419,28 +422,6 @@ private fun TeacherReferenceSection(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                LtrContent {
-                    Text(
-                        text = formatPlaybackClock(totalMs),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MelovaSecondary
-                    )
-                }
-                LtrContent {
-                    Text(
-                        text = formatPlaybackClock(currentMs),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MelovaText.copy(alpha = 0.55f)
-                    )
-                }
-            }
-
             if (waveformPeaks.isNotEmpty()) {
                 StudentRecordingWaveform(
                     peaks = waveformPeaks,
@@ -451,31 +432,43 @@ private fun TeacherReferenceSection(
                     onSeekToMs = { if (enabled) onPlayAtMs(it) },
                     onCorrectionClick = {}
                 )
-                Text(
-                    text = "روی موج بزنید تا از همان لحظه پخش شود",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MelovaText.copy(alpha = 0.45f),
-                    textAlign = TextAlign.Start
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "روی موج بزنید تا از همان لحظه پخش شود",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MelovaText.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PlaybackClock(currentMs = currentMs, totalMs = totalMs)
+                }
             }
 
-            OutlinedButton(
+            Button(
                 onClick = onOpenDetails,
                 enabled = enabled,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MelovaSecondary.copy(alpha = 0.6f))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(MelovaDimens.CompactButtonHeight),
+                shape = MelovaSmallShape,
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MelovaSecondary.copy(alpha = 0.14f),
+                    contentColor = MelovaSecondary
+                )
             ) {
                 Icon(
                     imageVector = Icons.Outlined.GraphicEq,
                     contentDescription = null,
-                    tint = MelovaSecondary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(MelovaDimens.IconSmall)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "جزئیات اجرای استاد (تحریر و ویبراتو)",
-                    color = MelovaSecondary
+                    style = MaterialTheme.typography.labelLarge
                 )
             }
         }
@@ -504,11 +497,11 @@ private fun StudentRecordingPanel(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MelovaCard),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             when {
                 isRecording -> {
@@ -516,12 +509,7 @@ private fun StudentRecordingPanel(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = null,
-                            tint = MelovaAccent,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        RecordingDot()
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "در حال ضبط",
@@ -537,28 +525,33 @@ private fun StudentRecordingPanel(
                                 textAlign = TextAlign.Start
                             )
                         }
+                        LtrContent {
+                            Text(
+                                text = formatPlaybackClock(uiState.recordingElapsedMs),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MelovaAccentSoft
+                            )
+                        }
                     }
+                    LiveLevelWave(levels = uiState.liveLevels)
                     MelovaProgressBar(
                         progress = uiState.progress,
                         modifier = Modifier.fillMaxWidth(),
-                        color = MelovaAccent,
-                        trackColor = MelovaText.copy(alpha = 0.15f)
+                        color = MelovaAccent.copy(alpha = 0.7f),
+                        trackColor = MelovaText.copy(alpha = 0.10f)
                     )
-                    OutlinedButton(
+                    Button(
                         onClick = onStopRecording,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.5.dp, MelovaAccentSoft.copy(alpha = 0.75f)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = MelovaAccent.copy(alpha = 0.10f),
-                            contentColor = MelovaAccentSoft
-                        )
+                            .height(MelovaDimens.PrimaryButtonHeight),
+                        shape = MelovaSmallShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
                     ) {
                         Icon(Icons.Default.Stop, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("پایان ضبط")
+                        Text("پایان ضبط", style = MaterialTheme.typography.titleSmall)
                     }
                 }
 
@@ -614,39 +607,38 @@ private fun StudentRecordingPanel(
                         onPlayCorrectionFromMarker = onPlayCorrectionFromMarker
                     )
                     if (isReviewing) {
-                        Button(
-                            onClick = onSubmitRecording,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(46.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+                        // Send and retry side by side: one glance, no scrolling for the second choice.
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("ارسال برای تحلیل")
-                        }
-                        OutlinedButton(
-                            onClick = onRetryRecording,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Icon(Icons.Default.Mic, contentDescription = null, tint = MelovaAccentSoft)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("ضبط دوباره", color = MelovaText)
-                        }
-                    } else if (!uiState.isSharedTake) {
-                        Button(
-                            onClick = onRetryRecording,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
-                        ) {
-                            Icon(Icons.Default.Mic, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("ضبط مجدد")
+                            Button(
+                                onClick = onSubmitRecording,
+                                modifier = Modifier
+                                    .weight(1.4f)
+                                    .height(MelovaDimens.PrimaryButtonHeight),
+                                shape = MelovaSmallShape,
+                                colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+                            ) {
+                                Text("ارسال برای تحلیل", style = MaterialTheme.typography.titleSmall)
+                            }
+                            OutlinedButton(
+                                onClick = onRetryRecording,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(MelovaDimens.PrimaryButtonHeight),
+                                shape = MelovaSmallShape,
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Mic,
+                                    contentDescription = null,
+                                    tint = MelovaAccentSoft,
+                                    modifier = Modifier.size(MelovaDimens.Icon)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("ضبط دوباره", color = MelovaText)
+                            }
                         }
                     }
                 }
@@ -654,7 +646,7 @@ private fun StudentRecordingPanel(
                 uiState.isSharedTake -> {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
@@ -679,7 +671,7 @@ private fun StudentRecordingPanel(
                             imageVector = Icons.Outlined.GraphicEq,
                             contentDescription = null,
                             tint = MelovaAccentSoft,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -701,13 +693,13 @@ private fun StudentRecordingPanel(
                         onClick = onRecord,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(46.dp),
-                        shape = RoundedCornerShape(16.dp),
+                            .height(MelovaDimens.PrimaryButtonHeight),
+                        shape = MelovaSmallShape,
                         colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
                     ) {
                         Icon(Icons.Default.Mic, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("شروع ضبط")
+                        Text("شروع ضبط", style = MaterialTheme.typography.titleSmall)
                     }
                 }
             }
@@ -715,24 +707,36 @@ private fun StudentRecordingPanel(
     }
 }
 
+private val PracticeSteps = listOf(
+    "نمونه استاد را با هدفون گوش دهید.",
+    "ضبط را بزنید و همان ملودی را بخوانید؛ اکتاو بالاتر یا پایین‌تر هم قبول است و لازم نیست سرعتتان دقیقاً مثل استاد باشد.",
+    "اجرایتان را گوش دهید و برای تحلیل بفرستید.",
+    "روی هر خطا بزنید تا اجرای خودتان و استاد را مقایسه کنید."
+)
+
+/** One line until opened, so the steps don't push the practice down the page. */
 @Composable
 private fun HeadphoneHintBanner() {
-    Row(
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MelovaSmallShape)
             .background(MelovaCardElevated)
+            .clickable { expanded = !expanded }
             .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Headphones,
-            contentDescription = null,
-            tint = MelovaGold,
-            modifier = Modifier.size(22.dp)
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Headphones,
+                contentDescription = null,
+                tint = MelovaGold,
+                modifier = Modifier.size(MelovaDimens.Icon)
+            )
             Text(
                 text = "نحوه تمرین",
                 style = MaterialTheme.typography.titleSmall,
@@ -741,12 +745,99 @@ private fun HeadphoneHintBanner() {
                 textAlign = TextAlign.Start
             )
             Text(
-                text = "۱) نمونه استاد را با هدفون گوش دهید.  ۲) ضبط را بزنید و همان ملودی را بخوانید؛ " +
-                    "اکتاو بالاتر یا پایین‌تر هم قبول است و لازم نیست سرعتتان دقیقاً مثل استاد باشد.  " +
-                    "۳) اجرایتان را گوش دهید و برای تحلیل بفرستید.  ۴) روی هر خطا بزنید تا اجرای خودتان و استاد را مقایسه کنید.",
+                text = "گوش دهید، بخوانید، بفرستید",
                 style = MaterialTheme.typography.bodySmall,
-                color = MelovaText.copy(alpha = 0.8f),
-                textAlign = TextAlign.Start
+                color = MelovaText.copy(alpha = 0.6f),
+                textAlign = TextAlign.Start,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) "بستن راهنما" else "باز کردن راهنما",
+                tint = MelovaText.copy(alpha = 0.6f),
+                modifier = Modifier.size(MelovaDimens.Icon)
+            )
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                PracticeSteps.forEachIndexed { index, step ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(MelovaPillShape)
+                                .background(MelovaGold.copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = persianDigits("${index + 1}"),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MelovaGold
+                            )
+                        }
+                        Text(
+                            text = step,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MelovaText.copy(alpha = 0.85f),
+                            textAlign = TextAlign.Start,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A soft pulsing red dot, the universal "this is recording" sign. */
+@Composable
+private fun RecordingDot() {
+    val pulse = rememberInfiniteTransition()
+    val alpha by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse)
+    )
+    Box(
+        modifier = Modifier
+            .size(12.dp)
+            .clip(MelovaPillShape)
+            .background(MelovaError.copy(alpha = alpha))
+    )
+}
+
+/**
+ * The microphone as it hears you: one rounded bar per poll, newest on the right,
+ * so the student sees the voice land while singing.
+ */
+@Composable
+private fun LiveLevelWave(levels: List<Float>) {
+    val accent = MelovaAccent
+    val rest = MelovaText.copy(alpha = 0.14f)
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+    ) {
+        val count = VocalTrainingViewModel.LIVE_LEVEL_COUNT
+        val step = size.width / count
+        val stroke = step * 0.6f
+        val mid = size.height / 2f
+        val minHalf = 1.5.dp.toPx()
+        val offset = count - levels.size
+        for (i in 0 until count) {
+            val level = levels.getOrNull(i - offset)
+            val x = step * i + step / 2f
+            // Square root lifts soft singing so it still shows; full voice fills the height.
+            val half = if (level == null) minHalf else maxOf(minHalf, sqrt(level.coerceIn(0f, 1f)) * mid)
+            drawLine(
+                color = if (level == null) rest else accent.copy(alpha = 0.45f + 0.55f * (i + 1f) / count),
+                start = Offset(x, mid - half),
+                end = Offset(x, mid + half),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
             )
         }
     }
@@ -769,16 +860,18 @@ private fun HolisticScoreResultCard(
     onShowTahrirDetail: (TahrirComparison) -> Unit,
     onRetryRecording: () -> Unit,
     onDismiss: () -> Unit,
-    isReadOnly: Boolean = false
+    isReadOnly: Boolean = false,
+    nextSectionTitle: String? = null,
+    onNextSection: (() -> Unit)? = null
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MelovaCard),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (result.requiresReRecord) {
                 val reRecordTitle = when (result.reRecordReason) {
@@ -810,8 +903,8 @@ private fun HolisticScoreResultCard(
                         onClick = onRetryRecording,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(46.dp),
-                        shape = RoundedCornerShape(14.dp),
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
                     ) {
                         Icon(Icons.Default.Mic, contentDescription = null)
@@ -821,7 +914,7 @@ private fun HolisticScoreResultCard(
                     OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("بستن", color = MelovaText)
                     }
@@ -829,39 +922,46 @@ private fun HolisticScoreResultCard(
                 return@Column
             }
 
-            Text(
-                text = "نتیجه‌ی اجرای شما",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MelovaText,
-                textAlign = TextAlign.Start
-            )
-
-            if (isNewBest) {
-                MelovaChip(text = "رکورد جدید! بهترین نمره‌ی شما در این بخش", color = MelovaGold)
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MelovaAccent.copy(alpha = 0.15f))
-                    .padding(12.dp),
-                contentAlignment = Alignment.Center
+            // Title and the overall score share one row: the number is the first thing seen, without a tall box.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "نتیجه‌ی اجرای شما",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MelovaText,
+                        textAlign = TextAlign.Start
+                    )
+                    if (isNewBest) {
+                        MelovaChip(text = "رکورد جدید در این بخش!", color = MelovaGold)
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .clip(MelovaSmallShape)
+                        .background(scoreColor(result.overall).copy(alpha = 0.14f))
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     LtrContent {
                         Text(
                             text = persianDigits(result.overall.toString()),
-                            style = MaterialTheme.typography.displaySmall,
+                            style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = scoreColor(result.overall)
                         )
                     }
                     Text(
                         text = "امتیاز کلی",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MelovaText.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MelovaText.copy(alpha = 0.7f),
                         textAlign = TextAlign.Center
                     )
                 }
@@ -941,12 +1041,56 @@ private fun HolisticScoreResultCard(
             }
 
             if (!isReadOnly) {
-                OutlinedButton(
-                    onClick = onDismiss,
+                // The way on is the main action: the next section, as a lesson leads from one to the next.
+                if (onNextSection != null) {
+                    Button(
+                        onClick = onNextSection,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(MelovaDimens.PrimaryButtonHeight),
+                        shape = MelovaSmallShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
+                    ) {
+                        Text(
+                            text = "بخش بعدی" + nextSectionTitle?.let { " • $it" }.orEmpty(),
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        ForwardArrow(tint = LocalContentColor.current)
+                    }
+                }
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("بستن نتیجه", color = MelovaText)
+                    OutlinedButton(
+                        onClick = onRetryRecording,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(MelovaDimens.ButtonHeight),
+                        shape = MelovaSmallShape
+                    ) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = MelovaAccentSoft,
+                            modifier = Modifier.size(MelovaDimens.Icon)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("دوباره بخوانم", color = MelovaText)
+                    }
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(MelovaDimens.ButtonHeight),
+                        shape = MelovaSmallShape
+                    ) {
+                        Text("بستن نتیجه", color = MelovaText)
+                    }
                 }
             }
         }
@@ -989,7 +1133,7 @@ private fun UserRecordingSection(
                     Modifier
                 } else {
                     Modifier
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(MelovaText.copy(alpha = 0.06f))
                         .padding(12.dp)
                 }
@@ -1004,7 +1148,7 @@ private fun UserRecordingSection(
                 imageVector = Icons.Outlined.GraphicEq,
                 contentDescription = null,
                 tint = MelovaAccentSoft,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -1021,7 +1165,7 @@ private fun UserRecordingSection(
                     textAlign = TextAlign.Start
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (isPlaybackActive) {
                     MelovaMediaIconButton(
                         onClick = onStopPlayback,
@@ -1078,8 +1222,8 @@ private fun UserRecordingSection(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    LegendDot(color = MelovaWarning, label = "بم")
-                    LegendDot(color = MelovaInfo, label = "زیر")
+                    LegendDot(color = MelovaWarning, label = "زیر")
+                    LegendDot(color = MelovaInfo, label = "بم")
                     LegendDot(color = MelovaTextMuted, label = "نت نخوانده")
                 }
             }
@@ -1087,11 +1231,23 @@ private fun UserRecordingSection(
     }
 }
 
+/** «current / total» in one quiet line under a wave. */
+@Composable
+private fun PlaybackClock(currentMs: Long, totalMs: Long) {
+    LtrContent {
+        Text(
+            text = "${formatPlaybackClock(currentMs)} / ${formatPlaybackClock(totalMs)}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MelovaText.copy(alpha = 0.6f)
+        )
+    }
+}
+
 @Composable
 private fun LegendDot(color: Color, label: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Box(
             modifier = Modifier

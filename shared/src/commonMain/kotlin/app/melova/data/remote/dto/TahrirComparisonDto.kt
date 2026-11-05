@@ -16,5 +16,6 @@ data class TahrirComparisonDto(
     @SerialName("vowel_count") val vowelCount: Int = 0,
     @SerialName("message") val message: String = "",
     @SerialName("student_clip") val studentClip: PlaybackClipDto? = null,
-    @SerialName("teacher_clip") val teacherClip: PlaybackClipDto? = null
+    @SerialName("teacher_clip") val teacherClip: PlaybackClipDto? = null,
+    @SerialName("word") val word: String? = null
 )

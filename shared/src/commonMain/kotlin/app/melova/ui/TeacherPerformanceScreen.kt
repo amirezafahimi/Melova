@@ -49,7 +49,11 @@ import app.melova.platform.persianDigits
 import app.melova.presentation.TeacherPerformanceUiState
 import app.melova.presentation.TeacherPerformanceViewModel
 import app.melova.ui.components.MelovaBackground
+import app.melova.ui.components.LetterTag
 import app.melova.ui.components.MelovaMediaIconButton
+import app.melova.ui.components.OrnamentRow
+import app.melova.ui.components.formatPreciseClock
+import app.melova.ui.components.ornamentNumbers
 import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.TeacherOrnamentWaveform
 import app.melova.ui.components.ornamentColor
@@ -81,7 +85,7 @@ fun TeacherPerformanceScreen(
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .verticalScroll(rememberScrollState())
                 .padding(PagePadding),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             RtlContent {
                 MelovaTopBar(
@@ -140,7 +144,7 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
                 contentDescription = "کوچک‌نمایی موج",
                 containerColor = MelovaAccentTint,
                 contentColor = MelovaAccentSoft,
-                buttonSize = 36.dp,
+                buttonSize = 40.dp,
                 iconSize = 20.dp
             )
             MelovaMediaIconButton(
@@ -150,7 +154,7 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
                 contentDescription = "بزرگ‌نمایی موج",
                 containerColor = MelovaAccentTint,
                 contentColor = MelovaAccentSoft,
-                buttonSize = 36.dp,
+                buttonSize = 40.dp,
                 iconSize = 20.dp
             )
         }
@@ -198,8 +202,7 @@ private fun WaveformCard(uiState: TeacherPerformanceUiState, viewModel: TeacherP
             }
         }
         Text(
-            text = "روی هر بازه بزنید تا فقط همان مصوت پخش شود؛ بیرون از بازه‌ها، پخش از همان لحظه شروع می‌شود. " +
-                "با دو انگشت موج را بزرگ یا کوچک کنید.",
+            text = "روی هر بازه بزنید تا همان مصوت پخش شود؛ با دو انگشت بزرگ‌نمایی کنید.",
             style = MaterialTheme.typography.labelSmall,
             color = MelovaText.copy(alpha = 0.45f),
             textAlign = TextAlign.Start
@@ -251,7 +254,7 @@ private fun OrnamentListCard(uiState: TeacherPerformanceUiState, viewModel: Teac
         when {
             uiState.isOrnamentsLoading -> Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MelovaAccent, strokeWidth = 2.dp)
                 Text(
@@ -296,63 +299,6 @@ private fun OrnamentListCard(uiState: TeacherPerformanceUiState, viewModel: Teac
     }
 }
 
-@Composable
-private fun OrnamentRow(
-    ornament: TeacherOrnament,
-    number: Int,
-    isSelected: Boolean,
-    isPlaying: Boolean,
-    onClick: () -> Unit
-) {
-    val color = ornamentColor(ornament.kind, LocalMelovaPalette.current)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) color.copy(alpha = 0.16f) else MelovaText.copy(alpha = 0.04f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = persianDigits("${ornament.kind.title} $number"),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MelovaText
-            )
-            LtrContent {
-                Text(
-                    text = "${formatPreciseClock(ornament.startMs)} → ${formatPreciseClock(ornament.endMs)}" +
-                        "  (${persianDigits(formatFixed(ornament.durationMs / 1000f, 2))}s)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MelovaText.copy(alpha = 0.6f)
-                )
-            }
-        }
-        MelovaMediaIconButton(
-            onClick = onClick,
-            icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-            contentDescription = if (isPlaying) "توقف" else "پخش این بازه",
-            containerColor = color,
-            buttonSize = 34.dp,
-            iconSize = 18.dp
-        )
-    }
-}
-
-/** The T/V mark: just the letter, bold, in the ornament's colour. */
-@Composable
-private fun LetterTag(letter: String, color: Color) {
-    Text(
-        text = letter,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Black,
-        color = color
-    )
-}
-
 
 @Composable
 private fun ChoicePill(
@@ -394,11 +340,11 @@ private fun SectionCard(content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MelovaCard),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             content()
         }
@@ -410,7 +356,7 @@ private fun LoadingCard(message: String) {
     SectionCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MelovaAccent, strokeWidth = 2.dp)
             Text(text = message, style = MaterialTheme.typography.bodySmall, color = MelovaText)
@@ -431,31 +377,12 @@ private fun RetryButton(onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent)
     ) {
         Text("تلاش دوباره")
     }
 }
 
-/** Numbers each kind on its own: تحریر ۱، تحریر ۲، ویبراتو ۱، گذر ۱… */
-private fun ornamentNumbers(ornaments: List<TeacherOrnament>): List<Int> {
-    val counts = mutableMapOf<TeacherOrnamentKind, Int>()
-    return ornaments.map { ornament ->
-        val next = (counts[ornament.kind] ?: 0) + 1
-        counts[ornament.kind] = next
-        next
-    }
-}
-
 private fun formatSpeed(speed: Float): String =
     persianDigits(if (speed == speed.toInt().toFloat()) "${speed.toInt()}×" else "${speed}×")
-
-/** m:ss.cc — hundredths, so a vowel's edges can be read exactly. */
-private fun formatPreciseClock(timeMs: Long): String {
-    val clamped = timeMs.coerceAtLeast(0L)
-    val minutes = clamped / 60_000
-    val seconds = (clamped / 1000) % 60
-    val hundredths = (clamped % 1000) / 10
-    return persianDigits("$minutes:${seconds.pad2()}.${hundredths.pad2()}")
-}
