@@ -14,6 +14,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -96,6 +99,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -628,8 +632,13 @@ private fun MessageBubble(
     var heldAt by remember(message.id) { mutableStateOf<Offset?>(null) }
     var anchor by remember(message.id) { mutableStateOf(Offset.Zero) }
     val isBusy = message.id in state.busyMessageIds
-    val canChange = isMine && !isBusy
-    val canAnswer = message.kind != ChatMessageKind.PRACTICE && !isBusy
+    // A practice result stays: its review is the record, so it can only be answered.
+    val canChange = isMine && !isBusy && message.kind != ChatMessageKind.PRACTICE
+    val canAnswer = !isBusy
+    // Where the finger last came down on the bubble, seen before any part of it takes the press,
+    // for the parts that open the menu themselves.
+    var lastDown by remember(message.id) { mutableStateOf(Offset.Zero) }
+    val openMenu = { if (canAnswer) heldAt = lastDown }
     // The wave has the whole bubble, so it says where the finger was in window terms.
     val holdInWindow: ((Offset) -> Unit)? = if (canAnswer) ({ heldAt = it - anchor }) else null
 
@@ -651,10 +660,25 @@ private fun MessageBubble(
         }
     }
 
-    Box(modifier = Modifier.onGloballyPositioned { anchor = it.positionInWindow() }) {
+    Box(
+        modifier = Modifier
+            .onGloballyPositioned { anchor = it.positionInWindow() }
+            .pointerInput(message.id) {
+                awaitEachGesture {
+                    lastDown = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial).position
+                }
+            }
+    ) {
         Box(
+            // Text has nothing else to do with a tap, so a tap opens its menu; the others keep the
+            // tap for playing or opening, and open it when held.
             modifier = if (canAnswer) {
-                Modifier.pointerInput(message.id) { detectTapGestures(onLongPress = { heldAt = it }) }
+                Modifier.pointerInput(message.id, message.kind) {
+                    detectTapGestures(
+                        onTap = if (message.kind == ChatMessageKind.TEXT) ({ heldAt = it }) else null,
+                        onLongPress = { heldAt = it }
+                    )
+                }
             } else {
                 Modifier
             }
@@ -671,7 +695,12 @@ private fun MessageBubble(
                     onHold = holdInWindow
                 )
                 ChatMessageKind.PRACTICE -> message.practice?.let { practice ->
-                    PracticeBubble(practice, note = message.text, onClick = { actions.openPractice(practice) })
+                    PracticeBubble(
+                        practice = practice,
+                        note = message.text,
+                        onClick = { actions.openPractice(practice) },
+                        onLongClick = openMenu
+                    )
                 }
             }
         }
@@ -1159,16 +1188,22 @@ private fun VoiceWave(
 
 /** A take the student sent; tapping it opens the page the student saw. */
 @Composable
-private fun PracticeBubble(practice: PracticeResultLink, note: String, onClick: () -> Unit) {
+private fun PracticeBubble(
+    practice: PracticeResultLink,
+    note: String,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     val shape = RoundedCornerShape(20.dp)
     Surface(
-        onClick = onClick,
         shape = shape,
         color = MelovaCard,
         modifier = Modifier
             .widthIn(max = 310.dp)
             .fillMaxWidth()
             .border(1.dp, MelovaAccent.copy(alpha = 0.55f), shape)
+            .clip(shape)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
