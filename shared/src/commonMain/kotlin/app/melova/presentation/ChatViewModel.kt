@@ -77,8 +77,9 @@ class ChatViewModel : ViewModel() {
             }
             state.copy(chats = chats, unread = chats.sumOf { it.unread }, thread = thread)
         }
-        // A voice someone took back can't be the one in the player.
+        // A voice someone took back can't be the one in the player, or the one being answered.
         if (_uiState.value.activeVoiceId in update.removed) stopVoice()
+        if (_uiState.value.replyToId in update.removed) cancelReply()
     }
 
     /** What the person has, with what changed written over it and what was taken back gone. */
@@ -110,7 +111,7 @@ class ChatViewModel : ViewModel() {
     /** The thread stays, to show at once when the person comes back from a result page. */
     fun closeThread() {
         stopVoice()
-        _uiState.update { it.copy(openChatId = null, threadError = null) }
+        _uiState.update { it.copy(openChatId = null, threadError = null, replyToId = null) }
     }
 
     /** The chat with a teacher, opened from their page. */
@@ -180,7 +181,15 @@ class ChatViewModel : ViewModel() {
     fun sendText(text: String) {
         val chatId = _uiState.value.openChatId ?: return
         if (text.isBlank()) return
-        enqueue(OutgoingMessage(nextLocalId(), chatId, ChatMessageKind.TEXT, text = text.trim()))
+        enqueue(
+            OutgoingMessage(
+                localId = nextLocalId(),
+                chatId = chatId,
+                kind = ChatMessageKind.TEXT,
+                text = text.trim(),
+                replyTo = takeReply()
+            )
+        )
     }
 
     /** The recording is kept here first, so the recorder is free the moment the bubble appears. */
@@ -194,10 +203,23 @@ class ChatViewModel : ViewModel() {
                 kind = ChatMessageKind.VOICE,
                 voice = runCatching { repository.keepForSending(localId, voice) }.getOrElse { voice },
                 durationMs = durationMs,
-                peaks = peaks
+                peaks = peaks,
+                replyTo = takeReply()
             )
         )
     }
+
+    /** The message the next one answers, chosen by holding it. */
+    fun startReply(messageId: Long) {
+        _uiState.update { it.copy(replyToId = messageId) }
+    }
+
+    fun cancelReply() {
+        _uiState.update { it.copy(replyToId = null) }
+    }
+
+    /** Who is being answered, cleared as the answer goes: the next message is its own. */
+    private fun takeReply(): Long? = _uiState.value.replyToId.also { cancelReply() }
 
     /** One more go at a message that didn't make it. */
     fun retrySend(localId: Long) {
@@ -225,9 +247,10 @@ class ChatViewModel : ViewModel() {
                     ChatMessageKind.VOICE -> repository.sendVoice(
                         message.chatId,
                         requireNotNull(message.voice),
-                        message.durationMs
+                        message.durationMs,
+                        message.replyTo
                     ) { sent -> onSendProgress(message.localId, sent) }
-                    else -> repository.sendText(message.chatId, message.text)
+                    else -> repository.sendText(message.chatId, message.text, message.replyTo)
                 }
             }
                 .onSuccess { update ->
@@ -468,6 +491,8 @@ data class OutgoingMessage(
     val durationMs: Long = 0L,
     /** The wave drawn on the bubble while it goes, so it looks like the one that will replace it. */
     val peaks: List<Float> = emptyList(),
+    /** The message in the thread this one answers, when it answers one. */
+    val replyTo: Long? = null,
     /** How much of it has gone, from 0 to 1; a text message is there or not. */
     val progress: Float = 0f,
     val hasFailed: Boolean = false
@@ -498,6 +523,7 @@ data class ChatUiState(
     val voiceArrived: Float = 0f,
     /** Voice messages already here, which play without waiting for the network. */
     val readyVoiceIds: Set<Long> = emptySet(),
+    val replyToId: Long? = null,
     val notifications: NotificationState = NotificationState.UNSUPPORTED,
     val message: String? = null
 )

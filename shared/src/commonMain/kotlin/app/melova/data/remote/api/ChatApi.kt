@@ -87,12 +87,13 @@ class ChatApi(private val client: HttpClient, private val socketClient: HttpClie
         chatId: String,
         text: String,
         durationMs: Long?,
-        audio: FilePart?
+        audio: FilePart?,
+        replyTo: Long? = null
     ): ChatThreadDto = client.call(HttpMethod.Post, "api/v1/chats/${segment(chatId)}/messages") {
         header(TEACHER_TOKEN, teacherToken)
         setBody(
             multipartBody(
-                mapOf("text" to text, "duration_ms" to durationMs?.toString()),
+                mapOf("text" to text, "duration_ms" to durationMs?.toString(), "reply_to" to replyTo?.toString()),
                 listOfNotNull(audio)
             )
         )
@@ -104,13 +105,14 @@ class ChatApi(private val client: HttpClient, private val socketClient: HttpClie
         chatId: String,
         durationMs: Long,
         audio: FilePart,
+        replyTo: Long?,
         onProgress: (Float) -> Unit
     ): ChatThreadDto = MelovaNetwork.json.decodeFromString(
         sendWithProgress(
             HttpMethod.Post,
             "api/v1/chats/${segment(chatId)}/messages",
             headerMap(teacherToken),
-            mapOf("text" to "", "duration_ms" to durationMs.toString()),
+            mapOf("text" to "", "duration_ms" to durationMs.toString(), "reply_to" to replyTo?.toString()),
             audio,
             onProgress
         )

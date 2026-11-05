@@ -55,6 +55,7 @@ data class ChatMessageDto(
     @SerialName("peaks") val peaks: List<Float>? = null,
     @SerialName("created_at") val createdAt: Double? = null,
     @SerialName("edited_at") val editedAt: Double? = null,
+    @SerialName("reply_to") val replyTo: Long? = null,
     @SerialName("practice") val practice: PracticeResultLinkDto? = null
 )
 

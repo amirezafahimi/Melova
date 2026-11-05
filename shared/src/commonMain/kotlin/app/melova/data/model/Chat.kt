@@ -52,6 +52,8 @@ data class ChatMessage(
     val createdAtMs: Long,
     /** When the sender rewrote it; null for one that stands as it was written. */
     val editedAtMs: Long?,
+    /** The message in this chat that this one answers, when it answers one. */
+    val replyToId: Long?,
     val practice: PracticeResultLink?
 )
 

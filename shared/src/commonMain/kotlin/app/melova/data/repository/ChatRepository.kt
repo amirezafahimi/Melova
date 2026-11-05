@@ -71,8 +71,8 @@ class ChatRepository(
         }
     }
 
-    suspend fun sendText(chatId: String, text: String): ChatUpdate =
-        apiCall { api.send(session.token, chatId, text.trim(), durationMs = null, audio = null) }
+    suspend fun sendText(chatId: String, text: String, replyTo: Long?): ChatUpdate =
+        apiCall { api.send(session.token, chatId, text.trim(), durationMs = null, audio = null, replyTo = replyTo) }
             .run { toUpdate(chat, messages, removed) }
 
     /** [onProgress] follows the voice on its way out, from 0 to 1. */
@@ -80,11 +80,12 @@ class ChatRepository(
         chatId: String,
         voice: LocalFile,
         durationMs: Long,
+        replyTo: Long?,
         onProgress: (Float) -> Unit
     ): ChatUpdate = apiCall {
         if (!voice.exists()) throw IOException("فایل پیام صوتی باز نشد.")
         val audio = FilePart("audio", voice.name, mediaTypeFor(voice.name), voice.readBytes())
-        api.sendVoice(session.token, chatId, durationMs, audio, onProgress)
+        api.sendVoice(session.token, chatId, durationMs, audio, replyTo, onProgress)
     }.run { toUpdate(chat, messages, removed) }
 
     suspend fun editText(chatId: String, messageId: Long, text: String): ChatUpdate =
@@ -184,6 +185,7 @@ private fun ChatMessageDto.toDomain(): ChatMessage? {
         peaks = peaks.orEmpty(),
         createdAtMs = ((createdAt ?: 0.0) * 1000).toLong(),
         editedAtMs = editedAt?.let { (it * 1000).toLong() },
+        replyToId = replyTo,
         practice = practice?.toDomain()
     )
 }

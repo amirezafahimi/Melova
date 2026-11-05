@@ -1,11 +1,15 @@
 package app.melova.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,13 +18,18 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +37,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,6 +48,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.outlined.Reply
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
@@ -69,13 +80,16 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -83,9 +97,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -96,7 +115,6 @@ import app.melova.data.model.ChatMessageKind
 import app.melova.data.model.ChatSide
 import app.melova.data.model.PracticeResultLink
 import app.melova.data.model.ReviewStatus
-import androidx.compose.ui.unit.Dp
 import app.melova.platform.LocalFile
 import app.melova.platform.PlatformBackHandler
 import app.melova.platform.formatMessageDay
@@ -138,8 +156,8 @@ import app.melova.ui.theme.MelovaBubbleReceived
 import app.melova.ui.theme.MelovaCard
 import app.melova.ui.theme.MelovaCardElevated
 import app.melova.ui.theme.MelovaCardShape
-import app.melova.ui.theme.MelovaDimens
 import app.melova.ui.theme.MelovaControl
+import app.melova.ui.theme.MelovaDimens
 import app.melova.ui.theme.MelovaError
 import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaOutline
@@ -148,6 +166,10 @@ import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
 import app.melova.ui.theme.MelovaWarning
+import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private const val MAX_TEXT_LENGTH = 4_000
 
@@ -372,6 +394,7 @@ fun ChatScreen(
     // A message taken back while it was open leaves no half-written edit behind.
     val editing = editingId?.let { id -> thread?.messages?.firstOrNull { it.id == id } }
     val deleting = deletingId?.let { id -> thread?.messages?.firstOrNull { it.id == id } }
+    val replying = state.replyToId?.let { id -> thread?.messages?.firstOrNull { it.id == id } }
 
     // Taking a message back can't be undone, for either side, so it is asked for first.
     if (deleting != null) {
@@ -395,7 +418,8 @@ fun ChatScreen(
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .imePadding()
             ) {
-                Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
+                // Nothing between the bar and the thread: the messages start right under it.
+                Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
                     MelovaTopBar(
                         title = chat?.peerName?.ifBlank { null } ?: "گفتگو",
                         subtitle = chat?.let { if (it.side == ChatSide.STUDENT) "استاد" else "هنرجو" },
@@ -428,7 +452,9 @@ fun ChatScreen(
                 }
                 ChatComposer(
                     editing = editing,
+                    replying = replying,
                     onCancelEdit = { editingId = null },
+                    onCancelReply = viewModel::cancelReply,
                     onSaveEdit = { text ->
                         editing?.let { viewModel.editText(it.id, text) }
                         editingId = null
@@ -448,6 +474,7 @@ private class MessageActions(
     val toggleVoice: (ChatMessage) -> Unit,
     val scrubVoice: (ChatMessage, Float) -> Unit,
     val seekVoice: (Float) -> Unit,
+    val reply: (ChatMessage) -> Unit,
     val edit: (ChatMessage) -> Unit,
     val delete: (ChatMessage) -> Unit,
     val retry: (Long) -> Unit,
@@ -466,6 +493,7 @@ private fun rememberMessageActions(
         toggleVoice = viewModel::toggleVoice,
         scrubVoice = viewModel::scrubVoice,
         seekVoice = viewModel::seekVoice,
+        reply = { message -> viewModel.startReply(message.id) },
         edit = { message -> onEdit(message.id) },
         delete = { message -> onDelete(message.id) },
         retry = viewModel::retrySend,
@@ -491,6 +519,30 @@ private fun Messages(
 ) {
     val side = chat.side
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    // Straight to the answered message, a third of the way up from the bottom, without the ride there.
+    // The message gone to is washed in the accent colour, which then ebbs away, so the eye finds it.
+    var litId by remember { mutableStateOf<Long?>(null) }
+    val light = remember { Animatable(0f) }
+    var lighting by remember { mutableStateOf<Job?>(null) }
+    val showMessage: (Long) -> Unit = { id ->
+        val index = messages.size - 1 - messages.indexOfFirst { it.id == id }
+        if (index < messages.size) {
+            lighting?.cancel()
+            lighting = scope.launch {
+                listState.scrollToItem(
+                    index = state.outgoing.size + index,
+                    scrollOffset = -listState.layoutInfo.viewportSize.height / 3
+                )
+                litId = id
+                light.snapTo(0f)
+                light.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
+                delay(650)
+                light.animateTo(0f, tween(1300, easing = LinearOutSlowInEasing))
+                litId = null
+            }
+        }
+    }
     val newest = messages.lastOrNull()
     // Newest sits at index 0 of the reversed list; someone reading back up stays where they are.
     LaunchedEffect(newest?.id, state.outgoing.size) {
@@ -526,12 +578,14 @@ private fun Messages(
                 val older = newestFirst.getOrNull(index + 1)
                 if (older == null || localDay(older.createdAtMs) != day) DayHeading(message.createdAtMs)
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(if (message.id == litId) Modifier.messageLight(MelovaAccent, light.value) else Modifier),
                     // The screen is RTL, so the person's own messages sit on the right.
                     horizontalAlignment = if (isMine) Alignment.Start else Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    MessageBubble(message = message, isMine = isMine, state = state, actions = actions)
+                    MessageBubble(message = message, isMine = isMine, state = state, actions = actions, onShowMessage = showMessage)
                     // Only the day's last message carries the time and the tick.
                     val newer = newestFirst.getOrNull(index - 1)
                     if (newer == null || localDay(newer.createdAtMs) != day) {
@@ -560,69 +614,148 @@ private fun Messages(
 }
 
 /**
- * One message, with the small menu its sender gets by holding it: a text message can be
- * rewritten, and anything but a take can be taken back.
+ * One message, with the small card of things to do with it that holding it opens, where the
+ * finger is: anyone can answer a message, and its sender can rewrite or take back their own.
  */
 @Composable
 private fun MessageBubble(
     message: ChatMessage,
     isMine: Boolean,
     state: ChatUiState,
-    actions: MessageActions
+    actions: MessageActions,
+    onShowMessage: (Long) -> Unit
 ) {
-    var menuOpen by remember(message.id) { mutableStateOf(false) }
+    var heldAt by remember(message.id) { mutableStateOf<Offset?>(null) }
+    var anchor by remember(message.id) { mutableStateOf(Offset.Zero) }
     val isBusy = message.id in state.busyMessageIds
-    val canChange = isMine && message.kind != ChatMessageKind.PRACTICE && !isBusy
+    val canChange = isMine && !isBusy
+    val canAnswer = message.kind != ChatMessageKind.PRACTICE && !isBusy
+    // The wave has the whole bubble, so it says where the finger was in window terms.
+    val holdInWindow: ((Offset) -> Unit)? = if (canAnswer) ({ heldAt = it - anchor }) else null
 
-    Box {
+    // Kept after the menu closes, so it closes where it opened.
+    var menuAt by remember(message.id) { mutableStateOf(Offset.Zero) }
+    if (heldAt != null) menuAt = heldAt!!
+
+    // The message this one answers, as long as it is still in the thread, drawn inside the bubble.
+    val answered = message.replyToId?.let { id -> state.thread?.messages?.firstOrNull { it.id == id } }
+    val quote: (@Composable () -> Unit)? = answered?.let { other ->
+        {
+            val chat = state.thread?.chat
+            QuotedMessage(
+                answered = other,
+                author = if (chat != null && other.sender == chat.side) "شما" else chat?.peerName.orEmpty().ifBlank { "طرف گفتگو" },
+                onClick = { onShowMessage(other.id) },
+                onHold = holdInWindow
+            )
+        }
+    }
+
+    Box(modifier = Modifier.onGloballyPositioned { anchor = it.positionInWindow() }) {
         Box(
-            modifier = if (canChange) {
-                Modifier.pointerInput(message.id) { detectTapGestures(onLongPress = { menuOpen = true }) }
+            modifier = if (canAnswer) {
+                Modifier.pointerInput(message.id) { detectTapGestures(onLongPress = { heldAt = it }) }
             } else {
                 Modifier
             }
         ) {
             when (message.kind) {
-                ChatMessageKind.TEXT -> TextBubble(message.text, isMine, isBusy)
+                ChatMessageKind.TEXT -> TextBubble(message.text, isMine, isBusy, quote)
                 ChatMessageKind.VOICE -> VoiceBubble(
                     message = message,
                     isMine = isMine,
                     state = state,
                     actions = actions,
+                    quote = quote,
                     // The wave answers the finger itself, so it opens the menu rather than the Box.
-                    onHold = if (canChange) ({ menuOpen = true }) else null
+                    onHold = holdInWindow
                 )
                 ChatMessageKind.PRACTICE -> message.practice?.let { practice ->
                     PracticeBubble(practice, note = message.text, onClick = { actions.openPractice(practice) })
                 }
             }
         }
-        PlatformBackHandler(enabled = menuOpen) { menuOpen = false }
-        DropdownMenu(
-            expanded = menuOpen,
-            onDismissRequest = { menuOpen = false },
-            containerColor = MelovaCardElevated
-        ) {
-            if (message.kind == ChatMessageKind.TEXT) {
-                DropdownMenuItem(
-                    text = { Text("ویرایش", color = MelovaText) },
-                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null, tint = MelovaAccentSoft) },
-                    onClick = {
-                        menuOpen = false
-                        actions.edit(message)
-                    }
-                )
+        MessageMenu(at = menuAt, isOpen = heldAt != null, onDismiss = { heldAt = null }) {
+            MessageMenuItem("پاسخ", Icons.AutoMirrored.Outlined.Reply, MelovaText, MelovaAccentSoft) {
+                heldAt = null
+                actions.reply(message)
             }
-            DropdownMenuItem(
-                text = { Text("حذف", color = MelovaError) },
-                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = MelovaError) },
-                onClick = {
-                    menuOpen = false
+            if (canChange && message.kind == ChatMessageKind.TEXT) {
+                MessageMenuItem("ویرایش", Icons.Outlined.Edit, MelovaText, MelovaAccentSoft) {
+                    heldAt = null
+                    actions.edit(message)
+                }
+            }
+            if (canChange) {
+                MessageMenuItem("حذف", Icons.Outlined.DeleteOutline, MelovaError, MelovaError) {
+                    heldAt = null
                     actions.delete(message)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The card a held message opens, at the finger rather than at the corner of the bubble. [at] is
+ * measured from the bubble's left edge, as the finger is, so the card hangs from a point placed
+ * there without regard to the page's direction: a menu's own offset counts from the right on a
+ * Persian screen, which sent it to the far side of the finger.
+ */
+@Composable
+private fun BoxScope.MessageMenu(
+    at: Offset,
+    isOpen: Boolean,
+    onDismiss: () -> Unit,
+    items: @Composable ColumnScope.() -> Unit
+) {
+    PlatformBackHandler(enabled = isOpen) { onDismiss() }
+    Box(modifier = Modifier.matchParentSize(), contentAlignment = AbsoluteAlignment.TopLeft) {
+        Box(modifier = Modifier.absoluteOffset { IntOffset(at.x.roundToInt(), at.y.roundToInt()) }.size(0.dp)) {
+            DropdownMenu(
+                expanded = isOpen,
+                onDismissRequest = onDismiss,
+                shape = MelovaCardShape,
+                containerColor = MelovaCardElevated,
+                shadowElevation = 12.dp,
+                border = BorderStroke(1.dp, MelovaOutline),
+                modifier = Modifier.width(IntrinsicSize.Max),
+                content = items
             )
         }
     }
+}
+
+@Composable
+private fun MessageMenuItem(
+    label: String,
+    icon: ImageVector,
+    color: Color,
+    iconTint: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = color)
+    }
+}
+
+/** The wash over a message gone to, edge to edge across the thread rather than inside its padding. */
+private fun Modifier.messageLight(accent: Color, strength: Float): Modifier = drawBehind {
+    val side = 16.dp.toPx()
+    val gap = 5.dp.toPx()
+    drawRect(
+        color = accent.copy(alpha = 0.2f * strength),
+        topLeft = Offset(-side, -gap),
+        size = Size(size.width + side * 2, size.height + gap * 2)
+    )
 }
 
 /** Sits over the first message of each day, so the rows themselves only need the hour. */
@@ -644,19 +777,89 @@ private fun DayHeading(timeMs: Long) {
 @Composable
 private fun bubbleColor(isMine: Boolean) = if (isMine) MelovaAccent.copy(alpha = 0.22f) else MelovaBubbleReceived
 
+/** One line standing for a message elsewhere in the thread: what an answer points back at. */
+private fun messagePreview(message: ChatMessage): String = when (message.kind) {
+    ChatMessageKind.TEXT -> message.text
+    ChatMessageKind.VOICE -> "پیام صوتی"
+    ChatMessageKind.PRACTICE -> message.practice?.sectionTitle?.ifBlank { null } ?: "تمرین"
+}
+
+/**
+ * The message an answer is to, at the top inside the answer's own bubble: who wrote it over one
+ * line of it, behind a bar in the accent colour.
+ */
 @Composable
-private fun TextBubble(text: String, isMine: Boolean, isBusy: Boolean = false) {
+private fun QuotedMessage(
+    answered: ChatMessage,
+    author: String,
+    onClick: () -> Unit,
+    onHold: ((Offset) -> Unit)?
+) {
+    var inWindow by remember { mutableStateOf(Offset.Zero) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { inWindow = it.positionInWindow() }
+            // A tap goes to the message; holding it still opens the bubble's menu, as anywhere else on it.
+            .pointerInput(answered.id, onHold) {
+                detectTapGestures(onTap = { onClick() }, onLongPress = onHold?.let { hold -> { hold(inWindow + it) } })
+            }
+            .height(IntrinsicSize.Min)
+            // The bubble's own corner less the gap around the quote, so the two curves run together.
+            .clip(RoundedCornerShape(14.dp))
+            .background(MelovaAccentSoft.copy(alpha = 0.12f)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.width(3.dp).fillMaxHeight().background(MelovaAccentSoft))
+        if (answered.kind == ChatMessageKind.VOICE) {
+            Icon(
+                imageVector = Icons.Outlined.GraphicEq,
+                contentDescription = null,
+                tint = MelovaAccentSoft,
+                modifier = Modifier.padding(start = 8.dp).size(18.dp)
+            )
+        }
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
+            Text(
+                text = author,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MelovaAccentSoft,
+                maxLines = 1
+            )
+            Text(
+                text = messagePreview(answered),
+                style = MaterialTheme.typography.bodySmall,
+                color = MelovaTextMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun TextBubble(
+    text: String,
+    isMine: Boolean,
+    isBusy: Boolean = false,
+    quote: (@Composable () -> Unit)? = null
+) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = bubbleColor(isMine),
         modifier = Modifier.widthIn(max = 300.dp).alpha(if (isBusy) 0.5f else 1f)
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MelovaText,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-        )
+        // As wide as the wider of the two, so the quote and the text share one edge.
+        Column(modifier = Modifier.width(IntrinsicSize.Max).padding(if (quote != null) 6.dp else 0.dp)) {
+            quote?.invoke()
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MelovaText,
+                modifier = Modifier.padding(horizontal = if (quote != null) 6.dp else 12.dp, vertical = if (quote != null) 4.dp else 8.dp)
+            )
+        }
     }
 }
 
@@ -666,7 +869,8 @@ private fun VoiceBubble(
     isMine: Boolean,
     state: ChatUiState,
     actions: MessageActions,
-    onHold: (() -> Unit)?
+    quote: (@Composable () -> Unit)?,
+    onHold: ((Offset) -> Unit)?
 ) {
     val isActive = state.activeVoiceId == message.id
     val isLoading = isActive && state.isVoiceLoading
@@ -702,6 +906,7 @@ private fun VoiceBubble(
         onScrub = { fraction -> actions.scrubVoice(message, fraction) },
         onScrubEnd = { fraction -> actions.seekVoice(fraction) },
         canScrub = !isLoading,
+        quote = quote,
         onHold = onHold
     )
 }
@@ -800,33 +1005,37 @@ private fun VoiceRow(
     button: @Composable () -> Unit,
     onScrub: (Float) -> Unit,
     onScrubEnd: (Float) -> Unit,
-    onHold: (() -> Unit)? = null
+    quote: (@Composable () -> Unit)? = null,
+    onHold: ((Offset) -> Unit)? = null
 ) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = bubbleColor(isMine),
         modifier = Modifier.widthIn(max = 280.dp).fillMaxWidth()
     ) {
-        // Sound runs left to right, on a Persian screen too.
-        LtrContent {
-            Row(
-                modifier = Modifier.padding(start = 8.dp, end = 14.dp, top = 8.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                button()
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    VoiceWave(
-                        peaks = peaks,
-                        progress = progress,
-                        faded = faded,
-                        canScrub = canScrub,
-                        onScrub = onScrub,
-                        onScrubEnd = onScrubEnd,
-                        onHold = onHold,
-                        modifier = Modifier.fillMaxWidth().height(40.dp)
-                    )
-                    Text(clock, style = MaterialTheme.typography.labelSmall, color = MelovaTextMuted)
+        Column {
+            quote?.let { Box(modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp)) { it() } }
+            // Sound runs left to right, on a Persian screen too.
+            LtrContent {
+                Row(
+                    modifier = Modifier.padding(start = 8.dp, end = 14.dp, top = 8.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    button()
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        VoiceWave(
+                            peaks = peaks,
+                            progress = progress,
+                            faded = faded,
+                            canScrub = canScrub,
+                            onScrub = onScrub,
+                            onScrubEnd = onScrubEnd,
+                            onHold = onHold,
+                            modifier = Modifier.fillMaxWidth().height(40.dp)
+                        )
+                        Text(clock, style = MaterialTheme.typography.labelSmall, color = MelovaTextMuted)
+                    }
                 }
             }
         }
@@ -879,7 +1088,7 @@ private fun VoiceWave(
     canScrub: Boolean,
     onScrub: (Float) -> Unit,
     onScrubEnd: (Float) -> Unit,
-    onHold: (() -> Unit)?,
+    onHold: ((Offset) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val played = MelovaAccentSoft
@@ -890,16 +1099,19 @@ private fun VoiceWave(
     val bars = peaks.ifEmpty { List(VOICE_EMPTY_BARS) { 0f } }
     val hold by rememberUpdatedState(onHold)
     var held by remember { mutableStateOf(0f) }
+    // Where the wave itself sits, so a finger on it can be reported where the bubble can use it.
+    var inWindow by remember { mutableStateOf(Offset.Zero) }
+    val place = Modifier.onGloballyPositioned { inWindow = it.positionInWindow() }
     val gestures = if (!canScrub) {
-        Modifier.pointerInput(onHold == null) {
+        place.pointerInput(onHold == null) {
             // The wave takes the whole bubble, so holding it is how a voice message is got at.
-            if (hold != null) detectTapGestures(onLongPress = { hold?.invoke() })
+            if (hold != null) detectTapGestures(onLongPress = { hold?.invoke(inWindow + it) })
         }
     } else {
-        Modifier
+        place
             .pointerInput(Unit) {
                 detectTapGestures(
-                    onLongPress = { hold?.invoke() },
+                    onLongPress = { hold?.invoke(inWindow + it) },
                     onTap = { offset ->
                         val fraction = (offset.x / size.width).coerceIn(0f, 1f)
                         scrub(fraction)
@@ -1019,7 +1231,9 @@ private fun PracticeBubble(practice: PracticeResultLink, note: String, onClick: 
 @Composable
 private fun ChatComposer(
     editing: ChatMessage?,
+    replying: ChatMessage?,
     onCancelEdit: () -> Unit,
+    onCancelReply: () -> Unit,
     onSaveEdit: (String) -> Unit,
     onRecordStart: () -> Unit,
     onSendText: (String) -> Unit,
@@ -1063,7 +1277,16 @@ private fun ChatComposer(
         }
         if (editing != null) {
             PlatformBackHandler(onBack = onCancelEdit)
-            EditingBanner(editing.text, onCancelEdit)
+            EditingBanner("ویرایش پیام", editing.text, Icons.Outlined.Edit, "بی‌خیال ویرایش", onCancelEdit)
+        } else if (replying != null) {
+            PlatformBackHandler(onBack = onCancelReply)
+            EditingBanner(
+                title = "پاسخ به پیام",
+                text = messagePreview(replying),
+                icon = Icons.AutoMirrored.Outlined.Reply,
+                cancelDescription = "بی‌خیال پاسخ",
+                onCancel = onCancelReply
+            )
         }
         when (take.phase) {
             TakePhase.EMPTY -> Row(
@@ -1096,9 +1319,15 @@ private fun ChatComposer(
     }
 }
 
-/** What is being rewritten, above the field, with the way out of it. */
+/** What is being rewritten or answered, above the field, with the way out of it. */
 @Composable
-private fun EditingBanner(text: String, onCancel: () -> Unit) {
+private fun EditingBanner(
+    title: String,
+    text: String,
+    icon: ImageVector,
+    cancelDescription: String,
+    onCancel: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1108,9 +1337,9 @@ private fun EditingBanner(text: String, onCancel: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(Icons.Outlined.Edit, contentDescription = null, tint = MelovaAccentSoft, modifier = Modifier.size(16.dp))
+        Icon(icon, contentDescription = null, tint = MelovaAccentSoft, modifier = Modifier.size(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text("ویرایش پیام", style = MaterialTheme.typography.labelSmall, color = MelovaAccentSoft)
+            Text(title, style = MaterialTheme.typography.labelSmall, color = MelovaAccentSoft)
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodySmall,
@@ -1120,7 +1349,7 @@ private fun EditingBanner(text: String, onCancel: () -> Unit) {
             )
         }
         IconButton(onClick = onCancel) {
-            Icon(Icons.Filled.Close, contentDescription = "بی‌خیال ویرایش", tint = MelovaTextMuted)
+            Icon(Icons.Filled.Close, contentDescription = cancelDescription, tint = MelovaTextMuted)
         }
     }
 }
