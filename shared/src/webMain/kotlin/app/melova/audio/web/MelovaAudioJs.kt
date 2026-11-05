@@ -26,6 +26,12 @@ external interface PickedFileJs : JsAny {
     val bytes: Int8Array
 }
 
+/** What melova-audio.js's upload resolves to; any status, as Ktor's failed calls carry one too. */
+external interface UploadAnswerJs : JsAny {
+    val status: Int
+    val body: String
+}
+
 external interface GoogleAnswerJs : JsAny {
     val credential: String?
     val cancelled: Boolean
@@ -55,6 +61,17 @@ private external object MelovaAudioGlobal : JsAny {
     fun createPlayer(): JsPlayer
     fun pickFile(accept: String): Promise<JsAny?>
     fun googleSignIn(clientId: String): Promise<JsAny?>
+    fun upload(
+        method: String,
+        url: String,
+        headersJson: String,
+        fieldsJson: String,
+        fileField: String,
+        fileName: String,
+        mimeType: String,
+        bytes: Int8Array,
+        progress: (Double) -> Unit
+    ): Promise<JsAny?>
     fun apiBaseUrl(): String
     fun canInstall(): Boolean
     fun watchInstall(changed: () -> Unit)
@@ -88,6 +105,20 @@ object MelovaAudioJs {
 
     /** Resolves to a [GoogleAnswerJs]; rejects when Google's script can't load. */
     fun googleSignIn(clientId: String): Promise<JsAny?> = MelovaAudioGlobal.googleSignIn(clientId)
+
+    /** Resolves to an [UploadAnswerJs]; rejects when the request never got an answer. */
+    fun upload(
+        method: String,
+        url: String,
+        headersJson: String,
+        fieldsJson: String,
+        fileField: String,
+        fileName: String,
+        mimeType: String,
+        bytes: Int8Array,
+        progress: (Double) -> Unit
+    ): Promise<JsAny?> =
+        MelovaAudioGlobal.upload(method, url, headersJson, fieldsJson, fileField, fileName, mimeType, bytes, progress)
 
     /** MELOVA_API_BASE_URL from the page, or empty. */
     fun apiBaseUrl(): String = MelovaAudioGlobal.apiBaseUrl()

@@ -11,6 +11,14 @@ data class TeacherOrnament(
     val durationMs: Long get() = endMs - startMs
 }
 
+/** A take on the server, not yet a section, and what was found in it. */
+data class UploadedTake(
+    val id: String,
+    val ornaments: List<TeacherOrnament>,
+    /** Why the ornaments couldn't be read; the take can still be confirmed. */
+    val failureReason: String?
+)
+
 /** [legend] is the name in the key under the waveform, where there is room to explain it. */
 enum class TeacherOrnamentKind(val letter: String, val title: String, val legend: String = title) {
     TAHRIR("T", "تحریر"),

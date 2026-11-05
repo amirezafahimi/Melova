@@ -53,6 +53,10 @@ class TeacherViewModel : ViewModel() {
     fun updateProfile(name: String, bio: String, cardNumber: String, cardHolder: String) =
         run("در حال ذخیره…") { repository.updateProfile(name, bio, cardNumber, cardHolder) }
 
+    fun setPhoto(photo: LocalFile) = run("در حال بارگذاری عکس…") { repository.setPhoto(photo) }
+
+    fun removePhoto() = run("در حال حذف عکس…") { repository.removePhoto() }
+
     /** [onCreated] gets the new lesson's id, so the panel can open it right away. */
     fun createLesson(fields: LessonFields, onCreated: (String) -> Unit = {}) {
         val before = _uiState.value.profile?.lessons.orEmpty().map { it.id }.toSet()
@@ -76,22 +80,53 @@ class TeacherViewModel : ViewModel() {
     fun deleteLesson(lessonId: String) = run("در حال حذف درس…") { repository.deleteLesson(lessonId) }
 
     fun uploadIntro(lessonId: String, audio: LocalFile, onSuccess: () -> Unit = {}) =
-        run("در حال بارگذاری آموزش…", onSuccess = onSuccess) { repository.uploadIntro(lessonId, audio) }
+        run("در حال بارگذاری آموزش…", onSuccess = onSuccess) {
+            repository.uploadIntro(lessonId, audio) { sent ->
+                // Once it is all sent, the server still converts it before answering.
+                _uiState.update {
+                    it.copy(
+                        uploadProgress = sent,
+                        busyLabel = if (sent >= 1f) "در حال آماده‌سازی آموزش…" else it.busyLabel
+                    )
+                }
+            }
+        }
 
     /** [onFailure] gets the error instead of the snackbar, for a dialog that stays open. */
     fun addSection(
         lessonId: String,
         title: String,
         description: String,
-        audio: LocalFile,
+        takeId: String,
         onSuccess: () -> Unit = {},
         onFailure: ((String) -> Unit)? = null
-    ) = run("در حال بارگذاری و آماده‌سازی بخش…", onSuccess = onSuccess, onFailure = onFailure) {
-        repository.addSection(lessonId, title, description, audio)
+    ) = run(
+        "در حال آماده‌سازی بخش…",
+        onSuccess = onSuccess,
+        onFailure = onFailure
+    ) {
+        repository.addSection(lessonId, title, description, takeId)
     }
 
-    fun deleteSection(lessonId: String, sectionId: String) =
-        run("در حال حذف بخش…") { repository.deleteSection(lessonId, sectionId) }
+    /** A null [takeId] keeps the take; a new one has its poem read, so it takes longer. */
+    fun updateSection(
+        lessonId: String,
+        sectionId: String,
+        title: String,
+        description: String,
+        takeId: String?,
+        onSuccess: () -> Unit = {},
+        onFailure: ((String) -> Unit)? = null
+    ) = run(
+        if (takeId == null) "در حال ذخیره…" else "در حال آماده‌سازی بخش…",
+        onSuccess = onSuccess,
+        onFailure = onFailure
+    ) {
+        repository.updateSection(lessonId, sectionId, title, description, takeId)
+    }
+
+    fun deleteSection(lessonId: String, sectionId: String, onSuccess: () -> Unit = {}) =
+        run("در حال حذف بخش…", onSuccess = onSuccess) { repository.deleteSection(lessonId, sectionId) }
 
     fun consumeMessage() {
         _uiState.update { it.copy(message = null) }
@@ -105,7 +140,7 @@ class TeacherViewModel : ViewModel() {
         action: suspend () -> TeacherProfile
     ) {
         if (_uiState.value.busyLabel != null) return
-        _uiState.update { it.copy(busyLabel = busyLabel, isLoading = busyLabel == null) }
+        _uiState.update { it.copy(busyLabel = busyLabel, uploadProgress = null, isLoading = busyLabel == null) }
         viewModelScope.launch {
             runCatching { action() }
                 .onSuccess { profile ->
@@ -114,6 +149,7 @@ class TeacherViewModel : ViewModel() {
                             isSignedIn = true,
                             profile = profile,
                             busyLabel = null,
+                            uploadProgress = null,
                             isLoading = false,
                             revision = if (changesCatalog) it.revision + 1 else it.revision
                         )
@@ -126,6 +162,7 @@ class TeacherViewModel : ViewModel() {
                         it.copy(
                             isSignedIn = repository.isSignedIn,
                             busyLabel = null,
+                            uploadProgress = null,
                             isLoading = false,
                             message = if (onFailure == null) text else it.message
                         )
@@ -142,6 +179,8 @@ data class TeacherUiState(
     val profile: TeacherProfile? = null,
     /** Non-null while a change is being sent; shown as a blocking progress overlay. */
     val busyLabel: String? = null,
+    /** How much of a file being sent has gone, 0 to 1; null when nothing is being sent. */
+    val uploadProgress: Float? = null,
     /** One-off error or notice for a snackbar. */
     val message: String? = null,
     val revision: Int = 0

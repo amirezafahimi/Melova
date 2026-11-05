@@ -57,12 +57,12 @@ object MelovaNetwork {
     val chatApi: ChatApi by lazy { ChatApi(teacherUploadClient, socketClient) }
 
     /** Takes and voice replies go up and down through these; give them time. */
-    private val teacherUploadClient: HttpClient by lazy { client(requestTimeoutSeconds = 300) }
+    internal val teacherUploadClient: HttpClient by lazy { client(requestTimeoutSeconds = 300) }
 
     /** Stays open for as long as the app is on screen, so it has no timeouts. */
     private val socketClient: HttpClient by lazy { HttpClient(socketEngine()) { install(WebSockets) } }
 
-    private const val STUDENT_HEADER = "X-Student-Token"
+    internal const val STUDENT_HEADER = "X-Student-Token"
 
     private fun client(requestTimeoutSeconds: Long, connectTimeoutSeconds: Long = 30): HttpClient =
         HttpClient(httpEngine()) {

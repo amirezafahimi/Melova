@@ -2,14 +2,17 @@ package app.melova.data.repository
 
 import app.melova.data.local.TeacherSession
 import app.melova.data.model.TeacherProfile
+import app.melova.data.model.UploadedTake
 import app.melova.data.remote.FilePart
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.api.TeacherApi
 import app.melova.data.remote.apiCall
 import app.melova.data.remote.dto.TeacherProfileDto
+import app.melova.data.remote.writeAtomically
 import app.melova.data.remote.mapper.toDomain
 import app.melova.platform.LocalFile
 import app.melova.platform.PlatformContext
+import app.melova.platform.cacheDir
 import kotlinx.io.IOException
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -17,7 +20,7 @@ import kotlinx.serialization.json.put
 
 /** Teacher panel calls; each returns the teacher's profile as the server now has it. */
 class TeacherRepository(
-    context: PlatformContext,
+    private val context: PlatformContext,
     private val api: TeacherApi = MelovaNetwork.teacherApi
 ) {
     private val session = TeacherSession(context)
@@ -45,6 +48,13 @@ class TeacherRepository(
         )
     }
 
+    /** The server crops it to a square; read now, as the picked file is only temporary. */
+    suspend fun setPhoto(photo: LocalFile) = call {
+        api.setPhoto(token(), FilePart("photo", "photo", "application/octet-stream", photo.readBytes()))
+    }
+
+    suspend fun removePhoto() = call { api.deletePhoto(token()) }
+
     suspend fun createLesson(fields: LessonFields) = call { api.createLesson(token(), fields.toMap()) }
 
     suspend fun updateLesson(lessonId: String, fields: LessonFields) =
@@ -68,13 +78,31 @@ class TeacherRepository(
 
     suspend fun deleteLesson(lessonId: String) = call { api.deleteLesson(token(), lessonId) }
 
-    suspend fun uploadIntro(lessonId: String, audio: LocalFile) = call {
-        api.uploadIntro(token(), lessonId, audio.toPart())
+    suspend fun uploadIntro(lessonId: String, audio: LocalFile, onProgress: (Float) -> Unit) = call {
+        api.uploadIntro(token(), lessonId, audio.toPart(), onProgress)
     }
 
-    suspend fun addSection(lessonId: String, title: String, description: String, audio: LocalFile) = call {
-        api.addSection(token(), lessonId, title, description, audio.toPart())
+    /** Sends a take to be read before it becomes a section; [sectionId] for a new take of one. */
+    suspend fun uploadTake(lessonId: String, sectionId: String?, audio: LocalFile, onProgress: (Float) -> Unit): UploadedTake =
+        apiCall { api.uploadTake(token(), lessonId, sectionId, audio.toPart(), onProgress) }.toDomain()
+
+    /** The take as the server stored it, for a picked file this device can't read. */
+    suspend fun takeAudio(lessonId: String, takeId: String): LocalFile = apiCall {
+        val dir = LocalFile(cacheDir(context), "take_preview").apply { mkdirs() }
+        dir.listFiles()?.forEach { it.delete() }
+        LocalFile(dir, "$takeId.wav").also { api.takeAudio(token(), lessonId, takeId).writeAtomically(it) }
     }
+
+    suspend fun discardTake(lessonId: String, takeId: String) {
+        apiCall { api.discardTake(token(), lessonId, takeId) }
+    }
+
+    suspend fun addSection(lessonId: String, title: String, description: String, takeId: String) = call {
+        api.addSection(token(), lessonId, title, description, takeId)
+    }
+
+    suspend fun updateSection(lessonId: String, sectionId: String, title: String, description: String, takeId: String?) =
+        call { api.updateSection(token(), lessonId, sectionId, title, description, takeId) }
 
     suspend fun deleteSection(lessonId: String, sectionId: String) =
         call { api.deleteSection(token(), lessonId, sectionId) }
