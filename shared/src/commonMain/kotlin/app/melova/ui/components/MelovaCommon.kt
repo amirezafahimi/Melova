@@ -177,6 +177,43 @@ fun MelovaTopBar(
     }
 }
 
+/**
+ * The small action that sits beside something else — «درس جدید» next to a heading, «دنبال کردن»
+ * at the end of a teacher's row. A tinted pill, never a solid fill: a page keeps its solid
+ * button for its one main action, and these stay quiet next to what they belong to. [done] empties
+ * the pill out to its outline, for an action already taken (following, a code already copied).
+ */
+@Composable
+fun MelovaSoftAction(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+    done: Boolean = false
+) {
+    val content = if (enabled) MelovaAccentSoft else MelovaTextMuted
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(MelovaDimens.CompactButtonHeight),
+        shape = MelovaPillShape,
+        color = if (done || !enabled) Color.Transparent else MelovaAccentTint,
+        border = if (done || !enabled) BorderStroke(1.dp, MelovaOutline) else null
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            icon?.let {
+                Icon(it, contentDescription = null, tint = content, modifier = Modifier.size(MelovaDimens.IconSmall))
+            }
+            Text(text, style = MaterialTheme.typography.labelLarge, color = content, maxLines = 1)
+        }
+    }
+}
+
 @Composable
 fun SectionHeader(title: String, trailing: String? = null) {
     Row(

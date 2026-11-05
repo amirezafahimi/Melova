@@ -24,7 +24,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -75,7 +74,6 @@ import androidx.compose.ui.unit.dp
 import app.melova.ui.theme.MelovaOutline
 import app.melova.ui.theme.MelovaCardShape
 import app.melova.ui.theme.MelovaSmallShape
-import app.melova.ui.theme.MelovaPillShape
 import app.melova.ui.theme.MelovaAccentTint
 import app.melova.ui.components.MelovaNavRow
 import app.melova.ui.components.MelovaGroupRow
@@ -97,6 +95,7 @@ import app.melova.ui.components.ConfirmDialog
 import app.melova.ui.components.FormDialog
 import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaChip
+import app.melova.ui.components.MelovaSoftAction
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTextField
 import app.melova.ui.components.MelovaTopBar
@@ -632,16 +631,7 @@ private fun HeaderWithAction(title: String, actionLabel: String, onAction: () ->
             color = MelovaText,
             modifier = Modifier.weight(1f)
         )
-        Button(
-            onClick = onAction,
-            shape = MelovaPillShape,
-            contentPadding = PaddingValues(start = 10.dp, end = 14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MelovaAccentTint, contentColor = MelovaAccentSoft),
-            modifier = Modifier.height(36.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(MelovaDimens.IconSmall))
-            Text(" $actionLabel", style = MaterialTheme.typography.labelLarge)
-        }
+        MelovaSoftAction(text = actionLabel, onClick = onAction, icon = Icons.Default.Add)
     }
 }
 

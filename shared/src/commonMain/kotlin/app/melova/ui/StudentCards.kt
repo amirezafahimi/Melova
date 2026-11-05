@@ -3,13 +3,13 @@ package app.melova.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.HourglassTop
@@ -20,7 +20,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +38,7 @@ import app.melova.data.model.LessonPurchaseStatus
 import app.melova.presentation.LoginGate
 import app.melova.presentation.TeacherAskState
 import app.melova.ui.components.FormDialog
+import app.melova.ui.components.MelovaSoftAction
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MelovaTextField
 import app.melova.ui.layout.LtrContent
@@ -299,18 +299,15 @@ private fun CardNumberRow(cardNumber: String) {
                 )
             }
         }
-        OutlinedButton(
+        MelovaSoftAction(
+            text = if (copied) "کپی شد" else "کپی",
             onClick = {
                 clipboard.setText(AnnotatedString(cardNumber))
                 copied = true
             },
-            shape = RoundedCornerShape(999.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp),
-            modifier = Modifier.height(40.dp)
-        ) {
-            Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-            Text(if (copied) " کپی شد" else " کپی", style = MaterialTheme.typography.labelMedium)
-        }
+            icon = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+            done = copied
+        )
     }
 }
 
