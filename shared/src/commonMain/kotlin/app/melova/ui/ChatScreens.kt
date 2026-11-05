@@ -1103,7 +1103,13 @@ private fun VoiceRow(
 
 @Composable
 private fun VoiceButton(icon: ImageVector, description: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = CircleShape, color = MelovaAccent, modifier = Modifier.size(44.dp)) {
+    // Playing a voice leaves the keyboard up, as the composer's own buttons do.
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MelovaAccent,
+        modifier = Modifier.focusProperties { canFocus = false }.size(44.dp)
+    ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(26.dp))
         }
@@ -1119,7 +1125,7 @@ private fun ProgressRing(progress: Float, description: String, onClick: () -> Un
         onClick = onClick,
         shape = CircleShape,
         color = MelovaAccent,
-        modifier = Modifier.size(44.dp).semantics { contentDescription = description }
+        modifier = Modifier.focusProperties { canFocus = false }.size(44.dp).semantics { contentDescription = description }
     ) {
         Box(contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
@@ -1233,6 +1239,8 @@ private fun PracticeBubble(
             .fillMaxWidth()
             .border(1.dp, MelovaAccent.copy(alpha = 0.55f), shape)
             .clip(shape)
+            // Holding it for its menu leaves the keyboard up.
+            .focusProperties { canFocus = false }
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
