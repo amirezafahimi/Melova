@@ -2,7 +2,8 @@
 <html lang="fa" dir="rtl" translate="no">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <!-- resizes-content: Chrome shrinks the page above the keyboard instead of sliding it under. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content">
     <title>ملووا</title>
     <!-- On a phone in another language, Chrome's translate bar would cover the bottom navigation. -->
     <meta name="google" content="notranslate">
@@ -73,6 +74,52 @@
                 var active = (root && root.activeElement) || document.activeElement;
                 if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) event.preventDefault();
             }, true);
+        })();
+    </script>
+    <script>
+        // Compose gets no keyboard inset in the browser, and Safari (and Chrome without the meta
+        // above) only overlays the keyboard and lets the page be dragged under it, taking the
+        // message field along. So the app is held to the part of the screen the keyboard leaves —
+        // its bottom edge on the keyboard's top — and the page itself never moves.
+        (function () {
+            var view = window.visualViewport;
+            if (!view) return;
+            var fitted = '';
+            function fit() {
+                var body = document.body;
+                if (!body) return;
+                var top = view.offsetTop + 'px', height = view.height + 'px';
+                if (top + height === fitted) return;
+                fitted = top + height;
+                body.style.position = 'fixed';
+                body.style.left = '0';
+                body.style.width = '100%';
+                body.style.top = top;
+                body.style.height = height;
+                // Compose measures its box again only when the window says it changed size.
+                window.dispatchEvent(new Event('resize'));
+            }
+            // The keyboard changes height after it is up too — the emoji panel is taller on some
+            // phones — and some browsers report a keyboard sliding in only once it has stopped.
+            // So any sign of a change is followed frame by frame for the next 40 frames or so.
+            var following = 0;
+            function follow() {
+                fit();
+                if (following > 0) return;
+                following = 40;
+                (function step() {
+                    fit();
+                    if (--following > 0) requestAnimationFrame(step);
+                })();
+            }
+            view.addEventListener('resize', follow);
+            view.addEventListener('scroll', follow);
+            window.addEventListener('resize', follow);
+            document.addEventListener('focusin', follow);
+            document.addEventListener('focusout', follow);
+            document.addEventListener('DOMContentLoaded', fit);
+            // Compose reads every touch itself; the browser's own dragging is what moved the page.
+            document.addEventListener('touchmove', function (event) { event.preventDefault(); }, { passive: false });
         })();
     </script>
     <script src="melova-audio.js"></script>
