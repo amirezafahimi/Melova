@@ -24,8 +24,8 @@ class MelovaRemoteDataSourceImpl(
     override suspend fun downloadLessonIntro(lessonId: String) =
         MelovaNetwork.api.downloadLessonIntro(lessonId)
 
-    override suspend fun downloadSectionAudio(lessonId: String, sectionId: String) =
-        MelovaNetwork.api.downloadSectionAudio(lessonId, sectionId)
+    override suspend fun downloadSectionAudio(lessonId: String, sectionId: String, teacherToken: String?) =
+        MelovaNetwork.api.downloadSectionAudio(lessonId, sectionId, teacherToken)
 
     override suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, speed: Float) =
         MelovaNetwork.api.downloadSectionSlowAudio(lessonId, sectionId, speed)

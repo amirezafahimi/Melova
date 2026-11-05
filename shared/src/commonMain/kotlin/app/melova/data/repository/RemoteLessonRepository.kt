@@ -6,11 +6,11 @@ import app.melova.data.model.Catalog
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
 import app.melova.data.model.TeacherOrnament
-import app.melova.data.model.TeacherOrnamentKind
 import app.melova.data.remote.datasource.MelovaRemoteDataSource
 import app.melova.data.remote.datasource.MelovaRemoteDataSourceImpl
 import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.mapper.toDomain
+import app.melova.data.remote.mapper.toOrnaments
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.writeAtomically
 import app.melova.platform.concurrentMapOf
@@ -73,7 +73,7 @@ class RemoteLessonRepository(
             version = section.audioVersion,
             extension = ".wav"
         ) { target ->
-            remoteDataSource.downloadSectionAudio(lesson.id, section.id).writeAtomically(target, minBytes = 45L)
+            remoteDataSource.downloadSectionAudio(lesson.id, section.id, TeacherSession(context).token).writeAtomically(target, minBytes = 45L)
             require(TeacherReferenceCache.isValidWav(target)) { "فایل صوتی استاد معتبر نیست." }
             // Playback-only copy: the server scores against its own original file.
             val (samples, sampleRate) = WavUtils.readPcm16Samples(target)
@@ -118,10 +118,7 @@ class RemoteLessonRepository(
             throw IOException("دریافت تحریرهای استاد ممکن نشد. اتصال اینترنت را بررسی کنید.", error)
         }
         response.failureReason?.takeIf { it.isNotBlank() }?.let { throw IOException(it) }
-        val ornaments = response.ornaments.mapNotNull { dto ->
-            val kind = TeacherOrnamentKind.fromRaw(dto.kind) ?: return@mapNotNull null
-            TeacherOrnament(kind, dto.startMs, dto.endMs).takeIf { dto.endMs > dto.startMs }
-        }.sortedBy { it.startMs }
+        val ornaments = response.ornaments.toOrnaments()
         ornamentCache[key] = ornaments
         ornaments
     }

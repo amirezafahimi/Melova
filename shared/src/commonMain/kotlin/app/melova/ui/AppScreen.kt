@@ -38,7 +38,13 @@ object AppScreen {
     /** A teacher's public page, as students see it. */
     const val TEACHER_PAGE = "teachers/{$ARG_TEACHER_ID}"
     const val TEACHER_PANEL = "teacher"
+    const val TEACHER_PROFILE = "teacher/profile"
     const val LESSON_EDITOR = "teacher/lesson/{$ARG_LESSON_ID}"
+    const val NEW_LESSON = "teacher/new-lesson"
+    const val LESSON_FORM = "teacher/lesson/{$ARG_LESSON_ID}/edit"
+    const val NEW_SECTION = "teacher/lesson/{$ARG_LESSON_ID}/new-section"
+    const val ARG_SECTION_ID = "sectionId"
+    const val EDIT_SECTION = "teacher/lesson/{$ARG_LESSON_ID}/section/{$ARG_SECTION_ID}"
     const val TEACHER_STUDENTS = "teacher/students"
     const val TEACHER_REPORT = "teacher/report"
 
@@ -75,6 +81,10 @@ object AppScreen {
     fun teacherPage(teacherId: String) = "teachers/${teacherId.encodeURLPathPart()}"
 
     fun lessonEditor(lessonId: String) = "teacher/lesson/${lessonId.encodeURLPathPart()}"
+    fun lessonForm(lessonId: String) = "teacher/lesson/${lessonId.encodeURLPathPart()}/edit"
+    fun newSection(lessonId: String) = "teacher/lesson/${lessonId.encodeURLPathPart()}/new-section"
+    fun editSection(lessonId: String, sectionId: String) =
+        "teacher/lesson/${lessonId.encodeURLPathPart()}/section/${sectionId.encodeURLPathPart()}"
 
     fun chat(chatId: String) = "chats/${chatId.encodeURLPathPart()}"
 }

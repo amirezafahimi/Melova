@@ -1,5 +1,6 @@
 package app.melova.ui
 
+import app.melova.ui.components.ForwardArrow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.PeopleOutline
@@ -32,6 +32,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.melova.ui.theme.MelovaGold
+import app.melova.ui.components.MelovaGroupRow
+import app.melova.ui.components.MelovaNavGroup
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonPurchaseRequest
 import app.melova.data.model.StudentCard
@@ -88,42 +91,33 @@ internal fun TeacherDeskEntryCard(
     onOpenStudents: () -> Unit,
     onOpenReport: () -> Unit
 ) {
-    MelovaSurfaceCard(contentPadding = 6.dp) {
-        Column {
-            DeskEntryRow(
-                Icons.Outlined.ChatBubbleOutline,
-                "گفتگو با هنرجوها",
-                if (unreadChats > 0) persianDigits("$unreadChats پیام تازه") else "پیام‌ها و نتیجه‌ی تمرین هنرجوها",
-                onOpenChats
+    MelovaNavGroup(
+        {
+            MelovaGroupRow(
+                icon = Icons.Outlined.ChatBubbleOutline,
+                title = "گفتگو با هنرجوها",
+                subtitle = if (unreadChats > 0) persianDigits("$unreadChats پیام تازه") else "پیام‌ها و نتیجه‌ی تمرین هنرجوها",
+                onClick = onOpenChats
             )
-            DeskEntryRow(
-                Icons.Outlined.PeopleOutline,
-                "هنرجوها و پرداخت‌ها",
-                if (pendingPurchases > 0) persianDigits("$pendingPurchases خرید منتظر تأیید شماست") else "تأیید خریدها و باز کردن درس برای هنرجو",
-                onOpenStudents
+        },
+        {
+            MelovaGroupRow(
+                icon = Icons.Outlined.PeopleOutline,
+                title = "هنرجوها و پرداخت‌ها",
+                subtitle = if (pendingPurchases > 0) persianDigits("$pendingPurchases خرید منتظر تأیید شماست") else "تأیید خریدها و باز کردن درس برای هنرجو",
+                onClick = onOpenStudents,
+                iconTint = if (pendingPurchases > 0) MelovaGold else MelovaAccentSoft
             )
-            DeskEntryRow(Icons.Outlined.Insights, "گزارش درآمد و زمان", "درآمد هر ساعت وقت شما، در مقایسه با کلاس خصوصی", onOpenReport)
+        },
+        {
+            MelovaGroupRow(
+                icon = Icons.Outlined.Insights,
+                title = "گزارش درآمد و زمان",
+                subtitle = "درآمد هر ساعت وقت شما، در مقایسه با کلاس خصوصی",
+                onClick = onOpenReport
+            )
         }
-    }
-}
-
-@Composable
-private fun DeskEntryRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    description: String,
-    onClick: () -> Unit
-) {
-    MelovaSurfaceCard(onClick = onClick, contentPadding = 10.dp, modifier = Modifier.padding(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(icon, contentDescription = null, tint = MelovaAccentSoft)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = MelovaText)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-            }
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
-        }
-    }
+    )
 }
 
 // ------------------------------------------------------------------ students
@@ -170,7 +164,7 @@ fun TeacherStudentsScreen(
             item { EmptyHint(Icons.Outlined.PeopleOutline, "هنرجویی پیدا نشد.") }
         }
         items(shown, key = { it.id }) { student ->
-            MelovaSurfaceCard(onClick = { paying = student }, contentPadding = 14.dp) {
+            MelovaSurfaceCard(onClick = { paying = student }, contentPadding = 12.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(student.name.ifBlank { "بی‌نام" }, style = MaterialTheme.typography.titleMedium, color = MelovaText)
@@ -207,8 +201,8 @@ private fun PurchaseRequestCard(
     busy: Boolean,
     onDecide: (approve: Boolean) -> Unit
 ) {
-    MelovaSurfaceCard(contentPadding = 14.dp) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    MelovaSurfaceCard(contentPadding = 12.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = request.studentName.ifBlank { "هنرجو" },
                 style = MaterialTheme.typography.titleMedium,
@@ -222,20 +216,20 @@ private fun PurchaseRequestCard(
             Text("نام واریزکننده: ${request.payer}", style = MaterialTheme.typography.bodySmall, color = MelovaText)
             Row(
                 modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
                     onClick = { onDecide(true) },
                     enabled = !busy,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                    modifier = Modifier.weight(1f).height(44.dp)
+                    modifier = Modifier.weight(1f).height(48.dp)
                 ) { Text("تأیید و باز کردن درس") }
                 OutlinedButton(
                     onClick = { onDecide(false) },
                     enabled = !busy,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.height(44.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(48.dp)
                 ) { Text("پیدا نشد", color = MelovaError) }
             }
         }
@@ -317,7 +311,7 @@ fun TeacherReportScreen(
             item { ReportNumbers(report) }
         }
         item {
-            MelovaSurfaceCard(onClick = { editingRate = true }, contentPadding = 14.dp) {
+            MelovaSurfaceCard(onClick = { editingRate = true }, contentPadding = 12.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("درآمد هر ساعت کلاس خصوصی شما", style = MaterialTheme.typography.titleSmall, color = MelovaText)
@@ -334,8 +328,8 @@ fun TeacherReportScreen(
         item {
             OutlinedButton(
                 onClick = { loggingTime = true },
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth().height(46.dp)
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
             ) { Text("ثبت زمان دیگر (آماده‌سازی، پیام‌ها، …)", color = MelovaAccentSoft) }
         }
         item {
@@ -389,7 +383,7 @@ fun TeacherReportScreen(
 @Composable
 private fun WorthItCard(report: TeacherReport) {
     MelovaSurfaceCard {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("درآمد خالص هر ساعت وقت شما", style = MaterialTheme.typography.titleSmall, color = MelovaTextMuted)
             Text(
                 text = report.netPerHourToman?.let(::formatToman) ?: "هنوز زمانی ثبت نشده",
@@ -416,7 +410,7 @@ private fun WorthItCard(report: TeacherReport) {
 @Composable
 private fun ReportNumbers(report: TeacherReport) {
     MelovaSurfaceCard {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ReportLine("درآمد ناخالص", formatToman(report.grossToman))
             ReportLine("درآمد خالص", formatToman(report.netToman))
             ReportLine("هنرجوی پرداخت‌کننده", persianDigits(report.payingStudents.toString()))

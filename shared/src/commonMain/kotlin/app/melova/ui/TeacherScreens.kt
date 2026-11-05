@@ -1,5 +1,23 @@
 package app.melova.ui
 
+import app.melova.ui.components.ForwardArrow
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import app.melova.presentation.ListenUiState
+import app.melova.presentation.TeacherListenViewModel
+import app.melova.ui.components.ListenButton
+import app.melova.ui.components.MelovaSwitch
+import app.melova.ui.components.SeekLine
+import app.melova.ui.components.formatClock
+import app.melova.ui.layout.LtrContent
+import app.melova.ui.theme.MelovaDimens
 import app.melova.platform.LocalFile
 import app.melova.platform.PlatformBackHandler as BackHandler
 import androidx.compose.foundation.background
@@ -7,6 +25,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +41,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -38,8 +56,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,9 +70,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.melova.ui.theme.MelovaOutline
+import app.melova.ui.theme.MelovaCardShape
+import app.melova.ui.theme.MelovaSmallShape
+import app.melova.ui.theme.MelovaPillShape
+import app.melova.ui.theme.MelovaAccentTint
+import app.melova.ui.components.MelovaNavRow
+import app.melova.ui.components.MelovaGroupRow
+import app.melova.ui.components.MelovaNavGroup
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.Sell
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.border
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
 import app.melova.data.repository.LessonFields
@@ -101,6 +129,8 @@ fun TeacherPanelScreen(
     /** Students waiting for the teacher to confirm a card payment. */
     pendingPurchases: Int,
     onOpenLesson: (String) -> Unit,
+    onNewLesson: () -> Unit,
+    onEditProfile: () -> Unit,
     onBack: () -> Unit,
     /** Null when the panel belongs to an account, which can't stop being a teacher. */
     onSignOut: (() -> Unit)? = null,
@@ -109,8 +139,6 @@ fun TeacherPanelScreen(
     onOpenStudents: () -> Unit = {},
     onOpenReport: () -> Unit = {}
 ) {
-    var editingProfile by rememberSaveable { mutableStateOf(false) }
-    var creatingLesson by rememberSaveable { mutableStateOf(false) }
     var confirmingSignOut by rememberSaveable { mutableStateOf(false) }
     val profile = state.profile
 
@@ -122,9 +150,9 @@ fun TeacherPanelScreen(
             return@TeacherScaffold
         }
         item {
-            MelovaSurfaceCard {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    TeacherAvatar(profile.name, size = 56.dp)
+            MelovaSurfaceCard(onClick = onEditProfile) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TeacherAvatar(profile.name, size = 56.dp, teacherId = profile.id, photoVersion = profile.photoVersion)
                     Column(modifier = Modifier.weight(1f)) {
                         Text(profile.name, style = MaterialTheme.typography.titleLarge, color = MelovaText)
                         Text(
@@ -135,7 +163,7 @@ fun TeacherPanelScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    IconButton(onClick = { editingProfile = true }) {
+                    IconButton(onClick = onEditProfile) {
                         Icon(Icons.Outlined.Edit, contentDescription = "ویرایش پروفایل استاد", tint = MelovaAccentSoft)
                     }
                 }
@@ -154,7 +182,7 @@ fun TeacherPanelScreen(
             HeaderWithAction(
                 title = "درس‌های شما",
                 actionLabel = "درس جدید",
-                onAction = { creatingLesson = true }
+                onAction = onNewLesson
             )
         }
         if (profile.lessons.isEmpty()) {
@@ -183,51 +211,6 @@ fun TeacherPanelScreen(
             onDismiss = { confirmingSignOut = false }
         )
     }
-    if (editingProfile && profile != null) {
-        var name by rememberSaveable { mutableStateOf(profile.name) }
-        var bio by rememberSaveable { mutableStateOf(profile.bio) }
-        var cardNumber by rememberSaveable { mutableStateOf(profile.cardNumber) }
-        var cardHolder by rememberSaveable { mutableStateOf(profile.cardHolder) }
-        FormDialog(
-            title = "پروفایل استاد",
-            confirmLabel = "ذخیره",
-            confirmEnabled = name.isNotBlank(),
-            onConfirm = {
-                viewModel.updateProfile(name, bio, cardNumber, cardHolder)
-                editingProfile = false
-            },
-            onDismiss = { editingProfile = false }
-        ) {
-            MelovaTextField(value = name, onValueChange = { name = it }, label = "نام نمایشی")
-            MelovaTextField(value = bio, onValueChange = { bio = it }, label = "معرفی کوتاه", singleLine = false, minLines = 3)
-            Text(
-                text = "هنرجوها قیمت درس را به این کارت واریز می‌کنند.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MelovaTextMuted
-            )
-            MelovaTextField(
-                value = cardNumber,
-                onValueChange = { cardNumber = it.take(24) },
-                label = "شماره کارت",
-                keyboardType = KeyboardType.Number,
-                leftToRight = true
-            )
-            MelovaTextField(value = cardHolder, onValueChange = { cardHolder = it.take(120) }, label = "نام صاحب کارت")
-        }
-    }
-    if (creatingLesson) {
-        LessonFormDialog(
-            title = "درس جدید",
-            initial = LessonFields("", "", profile?.lessons?.lastOrNull()?.level ?: "مقدماتی", ""),
-            confirmLabel = "ساختن و افزودن صدا",
-            onConfirm = {
-                creatingLesson = false
-                // Straight into the new lesson, where the intro and sections are recorded.
-                viewModel.createLesson(it, onCreated = onOpenLesson)
-            },
-            onDismiss = { creatingLesson = false }
-        )
-    }
 }
 
 @Composable
@@ -240,13 +223,13 @@ private fun ExitTeacherModeButton(onClick: () -> Unit) {
 @Composable
 private fun TeacherLessonRow(number: Int, lesson: Lesson, onClick: () -> Unit) {
     val ready = lesson.availableSections
-    MelovaSurfaceCard(onClick = onClick, contentPadding = 14.dp) {
+    MelovaSurfaceCard(onClick = onClick, contentPadding = 12.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             NumberBadge(number)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = lesson.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MelovaText,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -264,7 +247,7 @@ private fun TeacherLessonRow(number: Int, lesson: Lesson, onClick: () -> Unit) {
                     )
                 }
             }
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MelovaTextMuted)
+            ForwardArrow(tint = MelovaTextMuted)
         }
     }
 }
@@ -277,14 +260,17 @@ fun LessonEditorScreen(
     state: TeacherUiState,
     viewModel: TeacherViewModel,
     onPreview: () -> Unit,
-    onBack: () -> Unit
+    onEdit: () -> Unit,
+    onAddSection: () -> Unit,
+    onEditSection: (String) -> Unit,
+    onBack: () -> Unit,
+    listenViewModel: TeacherListenViewModel = viewModel { TeacherListenViewModel() }
 ) {
     val lesson = state.lesson(lessonId)
-    var editing by rememberSaveable { mutableStateOf(false) }
-    var addingSection by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     var editingSale by rememberSaveable { mutableStateOf(false) }
-    var sectionToDelete by remember { mutableStateOf<LessonSection?>(null) }
+    val listen by listenViewModel.uiState.collectAsStateWithLifecycle()
+    DisposableEffect(Unit) { onDispose { listenViewModel.pause() } }
     val introTake = rememberTakeController(TakeKind.INTRO)
     // Leaving the screen drops a take that isn't uploaded yet, so ask first.
     var pendingLeave by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -297,67 +283,92 @@ fun LessonEditorScreen(
         title = lesson?.title ?: "درس",
         subtitle = lesson?.let { if (it.published) "منتشرشده" else "پیش‌نویس" },
         onBack = { leave(onBack) },
-        busyLabel = state.busyLabel
+        busyLabel = state.busyLabel,
+        uploadProgress = state.uploadProgress
     ) {
         if (lesson == null) {
             item { LoadingOrRetry(state, onRetry = viewModel::refresh, missingMessage = "این درس حذف شده است.") }
             return@TeacherScaffold
         }
         item {
-            MelovaSurfaceCard {
-                Row(verticalAlignment = Alignment.Top) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(lesson.title, style = MaterialTheme.typography.titleLarge, color = MelovaText)
-                        if (lesson.subtitle.isNotBlank()) {
-                            Text(lesson.subtitle, style = MaterialTheme.typography.bodyMedium, color = MelovaAccentSoft)
+            MelovaSurfaceCard(onClick = onEdit) {
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(lesson.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MelovaText)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            PublishChip(lesson.published)
+                            if (lesson.level.isNotBlank()) MelovaChip(text = lesson.level)
+                            if (lesson.subtitle.isNotBlank()) MelovaChip(text = "خواننده: ${lesson.subtitle}", color = MelovaGold)
                         }
-                        if (lesson.level.isNotBlank()) MelovaChip(text = lesson.level)
                         Text(
                             text = lesson.description.ifBlank { "توضیحی برای این درس ننوشته‌اید." },
                             style = MaterialTheme.typography.bodySmall,
-                            color = MelovaTextMuted
+                            color = MelovaTextMuted,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                    IconButton(onClick = { editing = true }) {
-                        Icon(Icons.Outlined.Edit, contentDescription = "ویرایش اطلاعات درس", tint = MelovaAccentSoft)
-                    }
+                    Icon(Icons.Outlined.Edit, contentDescription = "ویرایش اطلاعات درس", tint = MelovaAccentSoft, modifier = Modifier.size(MelovaDimens.Icon))
                 }
             }
         }
         item {
+            // Who sees the lesson and what it costs, together: both decide who gets it.
             val canPublish = lesson.published || lesson.availableSections > 0
-            MelovaSurfaceCard(contentPadding = 14.dp) {
-                SwitchRow(
-                    title = "انتشار برای هنرجوها",
-                    description = when {
-                        lesson.published -> "همه این درس را در «جستجو» می‌بینند."
-                        canPublish -> "پیش‌نویس است؛ فقط شما آن را می‌بینید."
-                        else -> "برای انتشار، دست‌کم یک بخش اضافه کنید."
-                    },
-                    checked = lesson.published,
-                    enabled = canPublish && state.busyLabel == null,
-                    onCheckedChange = { viewModel.setLessonPublished(lesson.id, it) }
-                )
-            }
-        }
-        item {
-            SaleCard(
-                lesson = lesson,
-                hasCard = state.profile?.cardNumber?.isNotBlank() == true,
-                onEdit = { editingSale = true }
+            val hasCard = state.profile?.cardNumber?.isNotBlank() == true
+            MelovaNavGroup(
+                {
+                    MelovaGroupRow(
+                        icon = Icons.Outlined.Public,
+                        title = "انتشار برای هنرجوها",
+                        subtitle = when {
+                            lesson.published -> "همه این درس را در «جستجو» می‌بینند."
+                            canPublish -> "پیش‌نویس است؛ فقط شما آن را می‌بینید."
+                            else -> "برای انتشار، دست‌کم یک بخش اضافه کنید."
+                        },
+                        onClick = { if (canPublish) viewModel.setLessonPublished(lesson.id, !lesson.published) },
+                        showArrow = false,
+                        iconTint = if (lesson.published) MelovaSuccess else MelovaAccentSoft,
+                        enabled = canPublish && state.busyLabel == null,
+                        trailing = {
+                            MelovaSwitch(
+                                checked = lesson.published,
+                                onCheckedChange = { viewModel.setLessonPublished(lesson.id, it) },
+                                enabled = canPublish && state.busyLabel == null
+                            )
+                        }
+                    )
+                },
+                {
+                    MelovaGroupRow(
+                        icon = Icons.Outlined.Sell,
+                        title = if (lesson.priceToman > 0) "قیمت: ${formatToman(lesson.priceToman)}" else "درس رایگان",
+                        subtitle = saleNote(lesson, hasCard),
+                        onClick = { editingSale = true },
+                        iconTint = if (!lesson.isFree && !hasCard) MelovaError else MelovaGold
+                    )
+                }
             )
         }
         item { SectionHeader(title = "آموزش کلی") }
         item {
             IntroCard(
-                hasIntro = lesson.hasIntro,
+                lesson = lesson,
                 take = introTake,
+                listen = listen,
                 busy = state.busyLabel != null,
+                onListen = {
+                    introTake.pauseAll()
+                    listenViewModel.toggleIntro(lesson)
+                },
+                onSeek = listenViewModel::seekTo,
+                onSkip = listenViewModel::skipBy,
+                onReplace = listenViewModel::pause,
                 onUpload = { audio -> viewModel.uploadIntro(lesson.id, audio, onSuccess = introTake::clear) }
             )
         }
         item {
-            HeaderWithAction(title = "بخش‌های تمرین", actionLabel = "بخش جدید", onAction = { addingSection = true })
+            HeaderWithAction(title = "بخش‌های تمرین", actionLabel = "بخش جدید", onAction = { leave(onAddSection) })
         }
         if (lesson.sections.isEmpty()) {
             item {
@@ -367,16 +378,33 @@ fun LessonEditorScreen(
                 )
             }
         }
-        itemsIndexed(lesson.sections, key = { _, section -> section.id }) { index, section ->
-            TeacherSectionRow(number = index + 1, section = section, onDelete = { sectionToDelete = section })
+        if (lesson.sections.isNotEmpty()) {
+            item {
+                MelovaNavGroup(
+                    *lesson.sections.map { section ->
+                        @Composable {
+                            TeacherSectionRow(
+                                section = section,
+                                listen = listen,
+                                onListen = {
+                                    introTake.pauseAll()
+                                    listenViewModel.toggleSection(lesson, section)
+                                },
+                                onSeek = listenViewModel::seekTo,
+                                onEdit = { leave { onEditSection(section.id) } }
+                            )
+                        }
+                    }.toTypedArray()
+                )
+            }
         }
         if (lesson.sections.any { it.isAvailable }) {
             item {
-                OutlinedButton(
-                    onClick = { leave(onPreview) },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) { Text("دیدن درس از نگاه هنرجو", color = MelovaAccentSoft) }
+                MelovaNavRow(
+                    icon = Icons.Outlined.Visibility,
+                    title = "دیدن درس از نگاه هنرجو",
+                    onClick = { leave(onPreview) }
+                )
             }
         }
         item { DangerButton(label = "حذف درس", onClick = { confirmDelete = true }) }
@@ -392,35 +420,6 @@ fun LessonEditorScreen(
             onDismiss = { editingSale = false }
         )
     }
-    if (editing && lesson != null) {
-        LessonFormDialog(
-            title = "ویرایش درس",
-            initial = LessonFields(lesson.title, lesson.subtitle, lesson.level, lesson.description),
-            confirmLabel = "ذخیره",
-            onConfirm = {
-                viewModel.updateLesson(lesson.id, it)
-                editing = false
-            },
-            onDismiss = { editing = false }
-        )
-    }
-    if (addingSection && lesson != null) {
-        SectionFormDialog(
-            suggestedTitle = persianDigits("بخش ${lesson.sections.size + 1}"),
-            busyLabel = state.busyLabel,
-            onConfirm = { title, description, audio, onFailure ->
-                viewModel.addSection(
-                    lesson.id,
-                    title,
-                    description,
-                    audio,
-                    onSuccess = { addingSection = false },
-                    onFailure = onFailure
-                )
-            },
-            onDismiss = { addingSection = false }
-        )
-    }
     pendingLeave?.let { action ->
         ConfirmDialog(
             title = "ضبط ذخیره نشده",
@@ -432,18 +431,6 @@ fun LessonEditorScreen(
                 action()
             },
             onDismiss = { pendingLeave = null }
-        )
-    }
-    sectionToDelete?.let { section ->
-        ConfirmDialog(
-            title = "حذف بخش؟",
-            message = "«${section.title}» و فایل صوتی‌اش حذف می‌شود. نمره‌های هنرجوها برای این بخش دیگر نمایش داده نمی‌شود.",
-            confirmLabel = "حذف",
-            onConfirm = {
-                if (lesson != null) viewModel.deleteSection(lesson.id, section.id)
-                sectionToDelete = null
-            },
-            onDismiss = { sectionToDelete = null }
         )
     }
     if (confirmDelete && lesson != null) {
@@ -461,132 +448,108 @@ fun LessonEditorScreen(
     }
 }
 
+/** A section in the lesson's list: plays where it is, and opens its own page to change it. */
 @Composable
-private fun TeacherSectionRow(number: Int, section: LessonSection, onDelete: () -> Unit) {
-    MelovaSurfaceCard(contentPadding = 14.dp) {
+private fun TeacherSectionRow(
+    section: LessonSection,
+    listen: ListenUiState,
+    onListen: () -> Unit,
+    onSeek: (Float) -> Unit,
+    onEdit: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxWidth().clickable(onClick = onEdit).padding(12.dp)) {
+        TeacherListenRow(
+            title = section.title,
+            idleLine = persianDigits("${(section.durationMs + 999) / 1000} ثانیه"),
+            active = listen.key == TeacherListenViewModel.sectionKey(section),
+            listen = listen,
+            onListen = onListen,
+            onSeek = onSeek,
+            available = section.isAvailable,
+            trailing = { ForwardArrow(tint = MelovaTextMuted) }
+        )
+    }
+}
+
+/**
+ * One of the lesson's own files as a row: a play button, its name, and its length, or the time
+ * played with a line to seek along once it plays.
+ */
+@Composable
+internal fun TeacherListenRow(
+    title: String,
+    idleLine: String,
+    active: Boolean,
+    listen: ListenUiState,
+    onListen: () -> Unit,
+    onSeek: (Float) -> Unit,
+    onSkip: ((Long) -> Unit)? = null,
+    available: Boolean = true,
+    trailing: @Composable () -> Unit = {}
+) {
+    val ready = active && listen.isReady
+    val failed = !available || (active && listen.errorMessage != null)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            NumberBadge(number)
-            Column(modifier = Modifier.weight(1f)) {
+            if (available) {
+                ListenButton(
+                    isPlaying = active && listen.isPlaying,
+                    isLoading = active && listen.isLoading,
+                    onClick = onListen,
+                    contentDescription = if (active && listen.isPlaying) "توقف" else "پخش"
+                )
+            } else {
+                Box(
+                    modifier = Modifier.size(MelovaDimens.ListLead).clip(CircleShape).background(MelovaError.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Outlined.ErrorOutline, contentDescription = null, tint = MelovaError, modifier = Modifier.size(MelovaDimens.Icon))
+                }
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = MelovaText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    text = section.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MelovaText,
+                    text = when {
+                        !available -> "فایل صوتی پیدا نشد"
+                        active && listen.errorMessage != null -> listen.errorMessage
+                        active && listen.isLoading -> "در حال آماده‌سازی صدا…"
+                        ready && (listen.positionMs > 0 || listen.isPlaying) ->
+                            formatClock(listen.positionMs) + " از " + formatClock(listen.durationMs)
+                        else -> idleLine
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (failed) MelovaError else MelovaTextMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = if (section.isAvailable) {
-                        persianDigits("${(section.durationMs + 999) / 1000} ثانیه")
-                    } else {
-                        "فایل صوتی پیدا نشد"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (section.isAvailable) MelovaTextMuted else MelovaError
-                )
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Outlined.DeleteOutline, contentDescription = "حذف بخش", tint = MelovaError)
+            if (ready && onSkip != null) {
+                // Audio time runs left to right, even on a right-to-left page.
+                LtrContent {
+                    Row {
+                        IconButton(onClick = { onSkip(-10_000L) }, modifier = Modifier.size(MelovaDimens.CompactButtonHeight)) {
+                            Icon(Icons.Default.Replay10, contentDescription = "۱۰ ثانیه عقب", tint = MelovaTextMuted, modifier = Modifier.size(MelovaDimens.Icon))
+                        }
+                        IconButton(onClick = { onSkip(10_000L) }, modifier = Modifier.size(MelovaDimens.CompactButtonHeight)) {
+                            Icon(Icons.Default.Forward10, contentDescription = "۱۰ ثانیه جلو", tint = MelovaTextMuted, modifier = Modifier.size(MelovaDimens.Icon))
+                        }
+                    }
+                }
             }
+            trailing()
         }
+        if (ready) LtrContent { SeekLine(progress = listen.progress, onSeek = onSeek) }
     }
 }
 
 // ------------------------------------------------------------------ dialogs
 
-@Composable
-private fun LessonFormDialog(
-    title: String,
-    initial: LessonFields,
-    confirmLabel: String,
-    onConfirm: (LessonFields) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var lessonTitle by rememberSaveable { mutableStateOf(initial.title) }
-    var subtitle by rememberSaveable { mutableStateOf(initial.subtitle) }
-    var level by rememberSaveable { mutableStateOf(initial.level) }
-    var description by rememberSaveable { mutableStateOf(initial.description) }
-    FormDialog(
-        title = title,
-        confirmLabel = confirmLabel,
-        confirmEnabled = lessonTitle.isNotBlank(),
-        onConfirm = { onConfirm(LessonFields(lessonTitle.trim(), subtitle.trim(), level.trim(), description.trim())) },
-        onDismiss = onDismiss
-    ) {
-        MelovaTextField(value = lessonTitle, onValueChange = { lessonTitle = it }, label = "عنوان درس *")
-        MelovaTextField(value = subtitle, onValueChange = { subtitle = it }, label = "زیرعنوان")
-        MelovaTextField(value = level, onValueChange = { level = it }, label = "سطح (مثلاً مقدماتی)")
-        MelovaTextField(value = description, onValueChange = { description = it }, label = "توضیحات", singleLine = false, minLines = 3)
-    }
-}
-
-@Composable
-private fun SectionFormDialog(
-    suggestedTitle: String,
-    busyLabel: String?,
-    onConfirm: (title: String, description: String, audio: LocalFile, onFailure: (String) -> Unit) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var title by rememberSaveable { mutableStateOf(suggestedTitle) }
-    var description by rememberSaveable { mutableStateOf("") }
-    var uploadError by remember { mutableStateOf<String?>(null) }
-    val take = rememberTakeController(TakeKind.SECTION)
-    val busy = busyLabel != null
-    FormDialog(
-        title = "بخش جدید",
-        confirmLabel = "بارگذاری",
-        confirmEnabled = title.isNotBlank() && take.canUpload,
-        busy = busy,
-        // A stray tap outside must not throw away a take.
-        dismissOnOutsideTap = !take.hasUnsavedWork,
-        onConfirm = {
-            take.audio?.let { audio ->
-                uploadError = null
-                take.pauseAll()
-                onConfirm(title.trim(), description.trim(), audio) { uploadError = it }
-            }
-        },
-        onDismiss = onDismiss
-    ) {
-        MelovaTextField(value = title, onValueChange = { title = it }, label = "عنوان بخش *")
-        MelovaTextField(value = description, onValueChange = { description = it }, label = "راهنمای هنرجو", singleLine = false, minLines = 2)
-        Text("اجرای شما *", style = MaterialTheme.typography.titleSmall, color = MelovaText)
-        TeacherAudioSlot(controller = take, enabled = !busy)
-        when {
-            busyLabel != null -> Text(busyLabel, style = MaterialTheme.typography.bodySmall, color = MelovaAccentSoft)
-            uploadError != null -> Text(uploadError.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MelovaError)
-            take.phase == TakePhase.EMPTY -> Text(
-                text = "فقط صدای خواندن خودتان، بدون ساز یا با ساز خیلی آرام، در جای ساکت. هنرجو همین را می‌خواند و با صدای شما مقایسه می‌شود.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MelovaTextMuted
-            )
-        }
-    }
-}
-
-@Composable
-private fun SaleCard(lesson: Lesson, hasCard: Boolean, onEdit: () -> Unit) {
-    MelovaSurfaceCard(onClick = onEdit, contentPadding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (lesson.priceToman > 0) "قیمت: ${formatToman(lesson.priceToman)}" else "درس رایگان",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MelovaText
-                )
-                Text(
-                    text = when {
-                        lesson.isFree && lesson.priceToman > 0 -> "فعلاً همه‌ی درس‌ها رایگان است و این قیمت برای بعد می‌ماند."
-                        lesson.isFree -> "همه می‌توانند تمرینش کنند. برای فروش، قیمت بگذارید."
-                        !hasCard -> "برای شروع فروش، شماره کارتتان را در پروفایل استاد بگذارید."
-                        else -> "هنرجو کارت‌به‌کارت می‌خرد و شما تأیید می‌کنید."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (!lesson.isFree && !hasCard) MelovaError else MelovaTextMuted
-                )
-            }
-            Icon(Icons.Outlined.Edit, contentDescription = "قیمت درس", tint = MelovaAccentSoft)
-        }
-    }
+/** What the price row says under the price. */
+private fun saleNote(lesson: Lesson, hasCard: Boolean): String = when {
+    lesson.isFree && lesson.priceToman > 0 -> "فعلاً همه‌ی درس‌ها رایگان است و این قیمت برای بعد می‌ماند."
+    lesson.isFree -> "همه می‌توانند تمرینش کنند. برای فروش، قیمت بگذارید."
+    !hasCard -> "برای شروع فروش، شماره کارتتان را در پروفایل استاد بگذارید."
+    else -> "هنرجو کارت‌به‌کارت می‌خرد و شما تأیید می‌کنید."
 }
 
 /** Price 0 makes the lesson free again. */
@@ -620,6 +583,7 @@ internal fun TeacherScaffold(
     subtitle: String?,
     onBack: () -> Unit,
     busyLabel: String?,
+    uploadProgress: Float? = null,
     content: LazyListScope.() -> Unit
 ) {
     MelovaBackground {
@@ -629,13 +593,13 @@ internal fun TeacherScaffold(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars),
                 contentPadding = PagePadding,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item { MelovaTopBar(title = title, subtitle = subtitle, onBack = onBack) }
                 content()
             }
         }
-        BusyOverlay(busyLabel)
+        BusyOverlay(busyLabel, uploadProgress)
     }
 }
 
@@ -661,96 +625,106 @@ private fun HeaderWithAction(title: String, actionLabel: String, onAction: () ->
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = MelovaText, modifier = Modifier.weight(1f))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MelovaText,
+            modifier = Modifier.weight(1f)
+        )
         Button(
             onClick = onAction,
-            shape = RoundedCornerShape(999.dp),
-            contentPadding = PaddingValues(horizontal = 14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-            modifier = Modifier.height(38.dp)
+            shape = MelovaPillShape,
+            contentPadding = PaddingValues(start = 10.dp, end = 14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MelovaAccentTint, contentColor = MelovaAccentSoft),
+            modifier = Modifier.height(36.dp)
         ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(MelovaDimens.IconSmall))
             Text(" $actionLabel", style = MaterialTheme.typography.labelLarge)
         }
     }
 }
 
+/**
+ * The lesson's spoken intro: played here once it is uploaded, with recording or picking a new one
+ * folded under it until asked for.
+ */
 @Composable
-private fun IntroCard(hasIntro: Boolean, take: TakeController, busy: Boolean, onUpload: (LocalFile) -> Unit) {
+private fun IntroCard(
+    lesson: Lesson,
+    take: TakeController,
+    listen: ListenUiState,
+    busy: Boolean,
+    onListen: () -> Unit,
+    onSeek: (Float) -> Unit,
+    onSkip: (Long) -> Unit,
+    onReplace: () -> Unit,
+    onUpload: (LocalFile) -> Unit
+) {
+    // A new upload changes the version, which folds the recorder away again.
+    var replacing by rememberSaveable(lesson.introVersion) { mutableStateOf(false) }
+    val showSlot = !lesson.hasIntro || replacing || take.phase != TakePhase.EMPTY
     MelovaSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(
-                    imageVector = if (hasIntro) Icons.Outlined.CheckCircle else Icons.Outlined.AudioFile,
-                    contentDescription = null,
-                    tint = if (hasIntro) MelovaSuccess else MelovaGold,
-                    modifier = Modifier.size(28.dp)
+            if (lesson.hasIntro) {
+                TeacherListenRow(
+                    title = "آموزش کلی درس",
+                    idleLine = "هنرجو پیش از تمرین آن را گوش می‌دهد.",
+                    active = listen.key == TeacherListenViewModel.introKey(lesson),
+                    listen = listen,
+                    onListen = onListen,
+                    onSeek = onSeek,
+                    onSkip = onSkip
                 )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (hasIntro) "آموزش این درس آماده است" else "هنوز آموزشی برای این درس ندارید",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MelovaText
-                    )
-                    Text(
-                        text = if (hasIntro) {
-                            "هنرجو پیش از تمرین آن را گوش می‌دهد. برای جایگزینی، دوباره ضبط کنید یا فایل دیگری بدهید."
-                        } else {
-                            "توضیح صوتی شما درباره‌ی کل درس؛ همین‌جا ضبط کنید یا فایلش را انتخاب کنید."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MelovaTextMuted
-                    )
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Outlined.AudioFile, contentDescription = null, tint = MelovaGold, modifier = Modifier.size(28.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("هنوز آموزشی برای این درس ندارید", style = MaterialTheme.typography.titleMedium, color = MelovaText)
+                        Text(
+                            "توضیح صوتی شما درباره‌ی کل درس؛ همین‌جا ضبط کنید یا فایلش را انتخاب کنید.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MelovaTextMuted
+                        )
+                    }
                 }
             }
-            TeacherAudioSlot(controller = take, enabled = !busy)
-            if (take.phase == TakePhase.READY) {
-                Button(
-                    onClick = { take.audio?.let(onUpload) },
-                    enabled = take.canUpload && !busy,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
+            if (!showSlot) {
+                TextButton(
+                    onClick = {
+                        onReplace()
+                        replacing = true
+                    },
+                    enabled = !busy,
+                    shape = MelovaSmallShape,
+                    modifier = Modifier.fillMaxWidth().height(MelovaDimens.CompactButtonHeight)
                 ) {
-                    Icon(Icons.Outlined.CloudUpload, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text(if (hasIntro) "  جایگزینی آموزش فعلی" else "  بارگذاری آموزش", style = MaterialTheme.typography.labelLarge)
+                    Icon(Icons.Outlined.Mic, contentDescription = null, tint = MelovaAccentSoft, modifier = Modifier.size(MelovaDimens.IconSmall))
+                    Text("  ضبط دوباره یا انتخاب فایل دیگر", style = MaterialTheme.typography.labelLarge, color = MelovaAccentSoft)
+                }
+            } else {
+                if (lesson.hasIntro) HorizontalDivider(thickness = 1.dp, color = MelovaOutline)
+                TeacherAudioSlot(controller = take, enabled = !busy)
+                if (take.phase == TakePhase.READY) {
+                    Button(
+                        onClick = { take.audio?.let(onUpload) },
+                        enabled = take.canUpload && !busy,
+                        shape = MelovaSmallShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
+                        modifier = Modifier.fillMaxWidth().height(MelovaDimens.ButtonHeight)
+                    ) {
+                        Icon(Icons.Outlined.CloudUpload, contentDescription = null, modifier = Modifier.size(MelovaDimens.Icon))
+                        Text(if (lesson.hasIntro) "  جایگزینی آموزش فعلی" else "  بارگذاری آموزش", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                if (lesson.hasIntro && take.phase == TakePhase.EMPTY) {
+                    TextButton(onClick = { replacing = false }, modifier = Modifier.fillMaxWidth()) {
+                        Text("انصراف", style = MaterialTheme.typography.labelLarge, color = MelovaTextMuted)
+                    }
                 }
             }
         }
     }
-}
-
-@Composable
-private fun SwitchRow(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    enabled: Boolean = true
-) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = MelovaText)
-            Text(description, style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-        }
-        MelovaSwitch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
-    }
-}
-
-@Composable
-private fun MelovaSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        enabled = enabled,
-        colors = SwitchDefaults.colors(
-            checkedTrackColor = MelovaAccent,
-            checkedThumbColor = Color.White,
-            uncheckedTrackColor = MelovaAccent.copy(alpha = 0.22f),
-            uncheckedThumbColor = MelovaControl,
-            uncheckedBorderColor = MelovaControl
-        )
-    )
 }
 
 @Composable
@@ -762,12 +736,12 @@ private fun PublishChip(published: Boolean) {
 private fun NumberBadge(number: Int) {
     Box(
         modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(MelovaCardElevated),
+            .size(32.dp)
+            .clip(MelovaSmallShape)
+            .background(MelovaAccentTint),
         contentAlignment = Alignment.Center
     ) {
-        Text(persianDigits(number.toString()), style = MaterialTheme.typography.titleMedium, color = MelovaAccentSoft)
+        Text(persianDigits(number.toString()), style = MaterialTheme.typography.titleSmall, color = MelovaAccentSoft)
     }
 }
 
@@ -776,9 +750,9 @@ internal fun EmptyHint(icon: ImageVector, text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(MelovaCardElevated.copy(alpha = 0.6f))
-            .padding(14.dp),
+            .clip(MelovaCardShape)
+            .border(1.dp, MelovaOutline, MelovaCardShape)
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -789,13 +763,12 @@ internal fun EmptyHint(icon: ImageVector, text: String) {
 
 @Composable
 private fun DangerButton(label: String, onClick: () -> Unit) {
-    OutlinedButton(
+    TextButton(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MelovaError.copy(alpha = 0.5f)),
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(46.dp)
+        shape = MelovaSmallShape,
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(MelovaDimens.ButtonHeight)
     ) {
-        Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = MelovaError)
-        Text("  $label", color = MelovaError)
+        Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = MelovaError, modifier = Modifier.size(MelovaDimens.Icon))
+        Text("  $label", color = MelovaError, style = MaterialTheme.typography.labelLarge)
     }
 }

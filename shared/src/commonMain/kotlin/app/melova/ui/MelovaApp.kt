@@ -25,6 +25,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -153,10 +155,12 @@ fun MelovaApp(
         }
     }
 
+    val hazeState = rememberHazeState()
     Box(modifier = Modifier.fillMaxSize()) {
         // The UI is RTL, so "forward" slides in from the left.
         NavHost(
             navController = navController,
+            modifier = Modifier.hazeSource(hazeState),
             startDestination = AppScreen.SPLASH,
             enterTransition = { slideInHorizontally { -it / 4 } + fadeIn() },
             exitTransition = { fadeOut() },
@@ -186,6 +190,11 @@ fun MelovaApp(
                         catalogViewModel.refreshProgress()
                     },
                     onLessonClick = { navController.navigate(AppScreen.lesson(it)) },
+                    onSectionClick = { lessonId, sectionId ->
+                        // Through the lesson page, so back from the practice lands there.
+                        navController.navigate(AppScreen.lesson(lessonId))
+                        navController.navigate(AppScreen.practice(lessonId, sectionId))
+                    },
                     onSolfegeClick = { navController.navigate(AppScreen.SOLFEGE) },
                     onExploreClick = { selectTab(MainTab.EXPLORE) },
                     unreadChats = chatState.unread,
@@ -328,10 +337,20 @@ fun MelovaApp(
             ) { entry ->
                 val lessonId = entry.arguments?.read { getStringOrNull(VocalTrainingViewModel.ARG_LESSON_ID) }.orEmpty()
                 val sectionId = entry.arguments?.read { getStringOrNull(VocalTrainingViewModel.ARG_SECTION_ID) }.orEmpty()
+                val nextSection = catalogState.lesson(lessonId)?.let { catalogState.sectionAfter(it, sectionId) }
                 VocalTrainingScreen(
                     onBack = { navController.popBackStack() },
                     onOpenTeacherDetails = {
                         navController.navigate(AppScreen.teacherPerformance(lessonId, sectionId))
+                    },
+                    nextSectionTitle = nextSection?.title,
+                    onNextSection = nextSection?.let { next ->
+                        {
+                            // Replaces this practice, so back still goes to the lesson page.
+                            navController.navigate(AppScreen.practice(lessonId, next.id)) {
+                                popUpTo(AppScreen.PRACTICE) { inclusive = true }
+                            }
+                        }
                     },
                     loginGate = studentState.loginGate,
                     onLogin = { navController.navigate(AppScreen.login(LoginReason.TEACHER)) },
@@ -424,6 +443,8 @@ fun MelovaApp(
                     viewModel = teacherViewModel,
                     pendingPurchases = deskState.purchaseRequests.size,
                     onOpenLesson = { navController.navigate(AppScreen.lessonEditor(it)) },
+                    onNewLesson = { navController.navigate(AppScreen.NEW_LESSON) },
+                    onEditProfile = { navController.navigate(AppScreen.TEACHER_PROFILE) },
                     onBack = { navController.popBackStack() },
                     // An account stays a teacher for good; only a bare teacher code can leave.
                     onSignOut = if (studentState.account?.signedIn == true) null else {
@@ -466,6 +487,74 @@ fun MelovaApp(
                     state = teacherState,
                     viewModel = teacherViewModel,
                     onPreview = { navController.navigate(AppScreen.lesson(lessonId)) },
+                    onEdit = { navController.navigate(AppScreen.lessonForm(lessonId)) },
+                    onAddSection = { navController.navigate(AppScreen.newSection(lessonId)) },
+                    onEditSection = { sectionId -> navController.navigate(AppScreen.editSection(lessonId, sectionId)) },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(AppScreen.TEACHER_PROFILE) {
+                TeacherProfileScreen(
+                    state = teacherState,
+                    viewModel = teacherViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(AppScreen.NEW_LESSON) {
+                LessonFormScreen(
+                    lessonId = null,
+                    state = teacherState,
+                    viewModel = teacherViewModel,
+                    // The form gives way to the new lesson, so back from there returns to the panel.
+                    onCreated = { id ->
+                        navController.navigate(AppScreen.lessonEditor(id)) {
+                            popUpTo(AppScreen.NEW_LESSON) { inclusive = true }
+                        }
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                AppScreen.LESSON_FORM,
+                arguments = listOf(navArgument(AppScreen.ARG_LESSON_ID) { type = NavType.StringType })
+            ) { entry ->
+                LessonFormScreen(
+                    lessonId = entry.arguments?.read { getStringOrNull(AppScreen.ARG_LESSON_ID) }.orEmpty(),
+                    state = teacherState,
+                    viewModel = teacherViewModel,
+                    onCreated = {},
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                AppScreen.NEW_SECTION,
+                arguments = listOf(navArgument(AppScreen.ARG_LESSON_ID) { type = NavType.StringType })
+            ) { entry ->
+                SectionEditorScreen(
+                    lessonId = entry.arguments?.read { getStringOrNull(AppScreen.ARG_LESSON_ID) }.orEmpty(),
+                    sectionId = null,
+                    state = teacherState,
+                    viewModel = teacherViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                AppScreen.EDIT_SECTION,
+                arguments = listOf(
+                    navArgument(AppScreen.ARG_LESSON_ID) { type = NavType.StringType },
+                    navArgument(AppScreen.ARG_SECTION_ID) { type = NavType.StringType }
+                )
+            ) { entry ->
+                SectionEditorScreen(
+                    lessonId = entry.arguments?.read { getStringOrNull(AppScreen.ARG_LESSON_ID) }.orEmpty(),
+                    sectionId = entry.arguments?.read { getStringOrNull(AppScreen.ARG_SECTION_ID) }.orEmpty(),
+                    state = teacherState,
+                    viewModel = teacherViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -479,7 +568,8 @@ fun MelovaApp(
         ) {
             MelovaBottomBar(
                 selected = currentTab ?: MainTab.PRACTICE,
-                onSelect = { tab -> if (tab != currentTab) selectTab(tab) }
+                onSelect = { tab -> if (tab != currentTab) selectTab(tab) },
+                backdrop = hazeState
             )
         }
 

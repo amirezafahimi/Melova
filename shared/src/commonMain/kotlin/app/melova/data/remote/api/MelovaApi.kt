@@ -32,9 +32,11 @@ class MelovaApi(private val client: HttpClient) {
     suspend fun downloadLessonIntro(lessonId: String): ByteArray =
         client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/intro").bodyAsBytes()
 
-    suspend fun downloadSectionAudio(lessonId: String, sectionId: String): ByteArray =
-        client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/audio")
-            .bodyAsBytes()
+    /** With a teacher code, that teacher's draft sections too. */
+    suspend fun downloadSectionAudio(lessonId: String, sectionId: String, teacherToken: String?): ByteArray =
+        client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/audio") {
+            teacherToken?.let { header(TEACHER_TOKEN, it) }
+        }.bodyAsBytes()
 
     /** The section at a lower speed, stretched on the server with far fewer artefacts than the player's own. */
     suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, speed: Float): ByteArray =
