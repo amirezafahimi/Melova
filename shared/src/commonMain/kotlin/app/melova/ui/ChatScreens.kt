@@ -571,8 +571,19 @@ private fun Messages(
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom)
     ) {
         // A reversed list draws its first items at the bottom, where what is still going sits.
-        items(state.outgoing.asReversed(), key = { "pending-${it.localId}" }) { pending ->
-            PendingRow(pending = pending, actions = actions)
+        val pendingNewestFirst = state.outgoing.asReversed()
+        itemsIndexed(pendingNewestFirst, key = { _, pending -> "pending-${pending.localId}" }) { index, pending ->
+            val day = localDay(pending.createdAtMs)
+            val older = pendingNewestFirst.getOrNull(index + 1)?.createdAtMs ?: messages.lastOrNull()?.createdAtMs
+            val newer = pendingNewestFirst.getOrNull(index - 1)
+            PendingRow(
+                pending = pending,
+                state = state,
+                actions = actions,
+                onShowMessage = showMessage,
+                showsDay = older == null || localDay(older) != day,
+                showsTime = newer == null || localDay(newer.createdAtMs) != day
+            )
         }
         val newestFirst = messages.asReversed()
         itemsIndexed(newestFirst, key = { _, message -> message.id }) { index, message ->
@@ -591,9 +602,9 @@ private fun Messages(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     MessageBubble(message = message, isMine = isMine, state = state, actions = actions, onShowMessage = showMessage)
-                    // Only the day's last message carries the time and the tick.
-                    val newer = newestFirst.getOrNull(index - 1)
-                    if (newer == null || localDay(newer.createdAtMs) != day) {
+                    // Only the day's last message carries the time and the tick, counting those still going.
+                    val newer = newestFirst.getOrNull(index - 1)?.createdAtMs ?: state.outgoing.firstOrNull()?.createdAtMs
+                    if (newer == null || localDay(newer) != day) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
                                 text = formatTimeOfDay(message.createdAtMs),
@@ -647,19 +658,7 @@ private fun MessageBubble(
     var menuAt by remember(message.id) { mutableStateOf(Offset.Zero) }
     if (heldAt != null) menuAt = heldAt!!
 
-    // The message this one answers, as long as it is still in the thread, drawn inside the bubble.
-    val answered = message.replyToId?.let { id -> state.thread?.messages?.firstOrNull { it.id == id } }
-    val quote: (@Composable () -> Unit)? = answered?.let { other ->
-        {
-            val chat = state.thread?.chat
-            QuotedMessage(
-                answered = other,
-                author = if (chat != null && other.sender == chat.side) "شما" else chat?.peerName.orEmpty().ifBlank { "طرف گفتگو" },
-                onClick = { onShowMessage(other.id) },
-                onHold = holdInWindow
-            )
-        }
-    }
+    val quote = quoteOf(message.replyToId, state, onShowMessage, holdInWindow)
 
     Box(
         modifier = Modifier
@@ -807,6 +806,25 @@ private fun DayHeading(timeMs: Long) {
 @Composable
 private fun bubbleColor(isMine: Boolean) = if (isMine) MelovaAccent.copy(alpha = 0.22f) else MelovaBubbleReceived
 
+/** The message [replyToId] answers, as long as it is still in the thread, to draw inside the bubble. */
+private fun quoteOf(
+    replyToId: Long?,
+    state: ChatUiState,
+    onShowMessage: (Long) -> Unit,
+    onHold: ((Offset) -> Unit)?
+): (@Composable () -> Unit)? {
+    val chat = state.thread?.chat
+    val answered = replyToId?.let { id -> state.thread?.messages?.firstOrNull { it.id == id } } ?: return null
+    return {
+        QuotedMessage(
+            answered = answered,
+            author = if (chat != null && answered.sender == chat.side) "شما" else chat?.peerName.orEmpty().ifBlank { "طرف گفتگو" },
+            onClick = { onShowMessage(answered.id) },
+            onHold = onHold
+        )
+    }
+}
+
 /** One line standing for a message elsewhere in the thread: what an answer points back at. */
 private fun messagePreview(message: ChatMessage): String = when (message.kind) {
     ChatMessageKind.TEXT -> message.text
@@ -941,55 +959,66 @@ private fun VoiceBubble(
     )
 }
 
-/** A message still on its way out: the same bubble, with how much of it has gone. */
+/**
+ * A message still on its way out, drawn as it will be once it is there; only the clock in place
+ * of the tick says it hasn't gone yet, and a voice's button follows it out.
+ */
 @Composable
-private fun PendingRow(pending: OutgoingMessage, actions: MessageActions) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        if (pending.kind == ChatMessageKind.VOICE) {
-            VoiceRow(
-                isMine = true,
-                peaks = pending.peaks,
-                progress = 0f,
-                clock = formatClock(pending.durationMs),
-                faded = true,
-                button = {
-                    if (pending.hasFailed) {
-                        VoiceButton(Icons.Outlined.Refresh, "فرستادن دوباره") { actions.retry(pending.localId) }
-                    } else {
-                        ProgressRing(pending.progress, description = "در حال فرستادن") {}
-                    }
-                },
-                onScrub = {},
-                onScrubEnd = {},
-                canScrub = false
-            )
-        } else {
-            TextBubble(pending.text, isMine = true, isBusy = !pending.hasFailed)
-        }
-        if (pending.hasFailed) {
-            FailedRow(onRetry = { actions.retry(pending.localId) }, onDiscard = { actions.discard(pending.localId) })
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = if (pending.kind == ChatMessageKind.VOICE) {
-                        "در حال فرستادن ${persianDigits((pending.progress * 100).toInt().toString())}٪"
-                    } else {
-                        "در حال فرستادن"
+private fun PendingRow(
+    pending: OutgoingMessage,
+    state: ChatUiState,
+    actions: MessageActions,
+    onShowMessage: (Long) -> Unit,
+    showsDay: Boolean,
+    showsTime: Boolean
+) {
+    val quote = quoteOf(pending.replyTo, state, onShowMessage, onHold = null)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (showsDay) DayHeading(pending.createdAtMs)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (pending.kind == ChatMessageKind.VOICE) {
+                VoiceRow(
+                    isMine = true,
+                    peaks = pending.peaks,
+                    progress = 0f,
+                    clock = formatClock(pending.durationMs),
+                    faded = false,
+                    button = {
+                        if (pending.hasFailed) {
+                            VoiceButton(Icons.Outlined.Refresh, "فرستادن دوباره") { actions.retry(pending.localId) }
+                        } else {
+                            ProgressRing(pending.progress, description = "در حال فرستادن") {}
+                        }
                     },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MelovaTextMuted,
-                    modifier = Modifier.alignByBaseline()
+                    onScrub = {},
+                    onScrubEnd = {},
+                    canScrub = false,
+                    quote = quote
                 )
-                Icon(
-                    imageVector = Icons.Outlined.Schedule,
-                    contentDescription = null,
-                    tint = MelovaTextMuted,
-                    modifier = iconOnBaseline(TICK_BOTTOM_UNIT).size(14.dp)
-                )
+            } else {
+                TextBubble(pending.text, isMine = true, quote = quote)
+            }
+            if (pending.hasFailed) {
+                FailedRow(onRetry = { actions.retry(pending.localId) }, onDiscard = { actions.discard(pending.localId) })
+            } else if (showsTime) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = formatTimeOfDay(pending.createdAtMs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MelovaTextMuted,
+                        modifier = Modifier.alignByBaseline()
+                    )
+                    Icon(
+                        imageVector = Icons.Outlined.Schedule,
+                        contentDescription = "در حال فرستادن",
+                        tint = MelovaTextMuted,
+                        modifier = iconOnBaseline(TICK_BOTTOM_UNIT).size(14.dp)
+                    )
+                }
             }
         }
     }

@@ -10,10 +10,11 @@ import app.melova.data.model.ChatThread
 import app.melova.data.model.ChatUpdate
 import app.melova.data.repository.ChatRepository
 import app.melova.platform.ChatAlerts
-import app.melova.platform.LocalFile
 import app.melova.platform.KeyValueStore
+import app.melova.platform.LocalFile
 import app.melova.platform.NotificationState
 import app.melova.platform.appContext
+import app.melova.platform.currentTimeMillis
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -493,6 +494,8 @@ data class OutgoingMessage(
     val peaks: List<Float> = emptyList(),
     /** The message in the thread this one answers, when it answers one. */
     val replyTo: Long? = null,
+    /** When it was written, shown as its time until the server's own replaces it. */
+    val createdAtMs: Long = currentTimeMillis(),
     /** How much of it has gone, from 0 to 1; a text message is there or not. */
     val progress: Float = 0f,
     val hasFailed: Boolean = false
