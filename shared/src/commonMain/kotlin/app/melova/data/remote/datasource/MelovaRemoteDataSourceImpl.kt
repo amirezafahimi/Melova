@@ -21,14 +21,14 @@ class MelovaRemoteDataSourceImpl(
     override suspend fun getCatalog(teacherToken: String?): CatalogResponseDto =
         MelovaNetwork.api.catalog(teacherToken)
 
-    override suspend fun downloadLessonIntro(lessonId: String) =
-        MelovaNetwork.api.downloadLessonIntro(lessonId)
+    override suspend fun downloadLessonIntro(lessonId: String, version: String) =
+        MelovaNetwork.api.downloadLessonIntro(lessonId, version)
 
-    override suspend fun downloadSectionAudio(lessonId: String, sectionId: String, teacherToken: String?) =
-        MelovaNetwork.api.downloadSectionAudio(lessonId, sectionId, teacherToken)
+    override suspend fun downloadSectionAudio(lessonId: String, sectionId: String, version: String, teacherToken: String?) =
+        MelovaNetwork.api.downloadSectionAudio(lessonId, sectionId, version, teacherToken)
 
-    override suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, speed: Float) =
-        MelovaNetwork.api.downloadSectionSlowAudio(lessonId, sectionId, speed)
+    override suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, version: String, speed: Float) =
+        MelovaNetwork.api.downloadSectionSlowAudio(lessonId, sectionId, version, speed)
 
     // The first request analyses the teacher's file, which takes as long as scoring.
     override suspend fun getSectionOrnaments(lessonId: String, sectionId: String): TeacherOrnamentsResponseDto =

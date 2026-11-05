@@ -15,11 +15,11 @@ interface MelovaRemoteDataSource {
 
     suspend fun getCatalog(teacherToken: String?): CatalogResponseDto
 
-    suspend fun downloadLessonIntro(lessonId: String): ByteArray
+    suspend fun downloadLessonIntro(lessonId: String, version: String): ByteArray
 
-    suspend fun downloadSectionAudio(lessonId: String, sectionId: String, teacherToken: String?): ByteArray
+    suspend fun downloadSectionAudio(lessonId: String, sectionId: String, version: String, teacherToken: String?): ByteArray
 
-    suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, speed: Float): ByteArray
+    suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, version: String, speed: Float): ByteArray
 
     suspend fun getSectionOrnaments(lessonId: String, sectionId: String): TeacherOrnamentsResponseDto
 

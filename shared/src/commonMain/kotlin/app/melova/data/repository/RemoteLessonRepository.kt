@@ -57,7 +57,7 @@ class RemoteLessonRepository(
                 prefix = "intro_",
                 version = lesson.introVersion
             ) { target ->
-                remoteDataSource.downloadLessonIntro(lesson.id).writeAtomically(target, minBytes = 1_024L)
+                remoteDataSource.downloadLessonIntro(lesson.id, lesson.introVersion).writeAtomically(target, minBytes = 1_024L)
             }
         }
 
@@ -73,7 +73,7 @@ class RemoteLessonRepository(
             version = section.audioVersion,
             extension = ".wav"
         ) { target ->
-            remoteDataSource.downloadSectionAudio(lesson.id, section.id, TeacherSession(context).token).writeAtomically(target, minBytes = 45L)
+            remoteDataSource.downloadSectionAudio(lesson.id, section.id, section.audioVersion, TeacherSession(context).token).writeAtomically(target, minBytes = 45L)
             require(TeacherReferenceCache.isValidWav(target)) { "فایل صوتی استاد معتبر نیست." }
             // Playback-only copy: the server scores against its own original file.
             val (samples, sampleRate) = WavUtils.readPcm16Samples(target)
@@ -96,7 +96,7 @@ class RemoteLessonRepository(
             version = "${section.audioVersion}_$SLOW_RECIPE",
             extension = ".wav"
         ) { target ->
-            remoteDataSource.downloadSectionSlowAudio(lesson.id, section.id, speed).writeAtomically(target, minBytes = 45L)
+            remoteDataSource.downloadSectionSlowAudio(lesson.id, section.id, section.audioVersion, speed).writeAtomically(target, minBytes = 45L)
             require(TeacherReferenceCache.isValidWav(target)) { "فایل صوتی استاد معتبر نیست." }
             val (samples, sampleRate) = WavUtils.readPcm16Samples(target)
             if (samples.isNotEmpty()) {

@@ -3,6 +3,7 @@ package app.melova.data.remote.api
 import app.melova.data.remote.MelovaNetwork.call
 import app.melova.data.remote.MelovaNetwork.decode
 import app.melova.data.remote.MelovaNetwork.segment
+import app.melova.data.remote.MelovaNetwork.versionQuery
 import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.HealthResponseDto
 import app.melova.data.remote.dto.ScoringResponseDto
@@ -29,18 +30,18 @@ class MelovaApi(private val client: HttpClient) {
             teacherToken?.let { header(TEACHER_TOKEN, it) }
         }.decode()
 
-    suspend fun downloadLessonIntro(lessonId: String): ByteArray =
-        client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/intro").bodyAsBytes()
+    suspend fun downloadLessonIntro(lessonId: String, version: String): ByteArray =
+        client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/intro${versionQuery(version)}").bodyAsBytes()
 
     /** With a teacher code, that teacher's draft sections too. */
-    suspend fun downloadSectionAudio(lessonId: String, sectionId: String, teacherToken: String?): ByteArray =
-        client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/audio") {
+    suspend fun downloadSectionAudio(lessonId: String, sectionId: String, version: String, teacherToken: String?): ByteArray =
+        client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/audio${versionQuery(version)}") {
             teacherToken?.let { header(TEACHER_TOKEN, it) }
         }.bodyAsBytes()
 
     /** The section at a lower speed, stretched on the server with far fewer artefacts than the player's own. */
-    suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, speed: Float): ByteArray =
-        client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/audio/slow?speed=$speed")
+    suspend fun downloadSectionSlowAudio(lessonId: String, sectionId: String, version: String, speed: Float): ByteArray =
+        client.call(HttpMethod.Get, "api/v1/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/audio/slow?speed=$speed&v=${segment(version)}")
             .bodyAsBytes()
 
     /** The teacher's tahrir and vibrato vowels in one section. */

@@ -96,4 +96,12 @@ object MelovaNetwork {
 
     /** A path segment from an id, escaped like Retrofit's @Path. */
     internal fun segment(raw: String): String = raw.encodeURLPathPart()
+
+    /**
+     * The version of the file being asked for, added to its address. A lesson's audio keeps the
+     * same address when the teacher records it again, and a browser holding the old answer hands
+     * that one back; a new version is a new address, which nothing has an old answer for.
+     */
+    internal fun versionQuery(version: String): String =
+        if (version.isBlank()) "" else "?v=${segment(version)}"
 }
