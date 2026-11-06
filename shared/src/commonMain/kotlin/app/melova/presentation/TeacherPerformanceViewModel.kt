@@ -2,8 +2,10 @@ package app.melova.presentation
 
 import androidx.lifecycle.ViewModel
 import app.melova.platform.appContext
+import app.melova.platform.cacheDir
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import app.melova.audio.io.WavUtils
 import app.melova.audio.io.WaveformPeaksExtractor
 import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.playback.TeacherVocalGenerator
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import app.melova.platform.LocalFile
 import app.melova.platform.ioDispatcher
+import kotlin.math.roundToInt
 
 /**
  * The teacher's performance in detail: the wave, its tahrir (T) and vibrato (V) segments,
@@ -36,6 +39,8 @@ class TeacherPerformanceViewModel(
 
     private val lessonRepository: LessonRepository = RemoteLessonRepository()
     private val player = ReferenceAudioPlayer(appContext)
+    /** Plays the segments from [reel], so whatever sounds after a stop is silence, not the next consonant. */
+    private val segmentPlayer = ReferenceAudioPlayer(appContext)
 
     private val _uiState = MutableStateFlow(TeacherPerformanceUiState())
     val uiState: StateFlow<TeacherPerformanceUiState> = _uiState.asStateFlow()
@@ -49,6 +54,11 @@ class TeacherPerformanceViewModel(
     /** What the player reads from: the teacher's file, or a slower copy once one is here. */
     private var voice: Voice? = null
     private val voices = mutableMapOf<Float, Voice>()
+
+    /** Every segment of a voice cut out ahead of time, so a tap only has to seek. */
+    private var reel: Reel? = null
+    private val reels = mutableMapOf<Float, Reel>()
+    private var reelJob: Job? = null
 
     init {
         load()
@@ -108,6 +118,8 @@ class TeacherPerformanceViewModel(
             runCatching { lessonRepository.sectionOrnaments(currentLesson, currentSection) }
                 .onSuccess { ornaments ->
                     _uiState.update { it.copy(ornaments = ornaments, isOrnamentsLoading = false) }
+                    reels.clear()
+                    cutReel()
                 }
                 .onFailure { error ->
                     _uiState.update {
@@ -120,18 +132,74 @@ class TeacherPerformanceViewModel(
         }
     }
 
+    private fun cutReel() {
+        val current = voice ?: return
+        reelJob?.cancel()
+        reelJob = viewModelScope.launch { reelFor(current)?.let(::loadReel) }
+    }
+
+    private suspend fun reelFor(source: Voice): Reel? {
+        reels[source.speed]?.let { return it }
+        val ornaments = _uiState.value.ornaments.takeIf { it.isNotEmpty() } ?: return null
+        return runCatching { withContext(ioDispatcher) { writeReel(source, ornaments) } }
+            .getOrNull()
+            ?.also { reels[source.speed] = it }
+    }
+
+    private fun loadReel(next: Reel) {
+        reel = next
+        segmentPlayer.prepare(next.file, onFinished = ::onPlaybackFinished)
+        applySpeed()
+    }
+
+    /**
+     * The segments' own samples one after another, [REEL_GAP_MS] of silence after each and a few
+     * ms fade at each edge so the cut does not click. A stop always sounds a little late (what the
+     * speaker already has keeps playing), and here that late bit falls in the silence.
+     */
+    private fun writeReel(source: Voice, ornaments: List<TeacherOrnament>): Reel {
+        val (samples, sampleRate) = WavUtils.readPcm16Samples(source.file)
+        val samplesPerMs = sampleRate / source.speed / 1000f
+        val gap = sampleRate * REEL_GAP_MS / 1000
+        val clips = ornaments.map { ornament ->
+            val from = (ornament.startMs * samplesPerMs).toInt().coerceIn(0, samples.size)
+            val to = (ornament.endMs * samplesPerMs).toInt().coerceIn(from, samples.size)
+            val clip = samples.copyOfRange(from, to)
+            val fade = minOf(clip.size / 4, sampleRate * EDGE_FADE_MS / 1000)
+            for (index in 0 until fade) {
+                val gain = index.toFloat() / fade
+                clip[index] = (clip[index] * gain).toInt().toShort()
+                val tail = clip.size - 1 - index
+                clip[tail] = (clip[tail] * gain).toInt().toShort()
+            }
+            clip
+        }
+        val all = ShortArray(clips.sumOf { it.size + gap })
+        val startsMs = mutableListOf<Long>()
+        var at = 0
+        for (clip in clips) {
+            startsMs += at * 1000L / sampleRate
+            clip.copyInto(all, at)
+            at += clip.size + gap
+        }
+        val file = LocalFile(cacheDir(appContext), "teacher_segments_${(source.speed * 100).roundToInt()}.wav")
+        WavUtils.writePcm16Wav(file, all, sampleRate)
+        return Reel(file, source.speed, ornaments, startsMs)
+    }
+
     fun togglePlayback() {
         if (!_uiState.value.isReady) return
-        if (player.isPlaying) {
+        if (player.isPlaying || segmentPlayer.isPlaying) {
             player.pause()
+            segmentPlayer.pause()
             stopProgressPolling()
             _uiState.update { it.copy(isPlaying = false, positionMs = playheadMs()) }
             return
         }
         val state = _uiState.value
         val segment = state.playingIndex?.let { state.ornaments.getOrNull(it) }
-        if (segment != null && player.canResume) {
-            player.play()
+        if (segment != null && segmentPlayer.canResume) {
+            segmentPlayer.play()
             _uiState.update { it.copy(isPlaying = true) }
             // Still a segment: it must stop at its own vowel's end, not run into the next one.
             watchSegment(segment)
@@ -155,15 +223,18 @@ class TeacherPerformanceViewModel(
         if (!_uiState.value.isReady) return
         val ornament = _uiState.value.ornaments.getOrNull(index) ?: return
         val startMs = (fromMs ?: ornament.startMs).coerceIn(ornament.startMs, ornament.endMs)
-        // The whole voice is already in the player: the vowel starts the moment it is tapped,
-        // with nothing to cut or load first, and its end is kept by watching the playhead.
-        applySpeed()
-        player.setLooping(false)
-        player.playFrom((startMs / (voice?.speed ?: 1f)).toLong())
-        _uiState.update {
-            it.copy(selectedIndex = index, playingIndex = index, isPlaying = true, positionMs = startMs)
+        _uiState.update { it.copy(selectedIndex = index) }
+        viewModelScope.launch {
+            // Cut as soon as the segments arrive, so this waits only when tapped right away.
+            if (reel == null) reelJob?.join()
+            val current = reel ?: return@launch
+            if (_uiState.value.selectedIndex != index) return@launch
+            player.pause()
+            applySpeed()
+            segmentPlayer.playFrom(current.reelMs(index, startMs))
+            _uiState.update { it.copy(playingIndex = index, isPlaying = true, positionMs = startMs) }
+            watchSegment(ornament)
         }
-        watchSegment(ornament)
     }
 
     /**
@@ -177,10 +248,12 @@ class TeacherPerformanceViewModel(
                 val position = playheadMs()
                 _uiState.update { it.copy(positionMs = position.coerceAtMost(ornament.endMs)) }
                 if (position >= ornament.endMs) {
-                    if (_uiState.value.loopSegment) {
-                        player.playFrom((ornament.startMs / (voice?.speed ?: 1f)).toLong())
+                    val index = _uiState.value.playingIndex
+                    val current = reel
+                    if (_uiState.value.loopSegment && index != null && current != null) {
+                        segmentPlayer.playFrom(current.reelMs(index, ornament.startMs))
                     } else {
-                        player.pause()
+                        segmentPlayer.pause()
                         progressJob = null
                         _uiState.update {
                             it.copy(isPlaying = false, playingIndex = null, positionMs = ornament.endMs)
@@ -215,12 +288,15 @@ class TeacherPerformanceViewModel(
         }.getOrNull()
     }
 
-    private fun switchTo(next: Voice) {
-        val wasPlaying = player.isPlaying
+    private suspend fun switchTo(next: Voice) {
+        val nextReel = reelFor(next)
+        val wasPlaying = player.isPlaying || segmentPlayer.isPlaying
         val positionMs = playheadMs()
         val segment = _uiState.value.playingIndex
+        segmentPlayer.pause()
         voice = next
         loadWholeFile()
+        if (nextReel != null) loadReel(nextReel)
         when {
             // Carries on from the same moment instead of going back to the vowel's start.
             segment != null && wasPlaying -> playSegment(segment, fromMs = positionMs)
@@ -230,7 +306,9 @@ class TeacherPerformanceViewModel(
     }
 
     private fun applySpeed() {
-        player.setSpeed(_uiState.value.speed / (voice?.speed ?: 1f))
+        val speed = _uiState.value.speed
+        player.setSpeed(speed / (voice?.speed ?: 1f))
+        reel?.let { segmentPlayer.setSpeed(speed / it.speed) }
     }
 
     fun toggleLoop() {
@@ -251,6 +329,7 @@ class TeacherPerformanceViewModel(
 
     fun stopPlayback() {
         if (player.isPlaying) player.pause()
+        if (segmentPlayer.isPlaying) segmentPlayer.pause()
         stopProgressPolling()
         _uiState.update { it.copy(isPlaying = false, playingIndex = null) }
     }
@@ -258,6 +337,7 @@ class TeacherPerformanceViewModel(
     private fun playWholeFrom(positionMs: Long) {
         val totalMs = _uiState.value.durationMs.coerceAtLeast(1L)
         val startMs = positionMs.coerceIn(0L, totalMs)
+        segmentPlayer.pause()
         applySpeed()
         player.playFrom((startMs / (voice?.speed ?: 1f)).toLong())
         _uiState.update {
@@ -273,8 +353,12 @@ class TeacherPerformanceViewModel(
     }
 
     /** Where in the teacher's own time the player is; a slow copy runs longer than that. */
-    private fun playheadMs(): Long =
-        (player.currentPositionMs() * (voice?.speed ?: 1f)).toLong()
+    private fun playheadMs(): Long {
+        val segment = _uiState.value.playingIndex
+        val current = reel
+        if (segment != null && current != null) return current.teacherMs(segment, segmentPlayer.currentPositionMs())
+        return (player.currentPositionMs() * (voice?.speed ?: 1f)).toLong()
+    }
 
     private fun startProgressPolling() {
         progressJob?.cancel()
@@ -302,6 +386,7 @@ class TeacherPerformanceViewModel(
     override fun onCleared() {
         stopProgressPolling()
         player.release()
+        segmentPlayer.release()
         super.onCleared()
     }
 
@@ -316,11 +401,28 @@ class TeacherPerformanceViewModel(
         private const val PROGRESS_TICK_MS = 33L
         /** A segment's end is a moment in the voice, so its playhead is read more often. */
         private const val SEGMENT_TICK_MS = 8L
+        private const val EDGE_FADE_MS = 4
+        /** Longer than any output delay, Bluetooth too, so a late stop never reaches the next segment. */
+        private const val REEL_GAP_MS = 1_000
     }
 }
 
 /** The teacher's voice at [speed], which is 1 for their own file. */
 private class Voice(val file: LocalFile, val speed: Float)
+
+/** The segments of a voice at [speed] in one [file], segment i starting at [startsMs]`[i]` of it. */
+private class Reel(
+    val file: LocalFile,
+    val speed: Float,
+    private val ornaments: List<TeacherOrnament>,
+    private val startsMs: List<Long>
+) {
+    fun reelMs(index: Int, teacherMs: Long): Long =
+        startsMs[index] + ((teacherMs - ornaments[index].startMs) / speed).toLong()
+
+    fun teacherMs(index: Int, reelMs: Long): Long =
+        ornaments[index].startMs + ((reelMs - startsMs[index]) * speed).toLong()
+}
 
 data class TeacherPerformanceUiState(
     val title: String = "",
