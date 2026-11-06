@@ -1,8 +1,8 @@
 package app.melova.data.repository
 
+import app.melova.audio.io.takePart
 import app.melova.audio.playback.ExpectedSegment
 import app.melova.data.model.VocalScoreResult
-import app.melova.data.remote.FilePart
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.datasource.MelovaRemoteDataSource
 import app.melova.data.remote.datasource.MelovaRemoteDataSourceImpl
@@ -44,7 +44,7 @@ class RemoteVocalScoringRepository(
         }
         val body = multipartBody(
             fields,
-            listOf(FilePart("student", studentFile.name, "audio/wav", studentFile.readBytes()))
+            listOf(takePart("student", studentFile.readBytes()))
         )
 
         return try {

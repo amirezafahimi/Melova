@@ -1,5 +1,6 @@
 package app.melova.data.repository
 
+import app.melova.audio.io.takePart
 import app.melova.data.local.StudentSession
 import app.melova.data.local.TeacherSession
 import app.melova.data.model.LoginCodeSent
@@ -172,7 +173,7 @@ class StudentRepository(
         score: VocalScoreResult?
     ): String? {
         // Read now, so the next recording can't overwrite the file mid-upload.
-        val audio = FilePart("audio", "take.wav", "audio/wav", take.readBytes())
+        val audio = takePart("audio", take.readBytes())
         return apiCall {
             api.sendForReview(
                 lessonId = lessonId,
