@@ -1,9 +1,16 @@
 package app.melova.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,8 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -59,11 +64,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.melova.audio.pitch.PitchContour
 import app.melova.audio.pitch.PitchPoint
@@ -72,6 +79,7 @@ import app.melova.data.model.ErrorDetail
 import app.melova.data.model.ErrorDetailLane
 import app.melova.data.model.ErrorMarkKind
 import app.melova.data.model.TahrirKind
+import app.melova.data.model.isNotSung
 import app.melova.platform.PlatformBackHandler
 import app.melova.platform.pad2
 import app.melova.platform.persianDigits
@@ -82,11 +90,15 @@ import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaAccentTint
 import app.melova.ui.theme.MelovaCard
+import app.melova.ui.theme.MelovaDimens
 import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaInfo
+import app.melova.ui.theme.MelovaPillShape
 import app.melova.ui.theme.MelovaSecondary
+import app.melova.ui.theme.MelovaSmallShape
 import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaText
+import app.melova.ui.theme.MelovaTextMuted
 import app.melova.ui.theme.MelovaWarning
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -119,15 +131,16 @@ fun ErrorDetailSheet(
     val comparison = detail.comparison
     val markColor = when {
         comparison != null -> MelovaGold
-        correction?.direction == VocalScorer.CorrectionDirection.SHARP -> MelovaWarning
-        correction?.direction == VocalScorer.CorrectionDirection.FLAT -> MelovaInfo
+        correction != null -> correctionColor(correction)
         else -> MelovaSuccess
     }
     val kindLabel = when {
-        comparison == null -> "خطای نت"
+        comparison == null -> correction?.let(::correctionKind) ?: "خطای نت"
         comparison.kind == TahrirKind.VIBRATO -> "ویبراتو"
         else -> "تحریر"
     }
+    val word = quotedWord(comparison?.word ?: correction?.word)
+    val message = comparison?.message ?: correction?.message.orEmpty()
 
     PlatformBackHandler(onBack = onDismiss)
     ModalBottomSheet(
@@ -140,41 +153,54 @@ fun ErrorDetailSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                // The word is what the student remembers the mistake by, so it leads, large.
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        DetailPill(text = kindLabel, color = markColor)
+                        val timeMs = comparison?.refStartMs ?: correction?.startMs ?: 0L
+                        DetailPill(text = "\u200E${formatDetailClock(timeMs)}\u200F", color = MelovaTextMuted)
+                    }
+                    if (word != null) {
+                        Text(
+                            text = word,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MelovaText,
+                            textAlign = TextAlign.Start
+                        )
+                    }
                     Text(
-                        text = kindLabel,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MelovaText,
-                        modifier = Modifier.weight(1f),
+                        text = message,
+                        style = if (word != null) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                        fontWeight = if (word != null) FontWeight.SemiBold else FontWeight.Bold,
+                        color = markColor,
                         textAlign = TextAlign.Start
                     )
-                    val timeMs = comparison?.refStartMs ?: correction?.startMs ?: 0L
-                    DetailPill(text = "زمان ‎${formatDetailClock(timeMs)}‏", color = MelovaText)
                 }
-
-                wordLabel(comparison?.word ?: correction?.word)?.let { word ->
-                    DetailPill(text = word, color = MelovaAccent)
-                }
-
-                Text(
-                    text = comparison?.message ?: correction?.message.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = markColor,
-                    textAlign = TextAlign.Start
-                )
 
                 if (correction != null) {
                     NoteFacts(correction, markColor)
                 } else if (comparison != null) {
-                    DetailPill(text = persianDigits("تطابق ${comparison.score}٪"), color = markColor)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FactTile(
+                            label = "تطابق با استاد",
+                            value = persianDigits("${comparison.score}٪"),
+                            color = scoreColor(comparison.score),
+                            modifier = Modifier.weight(1f)
+                        )
+                        FactTile(
+                            label = "نوع",
+                            value = tahrirKindLabel(comparison.kind),
+                            color = markColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
 
                 DetailLaneCard(
@@ -212,30 +238,70 @@ fun ErrorDetailSheet(
 
                 OutlinedButton(
                     onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(MelovaDimens.ButtonHeight),
+                    shape = MelovaSmallShape
                 ) {
-                    Text("بستن", color = MelovaText)
+                    Text("بستن", style = MaterialTheme.typography.titleSmall, color = MelovaText)
                 }
             }
         }
     }
 }
 
+/** The teacher's note, the student's, and how far apart they were, each in its own tile. */
 @Composable
 private fun NoteFacts(correction: VocalScorer.PitchCorrection, markColor: Color) {
+    val cents = abs(correction.centsOff).roundToInt()
+    val way = when (correction.direction) {
+        VocalScorer.CorrectionDirection.SHARP -> "بالاتر"
+        VocalScorer.CorrectionDirection.FLAT -> "پایین‌تر"
+        VocalScorer.CorrectionDirection.GOOD -> null
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        DetailPill(text = "نت استاد: ${correction.expectedNote}", color = MelovaAccent)
-        if (correction.sungNote != "—") {
-            DetailPill(text = "شما: ${correction.sungNote}", color = markColor)
+        FactTile(label = "نت استاد", value = correction.expectedNote, color = MelovaAccentSoft, modifier = Modifier.weight(1f))
+        FactTile(
+            label = "نت شما",
+            value = if (correction.isNotSung) "خوانده نشد" else correction.sungNote,
+            color = markColor,
+            modifier = Modifier.weight(1f)
+        )
+        if (!correction.isNotSung && way != null && cents > 0) {
+            FactTile(
+                label = way,
+                value = persianDigits("$cents سنت"),
+                color = markColor,
+                modifier = Modifier.weight(1f)
+            )
         }
-        val cents = abs(correction.centsOff).roundToInt()
-        val way = when (correction.direction) {
-            VocalScorer.CorrectionDirection.SHARP -> "بالاتر"
-            VocalScorer.CorrectionDirection.FLAT -> "پایین‌تر"
-            VocalScorer.CorrectionDirection.GOOD -> null
-        }
-        if (way != null && cents > 0) DetailPill(text = persianDigits("$cents سنت $way"), color = markColor)
+    }
+}
+
+@Composable
+private fun FactTile(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(MelovaSmallShape)
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MelovaTextMuted,
+            maxLines = 1
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -243,12 +309,12 @@ private fun NoteFacts(correction: VocalScorer.PitchCorrection, markColor: Color)
 private fun DetailPill(text: String, color: Color) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
         color = color,
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.12f))
+            .clip(MelovaPillShape)
+            .background(color.copy(alpha = 0.14f))
             .padding(horizontal = 12.dp, vertical = 4.dp)
     )
 }
@@ -272,20 +338,28 @@ private fun DetailLaneCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MelovaSmallShape)
             .background(laneColor.copy(alpha = 0.08f))
-            .padding(10.dp),
+            .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, contentDescription = null, tint = laneColor, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(MelovaSmallShape)
+                    .background(laneColor.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = laneColor, modifier = Modifier.size(MelovaDimens.Icon))
+            }
+            Spacer(Modifier.width(8.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MelovaText,
                 modifier = Modifier.weight(1f),
@@ -299,13 +373,13 @@ private fun DetailLaneCard(
                     contentColor = if (isPlaying) Color.White else MelovaAccentSoft
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                         Text(
                             text = when {
@@ -313,7 +387,7 @@ private fun DetailLaneCard(
                                 lane.speed < 1f -> "پخش آهسته"
                                 else -> "پخش"
                             },
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(start = 4.dp)
                         )
@@ -623,12 +697,12 @@ private fun MarkLegend(markKind: ErrorMarkKind, markColor: Color, kindLabel: Str
         Spacer(Modifier.width(8.dp))
         Text(
             text = if (markKind == ErrorMarkKind.MOMENT) {
-                "نقطه: لحظه‌ای که نت شما از نت استاد فاصله گرفته. خط کم‌رنگ زیر خط شما، نت‌های استاد است. نشانگر را بکشید تا به هر لحظه بروید."
+                "نقطه جای خطاست و خط کم‌رنگ زیر خط شما نت‌های استاد. نشانگر را بکشید تا به هر لحظه بروید."
             } else {
-                "بازه‌ی رنگی: جای $kindLabel در صدای استاد و شما. خط کم‌رنگ زیر خط شما، نت‌های استاد است. نشانگر را بکشید تا به هر لحظه بروید."
+                "بازه‌ی رنگی جای $kindLabel است و خط کم‌رنگ زیر خط شما نت‌های استاد. نشانگر را بکشید تا به هر لحظه بروید."
             },
             style = MaterialTheme.typography.bodySmall,
-            color = MelovaText.copy(alpha = 0.65f),
+            color = MelovaTextMuted,
             textAlign = TextAlign.Start
         )
     }
@@ -640,25 +714,48 @@ private fun formatDetailClock(ms: Long): String {
     return persianDigits("${seconds / 60L}:${(seconds % 60L).pad2()}.${(safe % 1000L) / 100L}")
 }
 
-/** The «دیدن جزییات» pill on a correction or tahrir row. */
+/**
+ * «دیدن جزییات» under a correction or tahrir. While [isInviting] it blinks softly, so a student who
+ * hasn't found the detail view yet sees where it is.
+ */
 @Composable
-fun ShowDetailsButton(onClick: () -> Unit) {
+fun ShowDetailsButton(onClick: () -> Unit, isInviting: Boolean, modifier: Modifier = Modifier) {
+    val glow = if (isInviting) {
+        val blink = rememberInfiniteTransition(label = "details")
+        val value by blink.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(850, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "details-glow"
+        )
+        value
+    } else {
+        0f
+    }
+    val accent = MelovaAccent
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
-        color = MelovaAccentTint,
+        modifier = modifier
+            .height(MelovaDimens.CompactButtonHeight)
+            .graphicsLayer {
+                scaleX = 1f + 0.025f * glow
+                scaleY = 1f + 0.025f * glow
+            },
+        shape = MelovaSmallShape,
+        color = accent.copy(alpha = 0.14f + 0.26f * glow),
         contentColor = MelovaAccentSoft
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Outlined.GraphicEq, contentDescription = null, modifier = Modifier.size(16.dp))
+            Icon(Icons.Outlined.GraphicEq, contentDescription = null, modifier = Modifier.size(MelovaDimens.Icon))
             Text(
                 text = "دیدن جزییات",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 4.dp)
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 8.dp)
             )
         }
     }

@@ -23,7 +23,7 @@ object IntervalLabel {
     /** cents > 0 means sung sharp. */
     fun directionMessage(timeRange: String, cents: Float): String {
         val softener = if (abs(cents) < 150f) "کمی " else ""
-        val verb = if (cents > 0f) "بم‌تر" else "زیرتر"
+        val verb = if (cents > 0f) "پایین‌تر" else "بالاتر"
         return "در $timeRange — $softener$verb بخوانید (${of(cents)})"
     }
 }
