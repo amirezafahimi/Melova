@@ -5,6 +5,7 @@ import app.melova.data.remote.api.MelovaApi
 import app.melova.data.remote.dto.HealthResponseDto
 import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.ScoringResponseDto
+import app.melova.data.remote.dto.TakePieceAnswerDto
 import app.melova.data.remote.dto.TeacherOrnamentsResponseDto
 import io.ktor.http.content.OutgoingContent
 
@@ -36,4 +37,9 @@ class MelovaRemoteDataSourceImpl(
 
     override suspend fun scorePerformance(body: OutgoingContent): ScoringResponseDto =
         api.score(body)
+
+    override suspend fun streamTakePiece(streamId: String, body: OutgoingContent): TakePieceAnswerDto =
+        MelovaNetwork.api.streamTakePiece(streamId, body)
+
+    override suspend fun dropTakeStream(streamId: String) = MelovaNetwork.api.dropTakeStream(streamId)
 }

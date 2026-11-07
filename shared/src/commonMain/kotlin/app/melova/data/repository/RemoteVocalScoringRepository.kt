@@ -1,8 +1,10 @@
 package app.melova.data.repository
 
+import app.melova.audio.io.FlacEncoder
 import app.melova.audio.io.takePart
 import app.melova.audio.playback.ExpectedSegment
 import app.melova.data.model.VocalScoreResult
+import app.melova.data.remote.FilePart
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.datasource.MelovaRemoteDataSource
 import app.melova.data.remote.datasource.MelovaRemoteDataSourceImpl
@@ -16,6 +18,9 @@ import app.melova.platform.persianDigits
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 
 class RemoteVocalScoringRepository(
@@ -27,7 +32,8 @@ class RemoteVocalScoringRepository(
         studentFile: LocalFile,
         expectedSegments: List<ExpectedSegment>?,
         lessonId: String?,
-        sectionId: String?
+        sectionId: String?,
+        streamId: String?
     ): VocalScoreResult {
         require(studentFile.exists() && studentFile.length() > 44L) {
             "فایل ضبط هنرجو یافت نشد"
@@ -41,6 +47,7 @@ class RemoteVocalScoringRepository(
                 put("section_id", sectionId)
             }
             expectedSegments.toRequestJson()?.let { json -> put("expected_segments_json", json) }
+            streamId?.let { put("stream_id", it) }
         }
         val body = multipartBody(
             fields,
@@ -72,6 +79,25 @@ class RemoteVocalScoringRepository(
                 error
             )
         }
+    }
+
+    override fun streamTake(scope: CoroutineScope, lessonId: String?): TakeStream {
+        val id = TakeStream.newId()
+        return TakeStream(
+            id,
+            scope,
+            send = { offset, samples, sampleRate, ended ->
+                val piece = if (samples.isEmpty()) {
+                    emptyList()
+                } else {
+                    val flac = withContext(Dispatchers.Default) { FlacEncoder.encode(samples, sampleRate) }
+                    listOf(FilePart("piece", "piece.flac", "audio/flac", flac))
+                }
+                val fields = mapOf("offset" to offset.toString(), "ended" to ended.toString(), "lesson_id" to lessonId)
+                remoteDataSource.streamTakePiece(id, multipartBody(fields, piece)).accepted
+            },
+            drop = { remoteDataSource.dropTakeStream(id) }
+        )
     }
 
     private suspend fun pingServer() {

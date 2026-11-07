@@ -19,14 +19,28 @@
     view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
     view.setUint16(32, 2, true); view.setUint16(34, 16, true); text(36, 'data'); view.setUint32(40, length * 2, true);
     let offset = 44;
-    for (const chunk of chunks) {
-      for (let i = 0; i < chunk.length; i++) {
-        const s = Math.max(-1, Math.min(1, chunk[i]));
-        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-        offset += 2;
-      }
-    }
+    for (const chunk of chunks) offset = writePcm(view, offset, chunk, 0);
     return new Int8Array(buffer);
+  }
+
+  function writePcm(view, offset, chunk, from) {
+    for (let i = from; i < chunk.length; i++) {
+      const s = Math.max(-1, Math.min(1, chunk[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      offset += 2;
+    }
+    return offset;
+  }
+
+  /** Samples [from, end of chunks) as 16-bit PCM, written just as the WAV writes them. */
+  function pcmSince(chunks, length, from) {
+    const view = new DataView(new ArrayBuffer(Math.max(0, length - from) * 2));
+    let start = 0, offset = 0;
+    for (const chunk of chunks) {
+      if (start + chunk.length > from) offset = writePcm(view, offset, chunk, Math.max(0, from - start));
+      start += chunk.length;
+    }
+    return new Int8Array(view.buffer);
   }
 
   /** Mono PCM straight from the microphone, kept in memory and written as WAV at the end. */
@@ -62,6 +76,9 @@
     };
     return {
       elapsedMs: () => length * 1000 / context.sampleRate,
+      sampleRate: () => context.sampleRate,
+      sampleCount: () => length,
+      pcmSince: (from) => pcmSince(chunks, length, from),
       level: () => level,
       error: () => error,
       pause: () => { paused = true; },

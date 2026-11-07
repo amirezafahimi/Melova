@@ -13,8 +13,16 @@ expect class VocalRecorder(context: PlatformContext) {
     /** Records exactly [durationMs]; returns the recorded length. */
     suspend fun recordFor(durationMs: Long, outputFile: LocalFile): Long
 
-    /** Records until [requestStop] or [maxDurationMs]; returns the recorded length. */
-    suspend fun recordFreeform(outputFile: LocalFile, maxDurationMs: Long): Long
+    /**
+     * Records until [requestStop] or [maxDurationMs]; returns the recorded length. [onSamples] gets
+     * the take as it comes, before normalization, with its sample rate; on Android it is called on
+     * the recording thread.
+     */
+    suspend fun recordFreeform(
+        outputFile: LocalFile,
+        maxDurationMs: Long,
+        onSamples: ((ShortArray, Int) -> Unit)? = null
+    ): Long
 
     fun cancel()
 }

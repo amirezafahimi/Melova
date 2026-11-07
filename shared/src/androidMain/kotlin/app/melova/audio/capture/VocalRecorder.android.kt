@@ -39,18 +39,24 @@ actual class VocalRecorder actual constructor(
         )
     }
 
-    actual suspend fun recordFreeform(outputFile: LocalFile, maxDurationMs: Long): Long = withContext(Dispatchers.IO) {
+    actual suspend fun recordFreeform(
+        outputFile: LocalFile,
+        maxDurationMs: Long,
+        onSamples: ((ShortArray, Int) -> Unit)?
+    ): Long = withContext(Dispatchers.IO) {
         recordInternal(
             outputFile = outputFile,
             maxDurationMs = maxDurationMs,
-            stopWhenRequested = true
+            stopWhenRequested = true,
+            onSamples = onSamples
         )
     }
 
     private fun recordInternal(
         outputFile: LocalFile,
         maxDurationMs: Long,
-        stopWhenRequested: Boolean
+        stopWhenRequested: Boolean,
+        onSamples: ((ShortArray, Int) -> Unit)? = null
     ): Long {
         stopRequested = false
         if (!hasRecordAudioPermission()) {
@@ -113,6 +119,7 @@ actual class VocalRecorder actual constructor(
                         idleReads = 0
                         val toCopy = minOf(read, maxSamples - written)
                         readBuffer.copyInto(samples, written, 0, toCopy)
+                        onSamples?.invoke(readBuffer.copyOf(toCopy), sampleRate)
                         written += toCopy
                         var peak = 0
                         for (i in 0 until read) peak = maxOf(peak, abs(readBuffer[i].toInt()))

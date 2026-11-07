@@ -7,6 +7,7 @@ import app.melova.data.remote.MelovaNetwork.versionQuery
 import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.HealthResponseDto
 import app.melova.data.remote.dto.ScoringResponseDto
+import app.melova.data.remote.dto.TakePieceAnswerDto
 import app.melova.data.remote.dto.TeacherOrnamentsResponseDto
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
@@ -51,6 +52,14 @@ class MelovaApi(private val client: HttpClient) {
 
     suspend fun score(body: OutgoingContent): ScoringResponseDto =
         client.call(HttpMethod.Post, "api/v1/score") { setBody(body) }.decode()
+
+    /** A piece of a take being sung; the server analyses it in the background. */
+    suspend fun streamTakePiece(streamId: String, body: OutgoingContent): TakePieceAnswerDto =
+        client.call(HttpMethod.Post, "api/v1/score/stream/${segment(streamId)}") { setBody(body) }.decode()
+
+    suspend fun dropTakeStream(streamId: String) {
+        client.call(HttpMethod.Delete, "api/v1/score/stream/${segment(streamId)}")
+    }
 }
 
 internal const val TEACHER_TOKEN = "X-Teacher-Token"

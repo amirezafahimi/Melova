@@ -6,6 +6,11 @@ import org.khronos.webgl.Int8Array
 /** A recording in progress, from melova-audio.js. */
 external interface JsTake : JsAny {
     fun elapsedMs(): Double
+    fun sampleRate(): Int
+    fun sampleCount(): Int
+
+    /** Samples from [from] on, as 16-bit little-endian PCM like the finished WAV's. */
+    fun pcmSince(from: Int): Int8Array
     fun level(): Double
     fun error(): String?
     fun pause()

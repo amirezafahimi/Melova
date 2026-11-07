@@ -23,6 +23,7 @@ import app.melova.data.local.PracticeProgressStore
 import app.melova.data.repository.LessonRepository
 import app.melova.data.repository.RemoteLessonRepository
 import app.melova.data.repository.StudentRepository
+import app.melova.data.repository.TakeStream
 import app.melova.data.repository.VocalScoringRepository
 import app.melova.audio.playback.DetailVoicePlayer
 import app.melova.audio.playback.ReferenceAudioPlayer
@@ -89,6 +90,10 @@ class VocalTrainingViewModel(
     val uiState: StateFlow<VocalTrainingUiState> = _uiState.asStateFlow()
 
     private var sessionJob: Job? = null
+
+    /** The latest take as it was sung into the server; dropped when the take is thrown away. */
+    private var takeStream: TakeStream? = null
+
     private var progressJob: Job? = null
     private var snippetStopJob: Job? = null
     private var detailJob: Job? = null
@@ -792,6 +797,7 @@ class VocalTrainingViewModel(
     fun dismissResults() {
         sessionJob?.cancel()
         stopActivePlayback()
+        discardTakeStream()
         studentAudio = null
         _uiState.update {
             it.copy(
@@ -913,13 +919,19 @@ class VocalTrainingViewModel(
             )
         }
 
+        discardTakeStream()
+        val stream = scoringRepository.streamTake(viewModelScope, lessonId)
+        takeStream = stream
+
         sessionJob = viewModelScope.launch {
             try {
                 startRecordingProgressPolling(maxRecordingMs)
                 val recordedMs = withContext(ioDispatcher) {
-                    recorder.recordFreeform(recordingFile, maxRecordingMs)
+                    recorder.recordFreeform(recordingFile, maxRecordingMs, onSamples = stream?.let { it::add })
                 }
                 stopProgressPolling()
+                stream?.end()
+                if (recordedMs < minRequiredMs) discardTakeStream(stream)
 
                 when {
                     recordedMs < 500L -> {
@@ -953,6 +965,7 @@ class VocalTrainingViewModel(
             } catch (_: CancellationException) {
                 stopProgressPolling()
                 recorder.cancel()
+                discardTakeStream(stream)
                 if (_uiState.value.mode != VocalTrainingMode.RESULT) {
                     _uiState.update {
                         it.copy(mode = VocalTrainingMode.IDLE, progress = 0f, statusMessage = "ضبط لغو شد")
@@ -960,6 +973,7 @@ class VocalTrainingViewModel(
                 }
             } catch (e: SecurityException) {
                 stopProgressPolling()
+                discardTakeStream(stream)
                 _uiState.update {
                     it.copy(
                         mode = VocalTrainingMode.IDLE,
@@ -969,6 +983,7 @@ class VocalTrainingViewModel(
                 }
             } catch (e: IllegalStateException) {
                 stopProgressPolling()
+                discardTakeStream(stream)
                 _uiState.update {
                     it.copy(
                         mode = VocalTrainingMode.IDLE,
@@ -978,6 +993,7 @@ class VocalTrainingViewModel(
                 }
             } catch (e: Exception) {
                 stopProgressPolling()
+                discardTakeStream(stream)
                 _uiState.update {
                     it.copy(
                         mode = VocalTrainingMode.IDLE,
@@ -1027,13 +1043,15 @@ class VocalTrainingViewModel(
 
         try {
             val segments = lesson?.expectedSegments
+            val streamId = takeStream?.idToSend()
             val score = withContext(ioDispatcher) {
                 scoringRepository.score(
                     referenceFile = referenceFile,
                     studentFile = recordingFile,
                     expectedSegments = segments,
                     lessonId = lessonId,
-                    sectionId = sectionId
+                    sectionId = sectionId,
+                    streamId = streamId
                 )
             }
             val isNewBest = !score.requiresReRecord && score.overall > 0 &&
@@ -1152,6 +1170,12 @@ class VocalTrainingViewModel(
         }
     }
 
+    /** A recording that ends late passes its own [stream], so a newer take's stays. */
+    private fun discardTakeStream(stream: TakeStream? = takeStream) {
+        stream?.discard()
+        if (takeStream === stream) takeStream = null
+    }
+
     private fun stopProgressPolling() {
         progressJob?.cancel()
         progressJob = null
@@ -1161,6 +1185,7 @@ class VocalTrainingViewModel(
         sessionJob?.cancel()
         stopProgressPolling()
         recorder.cancel()
+        discardTakeStream()
         player.release()
         teacherVoice?.release()
         studentVoice?.release()
