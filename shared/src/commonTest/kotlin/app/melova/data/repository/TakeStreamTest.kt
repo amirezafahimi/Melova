@@ -1,5 +1,6 @@
 package app.melova.data.repository
 
+import app.melova.audio.io.atSpeechRate
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -60,6 +61,27 @@ class TakeStreamTest {
         stream.end()
 
         assertNull(stream.streamed())
+    }
+
+    @Test
+    fun aTakeAt44KilohertzGoesAt16WithTheLoudestSampleRecorded() = runTest {
+        val sent = mutableListOf<Sent>()
+        val stream = TakeStream("take", backgroundScope, send = { offset, samples, rate, ended ->
+            assertEquals(16_000, rate)
+            sent += Sent(offset, samples, ended)
+            true
+        }, drop = {})
+        // Its loudest sample is one the 16 kHz pieces skip.
+        val take = ShortArray(66_150) { if (it == 1) -9_000 else (it % 1_000).toShort() }
+        stream.add(take.copyOfRange(0, 10_000), 44_100)
+        stream.add(take.copyOfRange(10_000, take.size), 44_100)
+        stream.end()
+
+        val streamed = stream.streamed()
+        assertEquals(true, streamed?.whole)
+        assertEquals(9_000, streamed?.peak)
+        assertEquals(listOf(0, 16_000), sent.map { it.offset })
+        assertContentEquals(atSpeechRate(take, 44_100).first, sent.flatMap { it.samples.toList() }.toShortArray())
     }
 
     @Test

@@ -2,6 +2,7 @@ package app.melova.data.repository
 
 import app.melova.audio.io.FlacEncoder
 import app.melova.audio.io.WavUtils
+import app.melova.audio.io.atSpeechRate
 import app.melova.audio.io.crc32
 import app.melova.audio.io.takePart
 import app.melova.audio.playback.ExpectedSegment
@@ -52,10 +53,10 @@ class RemoteVocalScoringRepository(
             expectedSegments.toRequestJson()?.let { json -> put("expected_segments_json", json) }
             streamed?.let { put("stream_id", it.id) }
         }
-        val take = studentFile.readBytes()
+        val take = speechRateTake(studentFile.readBytes())
 
         return try {
-            val response = streamed?.takeIf { it.whole }?.let { scoreStreamedTake(fields, take) }
+            val response = streamed?.takeIf { it.whole }?.let { scoreStreamedTake(fields, take, it.peak) }
                 ?: remoteDataSource.scorePerformance(multipartBody(fields, listOf(takePart("student", take))))
             response.toDomain().copy(
                 sourceJson = MelovaNetwork.json.encodeToString(ScoringResponseDto.serializer(), response)
@@ -82,10 +83,23 @@ class RemoteVocalScoringRepository(
         }
     }
 
+    /** The take at the rate the models hear it at: a third of the upload, the score kept (see SpeechRate.kt). */
+    private suspend fun speechRateTake(wav: ByteArray): ByteArray = withContext(Dispatchers.Default) {
+        runCatching {
+            val (pcm, sampleRate) = WavUtils.readPcm16Le(wav)
+            val (samples, rate) = atSpeechRate(WavUtils.pcmBytesToSamples(pcm), sampleRate)
+            WavUtils.pcm16Wav(samples, rate)
+        }.getOrDefault(wav)
+    }
+
     /** Scores the take from its pieces on the server; null when the server asks for the take itself. */
-    private suspend fun scoreStreamedTake(fields: Map<String, String?>, take: ByteArray): ScoringResponseDto? {
+    private suspend fun scoreStreamedTake(fields: Map<String, String?>, take: ByteArray, peak: Int): ScoringResponseDto? {
         val pcm = WavUtils.readPcm16Le(take).first
-        val checked = fields + mapOf("take_crc" to crc32(pcm).toString(), "take_samples" to (pcm.size / 2).toString())
+        val checked = fields + mapOf(
+            "take_crc" to crc32(pcm).toString(),
+            "take_samples" to (pcm.size / 2).toString(),
+            "take_peak" to peak.toString()
+        )
         return try {
             remoteDataSource.scorePerformance(multipartBody(checked))
         } catch (error: ResponseException) {

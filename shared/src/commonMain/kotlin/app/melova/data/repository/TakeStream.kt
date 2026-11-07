@@ -1,5 +1,6 @@
 package app.melova.data.repository
 
+import app.melova.audio.io.SpeechRateDecimator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -8,6 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.concurrent.Volatile
+import kotlin.math.abs
 import kotlin.random.Random
 
 /**
@@ -29,8 +31,11 @@ class TakeStream(
 
     private val events = Channel<Event>(Channel.UNLIMITED)
 
-    /** The server has the take with this id; [whole] when every piece of it arrived. */
-    class Streamed(val id: String, val whole: Boolean)
+    /**
+     * The server has the take with this id; [whole] when every piece of it arrived. [peak] is the
+     * loudest sample recorded: the take is normalized by it, and the pieces, at 16 kHz, may miss it.
+     */
+    class Streamed(val id: String, val whole: Boolean, val peak: Int)
 
     @Volatile
     private var failed = false
@@ -38,11 +43,15 @@ class TakeStream(
     // Moves with every piece sent, and once more when the sending stops.
     private val progress = MutableStateFlow(0)
 
+    @Volatile
+    private var peak = 0
+
     private val sending = scope.launch {
         var offset = 0
         var sampleRate = 0
         var pending = ShortArray(0)
         var count = 0
+        var decimator: SpeechRateDecimator? = null
 
         suspend fun sendPiece(size: Int, ended: Boolean) {
             val piece = pending.copyOf(size)
@@ -63,12 +72,16 @@ class TakeStream(
         for (event in events) {
             when (event) {
                 is Samples -> {
-                    sampleRate = event.sampleRate
-                    if (count + event.samples.size > pending.size) {
-                        pending = pending.copyOf(maxOf(pending.size * 2, count + event.samples.size, sampleRate * 2))
+                    // A third of the bytes at 44.1 kHz, so the pieces keep up on a slow line.
+                    val speech = decimator ?: SpeechRateDecimator(event.sampleRate).also { decimator = it }
+                    for (sample in event.samples) peak = maxOf(peak, abs(sample.toInt()))
+                    val samples = speech.take(event.samples)
+                    sampleRate = speech.outputRate
+                    if (count + samples.size > pending.size) {
+                        pending = pending.copyOf(maxOf(pending.size * 2, count + samples.size, sampleRate * 2))
                     }
-                    event.samples.copyInto(pending, count)
-                    count += event.samples.size
+                    samples.copyInto(pending, count)
+                    count += samples.size
                     while (count >= sampleRate) sendPiece(sampleRate, ended = false)
                 }
                 End -> if (sampleRate > 0) sendPiece(count, ended = true)
@@ -104,7 +117,7 @@ class TakeStream(
             }
         }
         if (failed) return null
-        return Streamed(id, whole = sending.isCompleted && !sending.isCancelled)
+        return Streamed(id, whole = sending.isCompleted && !sending.isCancelled, peak = peak)
     }
 
     /** The take was thrown away; the server forgets its pieces. */
