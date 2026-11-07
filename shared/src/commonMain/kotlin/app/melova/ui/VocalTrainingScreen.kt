@@ -669,7 +669,8 @@ private fun StudentRecordingPanel(
                         onTogglePlayback = onToggleUserPlayback,
                         onStopPlayback = onStopPlayback,
                         onPlayAtMs = onPlayUserRecordingAt,
-                        onPlayCorrectionFromMarker = onPlayCorrectionFromMarker
+                        onPlayCorrectionFromMarker = onPlayCorrectionFromMarker,
+                        isBoxed = isReviewing
                     )
                     if (isReviewing) {
                         // Send and retry side by side: one glance, no scrolling for the second choice.
@@ -1315,7 +1316,8 @@ private fun UserRecordingSection(
     onStopPlayback: () -> Unit,
     onPlayAtMs: (Long) -> Unit,
     onPlayCorrectionFromMarker: (app.melova.audio.scoring.VocalScorer.PitchCorrection) -> Unit,
-    embedded: Boolean = false
+    /** Boxed while the take waits to be sent; once scored it sits straight in the panel's card. */
+    isBoxed: Boolean
 ) {
     val totalMs = (durationSeconds.coerceAtLeast(1) * 1000L)
     val currentMs = when {
@@ -1328,21 +1330,20 @@ private fun UserRecordingSection(
         selectedCorrectionStartMs != null -> selectedCorrectionStartMs
         else -> 0L
     }
-    val sectionSpacing = if (embedded) 8.dp else 10.dp
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (embedded) {
-                    Modifier
-                } else {
+                if (isBoxed) {
                     Modifier
                         .clip(RoundedCornerShape(12.dp))
                         .background(MelovaText.copy(alpha = 0.06f))
                         .padding(12.dp)
+                } else {
+                    Modifier
                 }
             ),
-        verticalArrangement = Arrangement.spacedBy(sectionSpacing)
+        verticalArrangement = Arrangement.spacedBy(if (isBoxed) 10.dp else 8.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1427,8 +1428,8 @@ private fun UserRecordingSection(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    LegendDot(color = MelovaWarning, label = "زیر")
-                    LegendDot(color = MelovaInfo, label = "بم")
+                    LegendDot(color = MelovaWarning, label = "بالاتر")
+                    LegendDot(color = MelovaInfo, label = "پایین‌تر")
                     LegendDot(color = MelovaTextMuted, label = "نت نخوانده")
                 }
             }
