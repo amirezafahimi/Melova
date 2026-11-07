@@ -71,60 +71,6 @@
     };
   }
 
-  /**
-   * A mono 16-bit WAV take as AAC in ADTS frames, which the server decodes back to the same WAV.
-   * Null where the browser has no AAC encoder; the WAV is sent then.
-   */
-  async function compressTake(wav, bitrate) {
-    try {
-      if (!window.AudioEncoder || !window.AudioData) return null;
-      const bytes = new Uint8Array(wav.buffer, wav.byteOffset, wav.byteLength);
-      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      const sampleRate = view.getUint32(24, true);
-      let offset = 12, pcm = null;
-      while (offset + 8 <= bytes.length) {
-        const id = String.fromCharCode(...bytes.subarray(offset, offset + 4));
-        const size = view.getUint32(offset + 4, true);
-        if (id === 'data') {
-          const end = Math.min(offset + 8 + size, bytes.length);
-          pcm = new Int16Array(bytes.slice(offset + 8, offset + 8 + ((end - offset - 8) & ~1)).buffer);
-          break;
-        }
-        offset += 8 + size + (size & 1);
-      }
-      if (!pcm || pcm.length === 0) return null;
-      const config = { codec: 'mp4a.40.2', sampleRate, numberOfChannels: 1, bitrate, aac: { format: 'adts' } };
-      const support = await AudioEncoder.isConfigSupported(config);
-      // Without ADTS framing the frames would need a container the page doesn't write.
-      if (!support.supported || !support.config.aac || support.config.aac.format !== 'adts') return null;
-      const frames = [];
-      let failed = false;
-      const encoder = new AudioEncoder({
-        output: (chunk) => { const frame = new Uint8Array(chunk.byteLength); chunk.copyTo(frame); frames.push(frame); },
-        error: () => { failed = true; },
-      });
-      encoder.configure(config);
-      for (let start = 0; start < pcm.length; start += sampleRate) {
-        const part = pcm.subarray(start, Math.min(start + sampleRate, pcm.length));
-        const data = new AudioData({
-          format: 's16', sampleRate, numberOfChannels: 1, numberOfFrames: part.length,
-          timestamp: Math.round(start * 1e6 / sampleRate), data: part,
-        });
-        encoder.encode(data);
-        data.close();
-      }
-      await encoder.flush();
-      encoder.close();
-      if (failed || frames.length === 0) return null;
-      const out = new Int8Array(frames.reduce((total, frame) => total + frame.length, 0));
-      let at = 0;
-      for (const frame of frames) { out.set(frame, at); at += frame.length; }
-      return out;
-    } catch (e) {
-      return null;
-    }
-  }
-
   /** The browser's own encoder and the file extension it writes; the server accepts m4a, ogg and webm for talk. */
   function compressedType() {
     const types = [['audio/mp4', 'm4a'], ['audio/ogg;codecs=opus', 'ogg'], ['audio/webm;codecs=opus', 'webm'], ['audio/webm', 'webm']];
@@ -434,7 +380,7 @@
   }
 
   // pickAudioFile is for the JS app, which a quick web build keeps from the last --legacy build.
-  globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], compressTake, createPlayer, pickFile, googleSignIn, upload, download,
+  globalThis.MelovaAudio = { startCapture, startCompressed, compressedExtension: () => compressedType()[1], createPlayer, pickFile, googleSignIn, upload, download,
     pickAudioFile: () => pickFile('audio/*'), apiBaseUrl: () => String(globalThis.MELOVA_API_BASE_URL || ''),
     canInstall: () => installOffer !== null, watchInstall: (changed) => { onInstallChange = changed; }, install,
     pushState, pushAddress: async () => addressOf(await pushSubscription()), pushSubscribe, pushUnsubscribe, askNotifications, watchChatLinks,

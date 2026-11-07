@@ -64,7 +64,6 @@ private external object MelovaAudioGlobal : JsAny {
     fun startCapture(sampleRate: Int): Promise<JsAny?>
     fun startCompressed(): Promise<JsAny?>
     fun compressedExtension(): String
-    fun compressTake(wav: Int8Array, bitrate: Int): Promise<JsAny?>
     fun createPlayer(): JsPlayer
     fun pickFile(accept: String): Promise<JsAny?>
     fun googleSignIn(clientId: String): Promise<JsAny?>
@@ -105,9 +104,6 @@ object MelovaAudioJs {
 
     /** What [startCompressed] will write in this browser: m4a, ogg or webm. */
     fun compressedExtension(): String = MelovaAudioGlobal.compressedExtension()
-
-    /** Resolves to the take as AAC in ADTS frames, or null where the browser can't encode AAC. */
-    fun compressTake(wav: Int8Array, bitrate: Int): Promise<JsAny?> = MelovaAudioGlobal.compressTake(wav, bitrate)
 
     fun createPlayer(): JsPlayer = MelovaAudioGlobal.createPlayer()
 
