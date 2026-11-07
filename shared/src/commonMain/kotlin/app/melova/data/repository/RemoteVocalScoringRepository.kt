@@ -1,6 +1,8 @@
 package app.melova.data.repository
 
 import app.melova.audio.io.FlacEncoder
+import app.melova.audio.io.WavUtils
+import app.melova.audio.io.crc32
 import app.melova.audio.io.takePart
 import app.melova.audio.playback.ExpectedSegment
 import app.melova.data.model.VocalScoreResult
@@ -17,6 +19,7 @@ import app.melova.platform.LocalFile
 import app.melova.platform.persianDigits
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +36,7 @@ class RemoteVocalScoringRepository(
         expectedSegments: List<ExpectedSegment>?,
         lessonId: String?,
         sectionId: String?,
-        streamId: String?
+        streamed: TakeStream.Streamed?
     ): VocalScoreResult {
         require(studentFile.exists() && studentFile.length() > 44L) {
             "فایل ضبط هنرجو یافت نشد"
@@ -47,15 +50,13 @@ class RemoteVocalScoringRepository(
                 put("section_id", sectionId)
             }
             expectedSegments.toRequestJson()?.let { json -> put("expected_segments_json", json) }
-            streamId?.let { put("stream_id", it) }
+            streamed?.let { put("stream_id", it.id) }
         }
-        val body = multipartBody(
-            fields,
-            listOf(takePart("student", studentFile.readBytes()))
-        )
+        val take = studentFile.readBytes()
 
         return try {
-            val response = remoteDataSource.scorePerformance(body)
+            val response = streamed?.takeIf { it.whole }?.let { scoreStreamedTake(fields, take) }
+                ?: remoteDataSource.scorePerformance(multipartBody(fields, listOf(takePart("student", take))))
             response.toDomain().copy(
                 sourceJson = MelovaNetwork.json.encodeToString(ScoringResponseDto.serializer(), response)
             )
@@ -78,6 +79,21 @@ class RemoteVocalScoringRepository(
                 "اتصال برقرار نشد؛ اینترنت را بررسی کنید.",
                 error
             )
+        }
+    }
+
+    /** Scores the take from its pieces on the server; null when the server asks for the take itself. */
+    private suspend fun scoreStreamedTake(fields: Map<String, String?>, take: ByteArray): ScoringResponseDto? {
+        val pcm = WavUtils.readPcm16Le(take).first
+        val checked = fields + mapOf("take_crc" to crc32(pcm).toString(), "take_samples" to (pcm.size / 2).toString())
+        return try {
+            remoteDataSource.scorePerformance(multipartBody(checked))
+        } catch (error: ResponseException) {
+            // 422: a server from before this, which wants the take every time.
+            if (error.response.status != HttpStatusCode.Conflict &&
+                error.response.status != HttpStatusCode.UnprocessableEntity
+            ) throw error
+            null
         }
     }
 

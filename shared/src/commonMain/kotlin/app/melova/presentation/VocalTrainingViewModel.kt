@@ -1043,7 +1043,7 @@ class VocalTrainingViewModel(
 
         try {
             val segments = lesson?.expectedSegments
-            val streamId = takeStream?.idToSend()
+            val streamed = takeStream?.streamed()
             val score = withContext(ioDispatcher) {
                 scoringRepository.score(
                     referenceFile = referenceFile,
@@ -1051,7 +1051,7 @@ class VocalTrainingViewModel(
                     expectedSegments = segments,
                     lessonId = lessonId,
                     sectionId = sectionId,
-                    streamId = streamId
+                    streamed = streamed
                 )
             }
             val isNewBest = !score.requiresReRecord && score.overall > 0 &&

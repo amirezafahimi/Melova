@@ -5,6 +5,9 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 
 class TakeStreamTest {
@@ -27,7 +30,9 @@ class TakeStreamTest {
         }
         stream.end()
 
-        assertEquals("take", stream.idToSend())
+        val streamed = stream.streamed()
+        assertEquals("take", streamed?.id)
+        assertEquals(true, streamed?.whole)
         assertEquals(listOf(0, 1_000, 2_000, 3_000), sent.map { it.offset })
         assertEquals(listOf(1_000, 1_000, 1_000, 700), sent.map { it.samples.size })
         assertEquals(listOf(false, false, false, true), sent.map { it.ended })
@@ -44,7 +49,7 @@ class TakeStreamTest {
         stream.add(ShortArray(3_500), 1_000)
         stream.end()
 
-        assertNull(stream.idToSend())
+        assertNull(stream.streamed())
         assertEquals(listOf(0, 1_000), offsets)
     }
 
@@ -54,7 +59,33 @@ class TakeStreamTest {
         stream.add(ShortArray(1_200), 1_000)
         stream.end()
 
-        assertNull(stream.idToSend())
+        assertNull(stream.streamed())
+    }
+
+    @Test
+    fun aSlowLineIsWaitedForWhileItsPiecesKeepGoing() = runTest {
+        // Each second of the take takes ten to send: slow, but moving.
+        val stream = TakeStream("take", backgroundScope, send = { _, _, _, _ -> delay(10_000); true }, drop = {})
+        stream.add(ShortArray(3_500), 1_000)
+        stream.end()
+
+        assertEquals(true, stream.streamed()?.whole)
+        assertEquals(40_000, currentTime)
+    }
+
+    @Test
+    fun piecesThatStopMovingAreLeftAndTheTakeGoesItself() = runTest {
+        val stream = TakeStream("take", backgroundScope, send = { offset, _, _, _ ->
+            if (offset > 0) awaitCancellation()
+            true
+        }, drop = {})
+        stream.add(ShortArray(3_000), 1_000)
+        stream.end()
+
+        val streamed = stream.streamed()
+        assertEquals("take", streamed?.id)
+        assertEquals(false, streamed?.whole)
+        assertEquals(15_000, currentTime)
     }
 
     @Test
