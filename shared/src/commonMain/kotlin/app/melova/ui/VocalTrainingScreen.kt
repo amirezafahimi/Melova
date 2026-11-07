@@ -1250,7 +1250,7 @@ private fun ReRecordResult(
     onRetryRecording: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val reRecordTitle = when (result.reRecordReason) {
+    val reRecordTitle = result.reRecordTitle ?: when (result.reRecordReason) {
         ReRecordReason.UNRELATED_MELODY -> "ملودی خوانده‌شده مرتبط نیست"
         ReRecordReason.UNRELATED_LYRICS -> "متن خوانده‌شده مرتبط نیست"
         null -> "اجرای شما با این درس مرتبط نیست"
@@ -1269,12 +1269,15 @@ private fun ReRecordResult(
             color = MelovaText.copy(alpha = 0.9f),
             textAlign = TextAlign.Start
         )
-        Text(
-            text = result.technicalAnalysis,
-            style = MaterialTheme.typography.bodySmall,
-            color = MelovaText.copy(alpha = 0.65f),
-            textAlign = TextAlign.Start
-        )
+        // Older results carry the same text in both; show it once.
+        if (result.technicalAnalysis.isNotBlank() && result.technicalAnalysis != result.summary) {
+            Text(
+                text = result.technicalAnalysis,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MelovaText,
+                textAlign = TextAlign.Start
+            )
+        }
         if (!isReadOnly) {
             Spacer(modifier = Modifier.height(4.dp))
             Button(

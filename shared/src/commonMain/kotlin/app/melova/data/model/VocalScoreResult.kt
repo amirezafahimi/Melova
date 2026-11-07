@@ -16,6 +16,8 @@ data class VocalScoreResult(
     val ornamentCorrections: List<VocalScorer.PitchCorrection> = emptyList(),
     val requiresReRecord: Boolean = false,
     val reRecordReason: ReRecordReason? = null,
+    /** What went wrong in a rejected take, in a few words; null from older results. */
+    val reRecordTitle: String? = null,
     /** Set when the scorer asks for the teacher on this take; the id makes it a free referral. */
     val teacherReferral: TeacherReferral? = null,
     /** Both voices' pitch as the score read it; null on takes scored before it was sent. */

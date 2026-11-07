@@ -9,6 +9,7 @@ data class ScoringResponseDto(
     @SerialName("failure_reason") val failureReason: String? = null,
     @SerialName("requires_re_record") val requiresReRecord: Boolean = false,
     @SerialName("re_record_reason") val reRecordReason: String? = null,
+    @SerialName("re_record_title") val reRecordTitle: String? = null,
     @SerialName("overall") val overall: Int = 0,
     @SerialName("pitch_accuracy") val pitchAccuracy: Int = 0,
     @SerialName("score_metrics") val scoreMetrics: List<ScoreMetricDto> = emptyList(),

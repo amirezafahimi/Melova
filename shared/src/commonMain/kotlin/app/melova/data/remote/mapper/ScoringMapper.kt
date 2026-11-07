@@ -41,6 +41,7 @@ fun ScoringResponseDto.toDomain(): VocalScoreResult {
         ornamentCorrections = ornamentCorrections.map { it.toDomain() },
         requiresReRecord = requiresReRecord,
         reRecordReason = reRecordReason.toDomain(),
+        reRecordTitle = reRecordTitle?.takeIf { it.isNotBlank() }?.let(::persianDigits),
         teacherReferral = teacherReview?.takeIf { it.suggested }?.let {
             TeacherReferral(reasons = it.reasons, referralId = it.referralId)
         },
