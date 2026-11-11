@@ -63,6 +63,8 @@ data class Chat(
     /** Which side the person looking at it is on. */
     val side: ChatSide,
     val peerName: String,
+    /** The teacher in this chat; their lessons' messages left show on the student's side. */
+    val teacherId: String = "",
     val unread: Int,
     /** The other side has seen every message up to this id. */
     val peerReadId: Long,

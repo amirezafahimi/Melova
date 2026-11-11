@@ -25,17 +25,20 @@ class MainActivity : ComponentActivity() {
         openTappedChat(intent)
         val themePreferences = ThemePreferences(this)
         setContent {
-            MelovaRoot(themePreferences) { darkTheme ->
-                // Status/navigation bar icons follow the app's theme, not only the system's.
-                LaunchedEffect(darkTheme) {
-                    val barStyle = if (darkTheme) {
-                        SystemBarStyle.dark(Color.TRANSPARENT)
-                    } else {
-                        SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+            MelovaRoot(
+                themePreferences = themePreferences,
+                onDarkThemeChange = { darkTheme ->
+                    // Status/navigation bar icons follow the app's theme, not only the system's.
+                    LaunchedEffect(darkTheme) {
+                        val barStyle = if (darkTheme) {
+                            SystemBarStyle.dark(Color.TRANSPARENT)
+                        } else {
+                            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                        }
+                        enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
                     }
-                    enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
                 }
-            }
+            )
         }
     }
 

@@ -7,8 +7,12 @@ import app.melova.data.remote.MelovaNetwork.jsonBody
 import app.melova.data.remote.MelovaNetwork.segment
 import app.melova.data.remote.dto.CreatedStudentDto
 import app.melova.data.remote.dto.FollowsDto
+import app.melova.data.remote.dto.LessonOfferDto
 import app.melova.data.remote.dto.LoginCodeSentDto
 import app.melova.data.remote.dto.LoginMethodsDto
+import app.melova.data.remote.dto.PracticeProgressDto
+import app.melova.data.remote.dto.PracticeTakeDetailDto
+import app.melova.data.remote.dto.PracticeTakesDto
 import app.melova.data.remote.dto.StudentMeDto
 import app.melova.data.remote.multipartBody
 import io.ktor.client.HttpClient
@@ -59,11 +63,15 @@ class StudentApi(private val client: HttpClient) {
     suspend fun claimFreeLesson(lessonId: String): StudentMeDto =
         client.call(HttpMethod.Post, "api/v1/me/lessons/${segment(lessonId)}/claim").decode()
 
-    /** The student paid for a lesson by card; it opens when the teacher finds the payment. */
-    suspend fun requestLesson(lessonId: String, payer: String): StudentMeDto =
-        client.call(HttpMethod.Post, "api/v1/me/lessons/${segment(lessonId)}/purchase-request") {
-            jsonBody(mapOf("payer" to payer).toJson())
+    /** Buy one version ("lesson" or "teacher") of a lesson; the mock provider pays at once. */
+    suspend fun checkout(lessonId: String, tier: String): StudentMeDto =
+        client.call(HttpMethod.Post, "api/v1/me/lessons/${segment(lessonId)}/checkout") {
+            jsonBody(mapOf("tier" to tier).toJson())
         }.decode()
+
+    /** The student's version of a lesson and their messages to the teacher. */
+    suspend fun lessonAccess(lessonId: String): LessonOfferDto =
+        client.call(HttpMethod.Get, "api/v1/me/lessons/${segment(lessonId)}/access").decode()
 
     suspend fun follow(teacherIds: Set<String>): FollowsDto =
         client.call(HttpMethod.Post, "api/v1/me/follows") {
@@ -95,6 +103,16 @@ class StudentApi(private val client: HttpClient) {
         )
     }.decode()
 
+    suspend fun practice(): PracticeProgressDto = client.call(HttpMethod.Get, "api/v1/me/practice").decode()
+
+    suspend fun practiceTakes(lessonId: String, sectionId: String): PracticeTakesDto =
+        client.call(HttpMethod.Get, "api/v1/me/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/takes").decode()
+
+    suspend fun practiceTake(takeId: String): PracticeTakeDetailDto =
+        client.call(HttpMethod.Get, "api/v1/me/takes/${segment(takeId)}").decode()
+
+    suspend fun practiceTakeAudio(takeId: String): ByteArray =
+        client.call(HttpMethod.Get, "api/v1/me/takes/${segment(takeId)}/audio").bodyAsBytes()
 }
 
 internal fun Map<String, String>.toJson() = JsonObject(mapValues { JsonPrimitive(it.value) })

@@ -14,7 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Insights
-import androidx.compose.material.icons.outlined.PeopleOutline
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,9 +36,19 @@ import app.melova.ui.theme.MelovaGold
 import app.melova.ui.components.MelovaGroupRow
 import app.melova.ui.components.MelovaNavGroup
 import app.melova.data.model.Lesson
-import app.melova.data.model.LessonPurchaseRequest
-import app.melova.data.model.StudentCard
+import app.melova.data.model.TeacherEarnings
 import app.melova.data.model.TeacherReport
+import app.melova.data.model.TeacherSale
+import app.melova.data.model.euroInput
+import app.melova.data.model.formatEuro
+import app.melova.data.model.parseEuroCents
+import app.melova.platform.formatMessageDay
+import app.melova.ui.theme.MelovaCardElevated
+import app.melova.ui.theme.MelovaDimens
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import app.melova.platform.persianDigits
 import app.melova.presentation.TeacherDeskUiState
 import app.melova.presentation.TeacherDeskViewModel
@@ -56,18 +66,6 @@ import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
 import app.melova.platform.formatFixed
 
-/** Persian digits for whole numbers typed with either digit set. */
-private fun parseWhole(text: String): Long? {
-    val latin = text.trim().map { ch ->
-        when (ch) {
-            in '۰'..'۹' -> '0' + (ch - '۰')
-            in '٠'..'٩' -> '0' + (ch - '٠')
-            else -> ch
-        }
-    }.filter { it.isDigit() }.joinToString("")
-    return latin.takeIf { it.isNotEmpty() }?.toLongOrNull()
-}
-
 private fun parseMinutes(text: String): Double? =
     text.trim().replace('٫', '.').replace('/', '.').let { raw ->
         val latin = raw.map { ch ->
@@ -82,13 +80,14 @@ private fun parseMinutes(text: String): Double? =
 
 // ------------------------------------------------------------------ panel entry
 
-/** On the teacher panel: the way into reviews, students and the report. */
+/** On the teacher panel: the way into chats, sales and the report. */
 @Composable
 internal fun TeacherDeskEntryCard(
-    pendingPurchases: Int,
+    /** This month's share, once loaded. */
+    earnings: TeacherEarnings?,
     unreadChats: Int,
     onOpenChats: () -> Unit,
-    onOpenStudents: () -> Unit,
+    onOpenEarnings: () -> Unit,
     onOpenReport: () -> Unit
 ) {
     MelovaNavGroup(
@@ -102,11 +101,12 @@ internal fun TeacherDeskEntryCard(
         },
         {
             MelovaGroupRow(
-                icon = Icons.Outlined.PeopleOutline,
-                title = "هنرجوها و پرداخت‌ها",
-                subtitle = if (pendingPurchases > 0) persianDigits("$pendingPurchases خرید منتظر تأیید شماست") else "تأیید خریدها و باز کردن درس برای هنرجو",
-                onClick = onOpenStudents,
-                iconTint = if (pendingPurchases > 0) MelovaGold else MelovaAccentSoft
+                icon = Icons.Outlined.Payments,
+                title = "فروش و درآمد",
+                subtitle = earnings?.takeIf { it.thisMonth.count > 0 }
+                    ?.let { "سهم شما در این ماه: ${formatEuro(it.thisMonth.teacherCents)}" }
+                    ?: "فروش درس‌ها و سهم شما از هر خرید",
+                onClick = onOpenEarnings
             )
         },
         {
@@ -120,170 +120,101 @@ internal fun TeacherDeskEntryCard(
     )
 }
 
-// ------------------------------------------------------------------ students
+// ------------------------------------------------------------------ earnings
 
+/**
+ * What the teacher's lessons sold and their share of each sale. Nothing is paid out yet,
+ * and the page says so, so no one waits for money that isn't on its way.
+ */
 @Composable
-fun TeacherStudentsScreen(
+fun TeacherEarningsScreen(
     state: TeacherDeskUiState,
     viewModel: TeacherDeskViewModel,
     lessons: List<Lesson>,
     onBack: () -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        viewModel.loadStudents()
-        viewModel.loadPurchaseRequests()
-    }
-    var paying by remember { mutableStateOf<StudentCard?>(null) }
-    var query by rememberSaveable { mutableStateOf("") }
-    val shown = state.students.filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
-
-    TeacherScaffold(title = "هنرجوها و پرداخت‌ها", subtitle = null, onBack = onBack, busyLabel = state.busyLabel) {
-        if (state.purchaseRequests.isNotEmpty()) {
-            item { SectionHeader(title = "خریدهای منتظر تأیید", trailing = persianDigits("${state.purchaseRequests.size} خرید")) }
-            items(state.purchaseRequests, key = { "request-" + it.id }) { request ->
-                PurchaseRequestCard(
-                    request = request,
-                    lessonTitle = lessons.firstOrNull { it.id == request.lessonId }?.title,
-                    busy = state.busyLabel != null,
-                    onDecide = { approve -> viewModel.decidePurchase(request.id, approve) }
-                )
+    LaunchedEffect(Unit) { viewModel.loadEarnings() }
+    TeacherScaffold(title = "فروش و درآمد", subtitle = null, onBack = onBack, busyLabel = state.busyLabel) {
+        val earnings = state.earnings
+        if (earnings == null) {
+            item {
+                if (state.isLoadingEarnings) CenteredProgress() else EmptyHint(Icons.Outlined.Payments, "فروش‌ها باز نشد. دوباره امتحان کنید.")
             }
-            item { SectionHeader(title = "هنرجوها") }
+            return@TeacherScaffold
         }
+        item { EarningsSummary(earnings) }
         item {
             Text(
-                text = "اگر هنرجویی بیرون از اپ پرداخت کرده، اینجا پیدایش کنید و درس را برایش باز کنید.",
+                text = "از هر خرید ${persianDigits("${100 - earnings.cutPercent}")}٪ سهم شما و ${persianDigits("${earnings.cutPercent}")}٪ سهم ملووا است. " +
+                    "سهم شما فعلاً فقط ثبت می‌شود؛ پرداخت به استادها هنوز شروع نشده است.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MelovaTextMuted
             )
         }
-        item { MelovaTextField(value = query, onValueChange = { query = it }, label = "جستجو با نام") }
-        if (state.isLoadingStudents && state.students.isEmpty()) {
-            item { CenteredProgress() }
-        } else if (shown.isEmpty()) {
-            item { EmptyHint(Icons.Outlined.PeopleOutline, "هنرجویی پیدا نشد.") }
-        }
-        items(shown, key = { it.id }) { student ->
-            MelovaSurfaceCard(onClick = { paying = student }, contentPadding = 12.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(student.name.ifBlank { "بی‌نام" }, style = MaterialTheme.typography.titleMedium, color = MelovaText)
-                        Text(
-                            text = persianDigits("${lessons.count { it.id in student.ownedLessons && !it.isFree }} درس پولی"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MelovaAccentSoft
-                        )
-                    }
-                    Text("ثبت پرداخت", style = MaterialTheme.typography.labelLarge, color = MelovaAccent)
-                }
+        item { SectionHeader(title = "خریدها") }
+        if (earnings.sales.isEmpty()) {
+            item { EmptyHint(Icons.Outlined.Payments, "هنوز خریدی نیست. وقتی هنرجویی درسی از شما بخرد، اینجا می‌آید.") }
+        } else {
+            items(earnings.sales, key = { it.id }) { sale ->
+                SaleRow(sale, lessonTitle = lessons.firstOrNull { it.id == sale.lessonId }?.title)
             }
         }
     }
-
-    paying?.let { student ->
-        PaymentDialog(
-            student = student,
-            paidLessons = lessons.filter { !it.isFree },
-            busy = state.busyLabel != null,
-            onConfirm = { lessonId, price ->
-                viewModel.recordPayment(student.id, lessonId, price, onDone = { paying = null })
-            },
-            onDismiss = { paying = null }
-        )
-    }
 }
 
-/** A student says they paid by card: the teacher checks their account and answers here. */
 @Composable
-private fun PurchaseRequestCard(
-    request: LessonPurchaseRequest,
-    lessonTitle: String?,
-    busy: Boolean,
-    onDecide: (approve: Boolean) -> Unit
-) {
-    MelovaSurfaceCard(contentPadding = 12.dp) {
+private fun EarningsSummary(earnings: TeacherEarnings) {
+    MelovaSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("سهم شما در این ماه", style = MaterialTheme.typography.titleSmall, color = MelovaTextMuted)
             Text(
-                text = request.studentName.ifBlank { "هنرجو" },
-                style = MaterialTheme.typography.titleMedium,
+                text = formatEuro(earnings.thisMonth.teacherCents),
+                style = MaterialTheme.typography.headlineSmall,
                 color = MelovaText
             )
-            Text(
-                text = "${lessonTitle ?: "درس"}، ${formatToman(request.priceToman)}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MelovaAccentSoft
-            )
-            Text("نام واریزکننده: ${request.payer}", style = MaterialTheme.typography.bodySmall, color = MelovaText)
-            Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { onDecide(true) },
-                    enabled = !busy,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MelovaAccent),
-                    modifier = Modifier.weight(1f).height(48.dp)
-                ) { Text("تأیید و باز کردن درس") }
-                OutlinedButton(
-                    onClick = { onDecide(false) },
-                    enabled = !busy,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(48.dp)
-                ) { Text("پیدا نشد", color = MelovaError) }
-            }
+            ReportLine("خرید در این ماه", persianDigits(earnings.thisMonth.count.toString()))
+            ReportLine("فروش این ماه", formatEuro(earnings.thisMonth.grossCents))
+            ReportLine("سهم شما از همه‌ی فروش‌ها", formatEuro(earnings.total.teacherCents))
+            ReportLine("همه‌ی فروش‌ها", formatEuro(earnings.total.grossCents))
         }
     }
 }
 
+/** One purchase: who bought which lesson and version, and the teacher's share of it. */
 @Composable
-private fun PaymentDialog(
-    student: StudentCard,
-    paidLessons: List<Lesson>,
-    busy: Boolean,
-    onConfirm: (lessonId: String, priceToman: Long) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var lessonId by rememberSaveable { mutableStateOf<String?>(null) }
-    var priceText by rememberSaveable { mutableStateOf("") }
-    val lesson = paidLessons.firstOrNull { it.id == lessonId }
-    val price = parseWhole(priceText)
-
-    FormDialog(
-        title = "ثبت پرداخت برای ${student.name.ifBlank { "هنرجو" }}",
-        confirmLabel = "ثبت",
-        confirmEnabled = lesson != null && price != null && !busy,
-        busy = busy,
-        onConfirm = { if (lesson != null && price != null) onConfirm(lesson.id, price) },
-        onDismiss = onDismiss
-    ) {
-        Text("کدام درس را خرید؟", style = MaterialTheme.typography.titleSmall, color = MelovaText)
-        if (paidLessons.isEmpty()) {
-            Text("درس پولی ندارید؛ قیمت را در صفحه‌ی هر درس تعیین کنید.", style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-        }
-        paidLessons.forEach { option ->
-            val owned = option.id in student.ownedLessons
-            val selected = option.id == lessonId
-            MelovaSurfaceCard(
-                onClick = {
-                    lessonId = if (selected) null else option.id
-                    if (!selected && priceText.isBlank() && option.priceToman > 0) priceText = persianDigits(option.priceToman.toString())
-                },
-                enabled = !owned,
-                contentPadding = 10.dp
+private fun SaleRow(sale: TeacherSale, lessonTitle: String?) {
+    MelovaSurfaceCard(contentPadding = 12.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                modifier = Modifier.size(MelovaDimens.ListLead).clip(CircleShape).background(MelovaCardElevated),
+                contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(option.title, style = MaterialTheme.typography.bodyMedium, color = MelovaText, modifier = Modifier.weight(1f))
-                    when {
-                        owned -> MelovaChip("دارد", color = MelovaTextMuted)
-                        selected -> MelovaChip("انتخاب شد", color = MelovaSuccess)
-                        option.priceToman > 0 -> Text(formatToman(option.priceToman), style = MaterialTheme.typography.bodySmall, color = MelovaTextMuted)
-                    }
-                }
+                Icon(Icons.Outlined.Payments, contentDescription = null, tint = MelovaSuccess, modifier = Modifier.size(MelovaDimens.Icon))
             }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = lessonTitle ?: "درس",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MelovaText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = buildString {
+                        append(if (sale.upgrade) "ارتقا به ${tierName(sale.tier)}" else tierName(sale.tier))
+                        append(" • ")
+                        append(sale.studentName.ifBlank { "هنرجو" })
+                        append(" • ")
+                        append(formatMessageDay(sale.createdAtMs))
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MelovaTextMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(formatEuro(sale.teacherCents), style = MaterialTheme.typography.titleSmall, color = MelovaSuccess)
         }
-        MelovaTextField(value = priceText, onValueChange = { priceText = it.take(12) }, label = "مبلغ دریافتی (تومان) *")
-        price?.let { Text(formatToman(it), style = MaterialTheme.typography.bodySmall, color = MelovaAccentSoft) }
     }
 }
 
@@ -316,7 +247,7 @@ fun TeacherReportScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("درآمد هر ساعت کلاس خصوصی شما", style = MaterialTheme.typography.titleSmall, color = MelovaText)
                         Text(
-                            text = state.privateHourlyRateToman?.let(::formatToman) ?: "تعیین نشده؛ برای مقایسه وارد کنید",
+                            text = state.privateHourlyRateCents?.let(::formatEuro) ?: "تعیین نشده؛ برای مقایسه وارد کنید",
                             style = MaterialTheme.typography.bodySmall,
                             color = MelovaTextMuted
                         )
@@ -342,18 +273,20 @@ fun TeacherReportScreen(
     }
 
     if (editingRate) {
-        var rateText by rememberSaveable { mutableStateOf(state.privateHourlyRateToman?.let { persianDigits(it.toString()) }.orEmpty()) }
+        var rateText by rememberSaveable { mutableStateOf(state.privateHourlyRateCents?.let(::euroInput).orEmpty()) }
         FormDialog(
             title = "درآمد هر ساعت کلاس خصوصی",
             confirmLabel = "ذخیره",
             onConfirm = {
-                viewModel.setPrivateHourlyRate(parseWhole(rateText))
+                viewModel.setPrivateHourlyRate(parseEuroCents(rateText)?.takeIf { it > 0 })
                 editingRate = false
             },
             onDismiss = { editingRate = false }
         ) {
-            MelovaTextField(value = rateText, onValueChange = { rateText = it.take(12) }, label = "تومان در ساعت")
-            parseWhole(rateText)?.let { Text(formatToman(it), style = MaterialTheme.typography.bodySmall, color = MelovaAccentSoft) }
+            MelovaTextField(value = rateText, onValueChange = { rateText = it.take(9) }, label = "یورو در ساعت")
+            parseEuroCents(rateText)?.takeIf { it > 0 }?.let {
+                Text(formatEuro(it), style = MaterialTheme.typography.bodySmall, color = MelovaAccentSoft)
+            }
         }
     }
     if (loggingTime) {
@@ -386,7 +319,7 @@ private fun WorthItCard(report: TeacherReport) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("درآمد خالص هر ساعت وقت شما", style = MaterialTheme.typography.titleSmall, color = MelovaTextMuted)
             Text(
-                text = report.netPerHourToman?.let(::formatToman) ?: "هنوز زمانی ثبت نشده",
+                text = report.netPerHourCents?.let(::formatEuro) ?: "هنوز زمانی ثبت نشده",
                 style = MaterialTheme.typography.headlineSmall,
                 color = when (report.worthIt) {
                     true -> MelovaSuccess
@@ -396,9 +329,9 @@ private fun WorthItCard(report: TeacherReport) {
             )
             Text(
                 text = when (report.worthIt) {
-                    true -> "بیشتر از کلاس خصوصی (${report.privateHourlyRateToman?.let(::formatToman)}). ارزشش را دارد."
-                    false -> "کمتر از کلاس خصوصی (${report.privateHourlyRateToman?.let(::formatToman)}). یا قیمت را بالا ببرید یا زمان بازبینی را کم کنید."
-                    null -> if (report.privateHourlyRateToman == null) "درآمد ساعتی کلاس خصوصی را وارد کنید تا مقایسه شود." else "با ثبت زمان، مقایسه انجام می‌شود."
+                    true -> "بیشتر از کلاس خصوصی (${report.privateHourlyRateCents?.let(::formatEuro)}). ارزشش را دارد."
+                    false -> "کمتر از کلاس خصوصی (${report.privateHourlyRateCents?.let(::formatEuro)}). یا قیمت را بالا ببرید یا زمان بازبینی را کم کنید."
+                    null -> if (report.privateHourlyRateCents == null) "درآمد ساعتی کلاس خصوصی را وارد کنید تا مقایسه شود." else "با ثبت زمان، مقایسه انجام می‌شود."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MelovaTextMuted
@@ -411,8 +344,8 @@ private fun WorthItCard(report: TeacherReport) {
 private fun ReportNumbers(report: TeacherReport) {
     MelovaSurfaceCard {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ReportLine("درآمد ناخالص", formatToman(report.grossToman))
-            ReportLine("درآمد خالص", formatToman(report.netToman))
+            ReportLine("فروش", formatEuro(report.grossCents))
+            ReportLine("سهم شما", formatEuro(report.netCents))
             ReportLine("هنرجوی پرداخت‌کننده", persianDigits(report.payingStudents.toString()))
             ReportLine("کل وقت شما", persianDigits("${formatFixed(report.teacherMinutes, 0)} دقیقه"))
             report.minutesPerPayingStudent?.let { ReportLine("وقت برای هر هنرجو", persianDigits("${formatFixed(it, 1)} دقیقه")) }

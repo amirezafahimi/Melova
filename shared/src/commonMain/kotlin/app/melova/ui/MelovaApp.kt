@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -85,9 +86,13 @@ fun MelovaApp(
     LaunchedEffect(studentState.accountRevision) {
         if (studentState.accountRevision > 0) catalogViewModel.refresh(silent = true)
     }
+    LaunchedEffect(studentState.account?.id, studentState.account?.signedIn) {
+        catalogViewModel.onAccountChanged(studentState.account?.signedIn == true)
+    }
     // A teacher is an ordinary account, so the panel opens and closes with it.
     LaunchedEffect(studentState.account?.id, studentState.account?.isTeacher) {
         teacherViewModel.onAccountChanged()
+        teacherDeskViewModel.onAccountChanged()
     }
     LaunchedEffect(studentState.account?.id, canChat) {
         chatViewModel.clear()
@@ -98,6 +103,14 @@ fun MelovaApp(
         chatState.message?.let {
             snackbarHostState.showSnackbar(it)
             chatViewModel.consumeMessage()
+        }
+    }
+    // A payment provider that finishes on its own page; the lesson opens when it reports back.
+    val uriHandler = LocalUriHandler.current
+    LaunchedEffect(studentState.paymentUrl) {
+        studentState.paymentUrl?.let { url ->
+            runCatching { uriHandler.openUri(url) }
+            studentViewModel.consumePaymentUrl()
         }
     }
     LaunchedEffect(studentState.message) {
@@ -322,7 +335,7 @@ fun MelovaApp(
                     isChangingLessons = studentState.isChangingLessons,
                     onLogin = { navController.navigate(AppScreen.login(LoginReason.PURCHASE)) },
                     onLoginToAdd = { navController.navigate(AppScreen.login(LoginReason.ADD_LESSON)) },
-                    onBuy = { payer -> studentViewModel.buyLesson(lessonId, payer) },
+                    onBuy = { tier -> studentViewModel.buyLesson(lessonId, tier) },
                     onAddFree = { studentViewModel.addLesson(lessonId) },
                     onTeacherClick = { navController.navigate(AppScreen.teacherPage(it)) }
                 )
@@ -354,7 +367,28 @@ fun MelovaApp(
                     },
                     loginGate = studentState.loginGate,
                     onLogin = { navController.navigate(AppScreen.login(LoginReason.TEACHER)) },
-                    onOpenChat = { navController.navigate(AppScreen.chat(it)) }
+                    onOpenChat = { navController.navigate(AppScreen.chat(it)) },
+                    onOpenPastTake = { navController.navigate(AppScreen.practicePastTake(lessonId, sectionId, it)) },
+                    onSeeVersions = { navController.navigate(AppScreen.lesson(lessonId)) },
+                    accountRevision = studentState.accountRevision
+                )
+            }
+
+            composable(
+                AppScreen.PRACTICE_PAST_TAKE,
+                arguments = listOf(
+                    navArgument(VocalTrainingViewModel.ARG_LESSON_ID) { type = NavType.StringType },
+                    navArgument(VocalTrainingViewModel.ARG_SECTION_ID) { type = NavType.StringType },
+                    navArgument(VocalTrainingViewModel.ARG_TAKE_ID) { type = NavType.StringType }
+                )
+            ) { entry ->
+                val lessonId = entry.arguments?.read { getStringOrNull(VocalTrainingViewModel.ARG_LESSON_ID) }.orEmpty()
+                val sectionId = entry.arguments?.read { getStringOrNull(VocalTrainingViewModel.ARG_SECTION_ID) }.orEmpty()
+                VocalTrainingScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTeacherDetails = {
+                        navController.navigate(AppScreen.teacherPerformance(lessonId, sectionId))
+                    }
                 )
             }
 
@@ -389,6 +423,8 @@ fun MelovaApp(
                 AppScreen.CHAT,
                 arguments = listOf(navArgument(AppScreen.ARG_CHAT_ID) { type = NavType.StringType })
             ) { entry ->
+                // Messages left change as takes are sent and come back, so the banner reads them fresh.
+                LaunchedEffect(Unit) { catalogViewModel.refresh(silent = true) }
                 ChatScreen(
                     chatId = entry.arguments?.read { getStringOrNull(AppScreen.ARG_CHAT_ID) }.orEmpty(),
                     state = chatState,
@@ -396,7 +432,9 @@ fun MelovaApp(
                     onOpenPractice = {
                         navController.navigate(AppScreen.practiceResult(it.lessonId, it.sectionId, it.reviewId))
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    lessonsOf = { teacherId -> catalogState.lessonsOf(teacherId).filter { it.isOwned == true } },
+                    onOpenLesson = { navController.navigate(AppScreen.lesson(it)) }
                 )
             }
 
@@ -437,11 +475,11 @@ fun MelovaApp(
             }
 
             composable(AppScreen.TEACHER_PANEL) {
-                LaunchedEffect(Unit) { teacherDeskViewModel.loadPurchaseRequests() }
+                LaunchedEffect(Unit) { teacherDeskViewModel.loadEarnings() }
                 TeacherPanelScreen(
                     state = teacherState,
                     viewModel = teacherViewModel,
-                    pendingPurchases = deskState.purchaseRequests.size,
+                    earnings = deskState.earnings,
                     onOpenLesson = { navController.navigate(AppScreen.lessonEditor(it)) },
                     onNewLesson = { navController.navigate(AppScreen.NEW_LESSON) },
                     onEditProfile = { navController.navigate(AppScreen.TEACHER_PROFILE) },
@@ -455,13 +493,13 @@ fun MelovaApp(
                     },
                     unreadChats = chatState.unread,
                     onOpenChats = { navController.navigate(AppScreen.CHATS) },
-                    onOpenStudents = { navController.navigate(AppScreen.TEACHER_STUDENTS) },
+                    onOpenEarnings = { navController.navigate(AppScreen.TEACHER_EARNINGS) },
                     onOpenReport = { navController.navigate(AppScreen.TEACHER_REPORT) }
                 )
             }
 
-            composable(AppScreen.TEACHER_STUDENTS) {
-                TeacherStudentsScreen(
+            composable(AppScreen.TEACHER_EARNINGS) {
+                TeacherEarningsScreen(
                     state = deskState,
                     viewModel = teacherDeskViewModel,
                     lessons = teacherState.profile?.lessons.orEmpty(),

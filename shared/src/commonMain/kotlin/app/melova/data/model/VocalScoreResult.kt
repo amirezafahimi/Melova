@@ -22,6 +22,9 @@ data class VocalScoreResult(
     val teacherReferral: TeacherReferral? = null,
     /** Both voices' pitch as the score read it; null on takes scored before it was sent. */
     val pitchLines: ScoredPitchLines? = null,
+    /** The section's best score after this take, and whether this take set it; null from older results. */
+    val bestScore: Int? = null,
+    val isNewBest: Boolean = false,
     /** The server's answer as JSON; sent with a take, it opens this same result again. */
     val sourceJson: String? = null
 )

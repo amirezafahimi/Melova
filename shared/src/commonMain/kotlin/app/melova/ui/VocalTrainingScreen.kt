@@ -107,6 +107,10 @@ import app.melova.ui.components.MelovaMediaIconButton
 import app.melova.ui.components.MelovaProgressBar
 import app.melova.ui.components.MelovaSkeleton
 import app.melova.ui.components.MelovaSurfaceCard
+import app.melova.ui.components.PastTakesSheet
+import app.melova.ui.components.TopBarAction
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.EditNote
 import app.melova.ui.components.MelovaTopBar
 import app.melova.ui.components.MelovaWaveSkeleton
 import app.melova.ui.components.ScoreMetricsList
@@ -151,9 +155,22 @@ fun VocalTrainingScreen(
     /** The lesson's next ready section, offered once a take is scored; null on the last one. */
     nextSectionTitle: String? = null,
     onNextSection: (() -> Unit)? = null,
+    /** Opens one of this section's earlier takes, read-only, on a page of its own. */
+    onOpenPastTake: (takeId: String) -> Unit = {},
+    /** Opens the lesson page, where its versions are bought, once the messages to the teacher run out. */
+    onSeeVersions: () -> Unit = {},
+    /** Changes when a purchase or sign-in changed what the student has, so messages left are read again. */
+    accountRevision: Int = 0,
     viewModel: VocalTrainingViewModel = viewModel { VocalTrainingViewModel(createSavedStateHandle()) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var seenRevision by rememberSaveable { mutableStateOf(accountRevision) }
+    LaunchedEffect(accountRevision) {
+        if (accountRevision != seenRevision) {
+            seenRevision = accountRevision
+            viewModel.refreshOffer()
+        }
+    }
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     val micPermission = rememberMicPermission { granted ->
@@ -178,8 +195,13 @@ fun VocalTrainingScreen(
                 RtlContent {
                     MelovaTopBar(
                         title = uiState.lessonTitle.ifBlank { "تمرین" },
-                        subtitle = uiState.sharedTakeStudent?.let { "اجرای $it" } ?: uiState.courseTitle,
-                        onBack = onBack
+                        subtitle = uiState.oldTakeLabel ?: uiState.courseTitle,
+                        onBack = onBack,
+                        action = TopBarAction(
+                            icon = Icons.Outlined.EditNote,
+                            description = "تاریخچهٔ اجراها",
+                            onClick = viewModel::openPastTakes
+                        ).takeUnless { uiState.isSharedTake }
                     )
 
                     LessonCard(uiState, onRetry = viewModel::loadLesson)
@@ -290,7 +312,22 @@ fun VocalTrainingScreen(
                             onSend = viewModel::sendToTeacher,
                             loginGate = loginGate,
                             onLogin = onLogin,
-                            onOpenChat = onOpenChat
+                            onOpenChat = onOpenChat,
+                            offer = uiState.lessonOffer,
+                            isFreeLesson = uiState.isFreeLesson,
+                            onSeeVersions = onSeeVersions
+                        )
+                    }
+
+                    if (uiState.arePastTakesOpen) {
+                        PastTakesSheet(
+                            takes = uiState.pastTakes,
+                            onOpenTake = { take ->
+                                viewModel.closePastTakes()
+                                if (uiState.playbackTarget != PlaybackTarget.NONE) viewModel.onStopClicked()
+                                onOpenPastTake(take.id)
+                            },
+                            onDismiss = viewModel::closePastTakes
                         )
                     }
                 }

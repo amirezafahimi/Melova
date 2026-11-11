@@ -23,8 +23,6 @@ data class TeacherProfileDto(
     @SerialName("id") val id: String?,
     @SerialName("name") val name: String?,
     @SerialName("bio") val bio: String?,
-    @SerialName("card_number") val cardNumber: String? = null,
-    @SerialName("card_holder") val cardHolder: String? = null,
     @SerialName("photo_version") val photoVersion: Long? = null,
     @SerialName("lessons") val lessons: List<LessonDto>?
 )
@@ -44,17 +42,27 @@ data class LessonDto(
     @SerialName("intro_version") val introVersion: String?,
     @SerialName("sections") val sections: List<LessonSectionDto>?,
     @SerialName("is_free") val isFree: Boolean? = null,
-    @SerialName("price_toman") val priceToman: Long? = null,
-    @SerialName("bazaar_sku") val bazaarSku: String? = null,
+    @SerialName("price_cents") val priceCents: Long? = null,
+    @SerialName("teacher_price_cents") val teacherPriceCents: Long? = null,
+    @SerialName("set_price_cents") val setPriceCents: Long? = null,
+    @SerialName("set_teacher_price_cents") val setTeacherPriceCents: Long? = null,
     @SerialName("is_owned") val isOwned: Boolean? = null,
-    @SerialName("purchase_status") val purchaseStatus: String? = null,
-    @SerialName("payment") val payment: LessonPaymentDto? = null
+    @SerialName("offer") val offer: LessonOfferDto? = null
 )
 
+/** A lesson's selling side for one student; see the server's ``lesson_offer``. */
 @Serializable
-data class LessonPaymentDto(
-    @SerialName("card_number") val cardNumber: String?,
-    @SerialName("card_holder") val cardHolder: String?
+data class LessonOfferDto(
+    @SerialName("owned_tier") val ownedTier: String? = null,
+    @SerialName("messages_left") val messagesLeft: Int? = null,
+    @SerialName("messages_total") val messagesTotal: Int? = null,
+    @SerialName("messages_until") val messagesUntil: Double? = null,
+    @SerialName("lesson_price_now_cents") val lessonPriceNowCents: Long? = null,
+    @SerialName("teacher_price_now_cents") val teacherPriceNowCents: Long? = null,
+    @SerialName("lesson_messages") val lessonMessages: Int? = null,
+    @SerialName("teacher_messages") val teacherMessages: Int? = null,
+    @SerialName("message_days") val messageDays: Int? = null,
+    @SerialName("answer_days") val answerDays: Int? = null
 )
 
 @Serializable

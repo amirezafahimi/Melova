@@ -45,13 +45,15 @@ class TeacherViewModel : ViewModel() {
         when {
             repository.isSignedIn && !isOpen -> run(busyLabel = null) { repository.profile() }
             !repository.isSignedIn && isOpen -> signOut()
+            // Straight from one teacher to another: the panel must show the new one's profile.
+            repository.isSignedIn && isOpen -> refresh()
         }
     }
 
     fun refresh() = run(busyLabel = null, changesCatalog = false) { repository.profile() }
 
-    fun updateProfile(name: String, bio: String, cardNumber: String, cardHolder: String) =
-        run("در حال ذخیره…") { repository.updateProfile(name, bio, cardNumber, cardHolder) }
+    fun updateProfile(name: String, bio: String) =
+        run("در حال ذخیره…") { repository.updateProfile(name, bio) }
 
     fun setPhoto(photo: LocalFile) = run("در حال بارگذاری عکس…") { repository.setPhoto(photo) }
 
@@ -73,9 +75,9 @@ class TeacherViewModel : ViewModel() {
     fun updateLesson(lessonId: String, fields: LessonFields) =
         run("در حال ذخیره…") { repository.updateLesson(lessonId, fields) }
 
-    /** [priceToman] 0 makes the lesson free. */
-    fun setLessonSale(lessonId: String, bazaarSku: String, priceToman: Long) =
-        run("در حال ذخیره قیمت…") { repository.setLessonSale(lessonId, bazaarSku, priceToman) }
+    /** A [priceCents] of 0 makes the lesson free; a [teacherPriceCents] of 0 sells only «درس». */
+    fun setLessonSale(lessonId: String, priceCents: Long, teacherPriceCents: Long) =
+        run("در حال ذخیره قیمت…") { repository.setLessonSale(lessonId, priceCents, teacherPriceCents) }
 
     fun deleteLesson(lessonId: String) = run("در حال حذف درس…") { repository.deleteLesson(lessonId) }
 

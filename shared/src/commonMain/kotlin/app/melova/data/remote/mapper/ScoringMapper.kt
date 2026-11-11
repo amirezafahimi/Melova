@@ -45,7 +45,9 @@ fun ScoringResponseDto.toDomain(): VocalScoreResult {
         teacherReferral = teacherReview?.takeIf { it.suggested }?.let {
             TeacherReferral(reasons = it.reasons, referralId = it.referralId)
         },
-        pitchLines = pitchLines?.toDomain()
+        pitchLines = pitchLines?.toDomain(),
+        bestScore = bestScore,
+        isNewBest = isNewBest
     )
 }
 

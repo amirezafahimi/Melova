@@ -3,18 +3,29 @@ package app.melova.data.repository
 import app.melova.audio.io.takePart
 import app.melova.data.local.StudentSession
 import app.melova.data.local.TeacherSession
+import app.melova.data.model.LessonCheckout
+import app.melova.data.model.LessonOffer
+import app.melova.data.model.LessonTier
 import app.melova.data.model.LoginCodeSent
+import app.melova.data.model.LoginChannel
 import app.melova.data.model.LoginMethods
+import app.melova.data.model.PracticeProgress
+import app.melova.data.model.PracticeTake
+import app.melova.data.model.PracticeTakeDetail
 import app.melova.data.model.StudentAccount
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.remote.FilePart
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.api.StudentApi
 import app.melova.data.remote.apiCall
+import app.melova.data.remote.dto.LoginMethodsDto
+import app.melova.data.remote.dto.PracticeTakeDto
+import app.melova.data.remote.mapper.toDomain
 import app.melova.data.remote.dto.StudentMeDto
 import app.melova.data.remote.writeAtomically
 import app.melova.platform.LocalFile
 import app.melova.platform.PlatformContext
+import app.melova.platform.cacheDir
 import app.melova.platform.filesDir
 import app.melova.platform.supportsGoogleSignIn
 import kotlinx.coroutines.sync.Mutex
@@ -22,8 +33,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.io.IOException
 
 /** How a sign-in code reaches the student; [apiKind] is what the server calls it. */
-enum class LoginChannel(val apiKind: String) { PHONE("phone"), EMAIL("email") }
-
 /** The student's own account, the takes they send the teacher, and the teacher's replies. */
 class StudentRepository(
     private val context: PlatformContext,
@@ -95,13 +104,7 @@ class StudentRepository(
     }
 
     suspend fun loginMethods(): LoginMethods {
-        val methods = apiCall { api.loginMethods() }
-        return LoginMethods(
-            phone = methods.phone == true,
-            email = methods.email == true,
-            googleClientId = methods.googleClientId?.takeIf { it.isNotBlank() && supportsGoogleSignIn },
-            isMock = methods.mock == true
-        )
+        return apiCall { api.loginMethods() }.toDomain(supportsGoogleSignIn)
     }
 
     /** True the first time it's asked, and never after signing in. */
@@ -145,12 +148,26 @@ class StudentRepository(
         ensureAccount()
     }
 
+    /** Taking a lesson needs a signed-in account, once there is a way to sign in. */
+    suspend fun mayTakeLessons(): Boolean =
+        runCatching { account().signedIn || !loginMethods().any }.getOrDefault(false)
+
     suspend fun claimFreeLesson(lessonId: String): StudentAccount =
         apiCall { api.claimFreeLesson(lessonId) }.toAccount()
 
-    /** The student paid for a lesson by card, under the name [payer]. */
-    suspend fun requestLesson(lessonId: String, payer: String): StudentAccount =
-        apiCall { api.requestLesson(lessonId, payer.trim()) }.toAccount()
+    /** Buys [tier] of a lesson; with the plain version owned, the one with the teacher costs the difference. */
+    suspend fun checkout(lessonId: String, tier: LessonTier): LessonCheckout {
+        val dto = apiCall { api.checkout(lessonId, tier.apiName) }
+        return LessonCheckout(
+            paid = dto.order?.status == "paid",
+            redirectUrl = dto.order?.redirectUrl?.takeIf { it.isNotBlank() },
+            offer = dto.lesson?.toDomain() ?: LessonOffer(),
+            account = dto.toAccount()
+        )
+    }
+
+    /** The student's version of a lesson and messages left; it changes as takes are sent and come back. */
+    suspend fun lessonOffer(lessonId: String): LessonOffer = apiCall { api.lessonAccess(lessonId) }.toDomain()
 
     /** Whom the student follows now. Follows are kept on the account, so a sign-in brings them. */
     suspend fun follow(teacherIds: Set<String>): Set<String> {
@@ -163,7 +180,8 @@ class StudentRepository(
 
     /**
      * Sends this take to the teacher, with its whole result so the chat can open the same page.
-     * The score's referral id says the scorer itself asked. Returns the chat it went into.
+     * The score's referral id says the scorer itself asked. Returns the chat it went into and
+     * the lesson's messages left after this one.
      */
     suspend fun sendForReview(
         lessonId: String,
@@ -171,7 +189,7 @@ class StudentRepository(
         take: LocalFile,
         note: String,
         score: VocalScoreResult?
-    ): String? {
+    ): SentForReview {
         // Read now, so the next recording can't overwrite the file mid-upload.
         val audio = takePart("audio", take.readBytes())
         return apiCall {
@@ -183,7 +201,42 @@ class StudentRepository(
                 scoreJson = score?.sourceJson,
                 audio = audio
             )
-        }.chatId
+        }.let { SentForReview(chatId = it.chatId, offer = it.lesson?.toDomain()) }
+    }
+
+    suspend fun practiceProgress(): PracticeProgress {
+        val progress = apiCall { api.practice() }
+        return PracticeProgress(
+            bestScores = progress.bestScores.orEmpty().mapNotNull { best ->
+                val score = best.score ?: return@mapNotNull null
+                PracticeProgress.key(best.lessonId ?: return@mapNotNull null, best.sectionId ?: return@mapNotNull null) to score
+            }.toMap(),
+            lastLessonId = progress.last?.lessonId,
+            lastSectionId = progress.last?.sectionId,
+            lastScore = progress.last?.score
+        )
+    }
+
+    /** This section's earlier takes the practice page lists, newest first. */
+    suspend fun practiceTakes(lessonId: String, sectionId: String): List<PracticeTake> =
+        apiCall { api.practiceTakes(lessonId, sectionId) }.takes.orEmpty().mapNotNull { it.toDomain() }
+
+    suspend fun practiceTake(takeId: String): PracticeTakeDetail {
+        val take = apiCall { api.practiceTake(takeId) }
+        return PracticeTakeDetail(
+            createdAtMs = ((take.createdAt ?: 0.0) * 1000).toLong(),
+            result = take.result?.toDomain()
+        )
+    }
+
+    /** The take's recording, downloaded once: a kept take never changes. */
+    suspend fun practiceTakeAudio(takeId: String): LocalFile = apiCall {
+        val dir = LocalFile(cacheDir(context), "practice_takes").apply { mkdirs() }
+        val target = LocalFile(dir, "${takeId.replace(Regex("[^A-Za-z0-9_-]"), "_")}.wav")
+        if (!target.exists() || target.length() == 0L) {
+            api.practiceTakeAudio(takeId).writeAtomically(target)
+        }
+        target
     }
 
     private companion object {
@@ -191,6 +244,19 @@ class StudentRepository(
         val accountLock = Mutex()
     }
 }
+
+/** A take on its way to the teacher. */
+data class SentForReview(val chatId: String?, val offer: LessonOffer?)
+
+internal fun LoginMethodsDto.toDomain(canUseGoogle: Boolean) = LoginMethods(
+    phone = phone == true,
+    email = email == true,
+    googleClientId = googleClientId?.takeIf { it.isNotBlank() && canUseGoogle },
+    mockChannels = LoginChannel.entries.filterTo(mutableSetOf()) { channel ->
+        // A server from before "mock_kinds" mocks every channel or none.
+        mockKinds?.contains(channel.apiKind) ?: (mock == true)
+    }
+)
 
 internal fun StudentMeDto.toDomain(awaitingName: Boolean) = StudentAccount(
     id = studentId.orEmpty(),
@@ -202,3 +268,17 @@ internal fun StudentMeDto.toDomain(awaitingName: Boolean) = StudentAccount(
     ownedLessons = ownedLessons.orEmpty().toSet(),
     needsName = awaitingName && signedIn == true && name.isNullOrBlank()
 )
+
+private fun PracticeTakeDto.toDomain(): PracticeTake? {
+    val takeId = id ?: return null
+    val takeScore = score ?: return null
+    val why = roles.orEmpty()
+    return PracticeTake(
+        id = takeId,
+        score = takeScore,
+        createdAtMs = ((createdAt ?: 0.0) * 1000).toLong(),
+        isFirst = "first" in why,
+        isBest = "best" in why,
+        isRecent = "recent" in why
+    )
+}

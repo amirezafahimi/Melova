@@ -12,14 +12,16 @@ import app.melova.audio.pitch.PitchContour
 import app.melova.audio.pitch.PitchPoint
 import app.melova.audio.scoring.VocalScorer
 import app.melova.data.model.ErrorDetail
+import app.melova.data.model.LessonOffer
 import app.melova.data.model.ErrorDetailLane
 import app.melova.data.model.ErrorMarkKind
 import app.melova.data.model.PlaybackClip
+import app.melova.data.model.PracticeProgress
+import app.melova.data.model.PracticeTake
 import app.melova.data.model.TahrirComparison
 import app.melova.data.model.VocalScoreResult
 import app.melova.data.repository.ChatRepository
 import app.melova.data.repository.RemoteVocalScoringRepository
-import app.melova.data.local.PracticeProgressStore
 import app.melova.data.repository.LessonRepository
 import app.melova.data.repository.RemoteLessonRepository
 import app.melova.data.repository.StudentRepository
@@ -30,6 +32,8 @@ import app.melova.audio.playback.ReferenceAudioPlayer
 import app.melova.audio.playback.TeacherVocalGenerator
 import app.melova.audio.capture.DeviceAudioHints
 import app.melova.audio.capture.VocalRecorder
+import app.melova.platform.formatMessageDay
+import app.melova.platform.formatTimeOfDay
 import app.melova.platform.persianDigits
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -56,11 +60,16 @@ class VocalTrainingViewModel(
     /** Set when this page shows a take sent to a teacher instead of a new practice. */
     private val reviewId: String? = savedStateHandle[ARG_REVIEW_ID]
 
+    /** Set when this page shows one of the student's earlier takes of this section. */
+    private val pastTakeId: String? = savedStateHandle[ARG_TAKE_ID]
+
+    /** An old take is on the page: it can be played, not sung again. */
+    private val showsOldTake = reviewId != null || pastTakeId != null
+
     private val scoringRepository: VocalScoringRepository = RemoteVocalScoringRepository()
     private val lessonRepository: LessonRepository = RemoteLessonRepository()
     private val studentRepository = StudentRepository(appContext)
     private val chatRepository = ChatRepository(appContext)
-    private val progressStore = PracticeProgressStore(appContext)
     private val player = ReferenceAudioPlayer(appContext)
     private val recorder = VocalRecorder(appContext)
 
@@ -83,8 +92,7 @@ class VocalTrainingViewModel(
 
     private val _uiState = MutableStateFlow(
         VocalTrainingUiState(
-            bestScore = if (reviewId == null) progressStore.bestScore(lessonId, sectionId) else null,
-            isSharedTake = reviewId != null
+            isSharedTake = showsOldTake
         )
     )
     val uiState: StateFlow<VocalTrainingUiState> = _uiState.asStateFlow()
@@ -106,6 +114,10 @@ class VocalTrainingViewModel(
 
     init {
         loadLesson()
+        if (!showsOldTake) {
+            loadPastTakes()
+            loadBestScore()
+        }
     }
 
     fun loadLesson() {
@@ -118,7 +130,7 @@ class VocalTrainingViewModel(
                     statusMessage = "در حال آماده‌سازی نمونه استاد…"
                 )
             }
-            if (reviewId != null && _uiState.value.mode != VocalTrainingMode.RESULT) loadSharedTake(reviewId)
+            if (showsOldTake && _uiState.value.mode != VocalTrainingMode.RESULT) loadSharedTake()
             runCatching {
                 val remoteLesson = lessonRepository.lessons(appContext)
                     .firstOrNull { it.id == lessonId }
@@ -134,7 +146,8 @@ class VocalTrainingViewModel(
                     )
                 }
                 // Singing in a free lesson adds it to the student's lessons.
-                if (reviewId == null && remoteLesson.isFree && remoteLesson.isOwned == false) claimFreeLesson()
+                if (!showsOldTake && remoteLesson.isFree && remoteLesson.isOwned == false) claimFreeLesson()
+                _uiState.update { it.copy(lessonOffer = remoteLesson.offer, isFreeLesson = remoteLesson.isFree) }
                 Triple(remoteLesson.title, prepared, withContext(ioDispatcher) {
                     WaveformPeaksExtractor.fromWavFile(prepared.referenceFile)
                 })
@@ -153,7 +166,7 @@ class VocalTrainingViewModel(
                         teacherWaveformPeaks = teacherPeaks,
                         isLessonReady = true,
                         isLessonLoading = false,
-                        statusMessage = if (reviewId != null) {
+                        statusMessage = if (showsOldTake) {
                             it.statusMessage
                         } else {
                             PRACTICE_TIP
@@ -174,11 +187,19 @@ class VocalTrainingViewModel(
     }
 
     /** The take and its result, so the rest of this page works just as after a recording. */
-    private fun loadSharedTake(id: String) {
+    private fun loadSharedTake() {
         viewModelScope.launch {
             runCatching {
-                val take = chatRepository.take(id)
-                val audio = chatRepository.takeAudio(id)
+                val take = pastTakeId?.let { id ->
+                    val past = studentRepository.practiceTake(id)
+                    OldTake(past.result, label = "اجرای ${formatMessageDay(past.createdAtMs)}، ${formatTimeOfDay(past.createdAtMs)}")
+                } ?: reviewId?.let { id ->
+                    val shared = chatRepository.take(id)
+                    OldTake(shared.result, label = shared.studentName.takeIf { shared.isTeacherViewing }?.let { "اجرای $it" })
+                } ?: error("این اجرا پیدا نشد.")
+                val audio = pastTakeId?.let { studentRepository.practiceTakeAudio(it) }
+                    ?: reviewId?.let { chatRepository.takeAudio(it) }
+                    ?: error("این اجرا پیدا نشد.")
                 val (pcm, peaks) = withContext(ioDispatcher) {
                     WavUtils.readPcm16Samples(audio) to WaveformPeaksExtractor.fromWavFile(audio)
                 }
@@ -191,7 +212,7 @@ class VocalTrainingViewModel(
                         userRecordingDurationSeconds = ((recordingMs + 999) / 1000).toInt().coerceAtLeast(1),
                         waveformPeaks = peaks,
                         scoreResult = take.result,
-                        sharedTakeStudent = take.studentName.takeIf { take.isTeacherViewing },
+                        oldTakeLabel = take.label,
                         statusMessage = take.result?.summary?.ifBlank { null } ?: "تحلیل این اجرا ذخیره نشده است."
                     )
                 }
@@ -544,8 +565,25 @@ class VocalTrainingViewModel(
         viewModelScope.launch {
             runCatching {
                 studentRepository.ensureAccount()
-                studentRepository.claimFreeLesson(lessonId)
-            }
+                // Someone who hasn't signed in can sing along, but the lesson isn't added to anyone.
+                if (studentRepository.mayTakeLessons()) {
+                    studentRepository.claimFreeLesson(lessonId)
+                    studentRepository.lessonOffer(lessonId)
+                } else {
+                    null
+                }
+            }.onSuccess { offer -> if (offer != null) _uiState.update { it.copy(lessonOffer = offer) } }
+        }
+    }
+
+    /**
+     * Reads the lesson's messages left again: after buying a version elsewhere, or when the
+     * server said there were none. Offline it keeps what it had.
+     */
+    fun refreshOffer() {
+        viewModelScope.launch {
+            runCatching { studentRepository.lessonOffer(lessonId) }
+                .onSuccess { offer -> _uiState.update { it.copy(lessonOffer = offer) } }
         }
     }
 
@@ -559,12 +597,19 @@ class VocalTrainingViewModel(
             runCatching {
                 studentRepository.ensureAccount()
                 studentRepository.sendForReview(lessonId, sectionId, userRecordingFile, note, score)
-            }.onSuccess { chatId ->
-                _uiState.update { it.copy(teacherAsk = TeacherAskState(isSent = true, chatId = chatId)) }
+            }.onSuccess { sent ->
+                _uiState.update {
+                    it.copy(
+                        teacherAsk = TeacherAskState(isSent = true, chatId = sent.chatId),
+                        lessonOffer = sent.offer ?: it.lessonOffer
+                    )
+                }
             }.onFailure { error ->
                 _uiState.update {
-                    it.copy(teacherAsk = TeacherAskState(error = error.message ?: "ارسال ممکن نشد."))
+                    it.copy(teacherAsk = TeacherAskState(error = error.message ?: "ارسال نشد. دوباره امتحان کنید."))
                 }
+                // A refusal may mean the messages ran out or expired since the page opened.
+                refreshOffer()
             }
         }
     }
@@ -920,7 +965,7 @@ class VocalTrainingViewModel(
         }
 
         discardTakeStream()
-        val stream = scoringRepository.streamTake(viewModelScope, lessonId)
+        val stream = scoringRepository.streamTake(viewModelScope, lessonId, sectionId)
         takeStream = stream
 
         sessionJob = viewModelScope.launch {
@@ -1006,6 +1051,33 @@ class VocalTrainingViewModel(
     }
 
     /** The student hears and sees the take first; nothing is uploaded until they send it. */
+    /** The best score the account has in this section, counted on the server. */
+    private fun loadBestScore() {
+        viewModelScope.launch {
+            runCatching { studentRepository.practiceProgress() }.onSuccess { progress ->
+                val best = progress.bestScores[PracticeProgress.key(lessonId, sectionId)]
+                _uiState.update { it.copy(bestScore = it.bestScore ?: best) }
+            }
+        }
+    }
+
+    /** This section's earlier takes for the «اجراهای قبلی شما» card; it stays as it was if they don't come. */
+    private fun loadPastTakes() {
+        viewModelScope.launch {
+            runCatching { studentRepository.practiceTakes(lessonId, sectionId) }
+                .onSuccess { takes -> _uiState.update { it.copy(pastTakes = takes) } }
+        }
+    }
+
+    fun openPastTakes() {
+        loadPastTakes()
+        _uiState.update { it.copy(arePastTakesOpen = true) }
+    }
+
+    fun closePastTakes() {
+        _uiState.update { it.copy(arePastTakesOpen = false) }
+    }
+
     private suspend fun showTakeForReview(recordingFile: LocalFile) {
         val peaks = withContext(ioDispatcher) { WaveformPeaksExtractor.fromWavFile(recordingFile) }
         _uiState.update {
@@ -1054,8 +1126,8 @@ class VocalTrainingViewModel(
                     streamed = streamed
                 )
             }
-            val isNewBest = !score.requiresReRecord && score.overall > 0 &&
-                progressStore.recordScore(lessonId, sectionId, score.overall)
+            // This take may now be one of them, and may have pushed an older one off the list.
+            loadPastTakes()
 
             val peaks = withContext(ioDispatcher) {
                 WaveformPeaksExtractor.fromWavFile(recordingFile)
@@ -1079,8 +1151,8 @@ class VocalTrainingViewModel(
                     scoreResult = score,
                     errorDetail = null,
                     teacherAsk = TeacherAskState(),
-                    isNewBest = isNewBest,
-                    bestScore = progressStore.bestScore(lessonId, sectionId),
+                    isNewBest = score.isNewBest,
+                    bestScore = score.bestScore ?: it.bestScore,
                     statusMessage = score.summary.ifBlank {
                         if (score.overall > 0) persianDigits("نمره: ${score.overall}") else "تحلیل انجام شد"
                     }
@@ -1196,6 +1268,7 @@ class VocalTrainingViewModel(
         const val ARG_LESSON_ID = "lessonId"
         const val ARG_SECTION_ID = "sectionId"
         const val ARG_REVIEW_ID = "reviewId"
+        const val ARG_TAKE_ID = "takeId"
         private const val USER_RECORDING_FILE_NAME = "user_vocal.wav"
         private const val PRACTICE_TIP = "برای تحلیل بهتر، جمله‌های استاد را عیناً بخوانید؛ بدون تکرار یا اصلاح."
         private const val CORRECTION_CLIP_PADDING_MS = 1_000L
@@ -1239,18 +1312,24 @@ data class VocalTrainingUiState(
     val playingSnippetTarget: PlaybackTarget? = null,
     val statusMessage: String = "",
     val scoreResult: VocalScoreResult? = null,
-    /** Best score for this section on this device, including the latest attempt. */
+    /** Best score for this section on the account, including the latest attempt. */
     val bestScore: Int? = null,
     val isNewBest: Boolean = false,
     val teacherAsk: TeacherAskState = TeacherAskState(),
+    /** This student's version of the lesson and messages to the teacher; null without an account. */
+    val lessonOffer: LessonOffer? = null,
+    val isFreeLesson: Boolean = true,
     /** The open «دیدن جزییات» sheet. */
     val errorDetail: ErrorDetail? = null,
     /** The voice sounding in the detail sheet. */
     val detailPlaying: PlaybackTarget = PlaybackTarget.NONE,
     /** A take opened from a chat: everything can be played, nothing can be recorded. */
     val isSharedTake: Boolean = false,
-    /** Whose take it is, when the teacher is the one looking. */
-    val sharedTakeStudent: String? = null
+    /** Under the title while an old take is open: whose take it is for the teacher, or when it was sung. */
+    val oldTakeLabel: String? = null,
+    /** This section's earlier takes, newest first: the first, the best score and the last three. */
+    val pastTakes: List<PracticeTake> = emptyList(),
+    val arePastTakesOpen: Boolean = false
 ) {
     /** A take is on the page, waiting to be sent or already scored. */
     val hasTake: Boolean
@@ -1264,6 +1343,9 @@ data class VocalTrainingUiState(
             playbackTarget == PlaybackTarget.USER &&
             isPlaying
 }
+
+/** An old take's result and the line under the page title while it is open. */
+private class OldTake(val result: VocalScoreResult?, val label: String?)
 
 /** Sending the latest take to the teacher. */
 data class TeacherAskState(

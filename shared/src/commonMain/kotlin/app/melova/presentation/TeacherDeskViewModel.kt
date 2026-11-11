@@ -3,8 +3,7 @@ package app.melova.presentation
 import androidx.lifecycle.ViewModel
 import app.melova.platform.appContext
 import androidx.lifecycle.viewModelScope
-import app.melova.data.model.LessonPurchaseRequest
-import app.melova.data.model.StudentCard
+import app.melova.data.model.TeacherEarnings
 import app.melova.data.model.TeacherReport
 import app.melova.data.repository.TeacherDeskRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,59 +13,32 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The teacher's desk: the students who pay directly, and whether the hours are worth it.
- * Activity-scoped so the panel and the students page share the waiting payments.
+ * The teacher's desk: what their lessons sold and earned them, and whether the hours are worth it.
+ * Activity-scoped so the panel and the earnings page share what was loaded.
  */
 class TeacherDeskViewModel : ViewModel() {
     private val repository = TeacherDeskRepository(appContext)
 
     private val _uiState = MutableStateFlow(
-        TeacherDeskUiState(privateHourlyRateToman = repository.privateHourlyRateToman)
+        TeacherDeskUiState(privateHourlyRateCents = repository.privateHourlyRateCents)
     )
     val uiState: StateFlow<TeacherDeskUiState> = _uiState.asStateFlow()
 
-    fun loadStudents() {
-        _uiState.update { it.copy(isLoadingStudents = true) }
+    /** Another account is using the app: its sales and report are not this one's. */
+    fun onAccountChanged() {
+        _uiState.value = TeacherDeskUiState(privateHourlyRateCents = repository.privateHourlyRateCents)
+    }
+
+    fun loadEarnings() {
+        _uiState.update { it.copy(isLoadingEarnings = true) }
         viewModelScope.launch {
-            runCatching { repository.students() }
-                .onSuccess { students -> _uiState.update { it.copy(students = students, isLoadingStudents = false) } }
+            runCatching { repository.earnings() }
+                .onSuccess { earnings -> _uiState.update { it.copy(earnings = earnings, isLoadingEarnings = false) } }
                 .onFailure { error ->
-                    _uiState.update { it.copy(isLoadingStudents = false, message = error.message ?: "خطا") }
+                    _uiState.update { it.copy(isLoadingEarnings = false, message = error.message ?: "فروش‌ها باز نشد.") }
                 }
         }
     }
-
-    /** Opens [lessonId] for a student who paid outside the app. */
-    fun recordPayment(studentId: String, lessonId: String, priceToman: Long, onDone: () -> Unit) =
-        run("در حال ثبت پرداخت…", onDone) {
-            val updated = repository.recordPayment(studentId, lessonId, priceToman)
-            _uiState.update { state ->
-                state.copy(
-                    students = state.students.map { if (it.id == updated.id) updated else it },
-                    message = "درس برای هنرجو باز شد."
-                )
-            }
-            loadPurchaseRequests()
-        }
-
-    fun loadPurchaseRequests() {
-        viewModelScope.launch {
-            runCatching { repository.purchaseRequests() }
-                .onSuccess { requests -> _uiState.update { it.copy(purchaseRequests = requests) } }
-        }
-    }
-
-    /** Confirming opens the lesson for the student; refusing tells them to check their payment. */
-    fun decidePurchase(requestId: String, approve: Boolean) =
-        run(if (approve) "در حال تأیید پرداخت…" else "در حال رد پرداخت…", onDone = ::loadStudents) {
-            val waiting = repository.decidePurchase(requestId, approve)
-            _uiState.update {
-                it.copy(
-                    purchaseRequests = waiting,
-                    message = if (approve) "درس برای هنرجو باز شد." else "به هنرجو گفته شد پرداختش پیدا نشد."
-                )
-            }
-        }
 
     fun loadReport() {
         _uiState.update { it.copy(isLoadingReport = true) }
@@ -79,9 +51,9 @@ class TeacherDeskViewModel : ViewModel() {
         }
     }
 
-    fun setPrivateHourlyRate(toman: Long?) {
-        repository.privateHourlyRateToman = toman
-        _uiState.update { it.copy(privateHourlyRateToman = repository.privateHourlyRateToman) }
+    fun setPrivateHourlyRate(cents: Long?) {
+        repository.privateHourlyRateCents = cents
+        _uiState.update { it.copy(privateHourlyRateCents = repository.privateHourlyRateCents) }
         loadReport()
     }
 
@@ -112,12 +84,11 @@ class TeacherDeskViewModel : ViewModel() {
 }
 
 data class TeacherDeskUiState(
-    val students: List<StudentCard> = emptyList(),
-    val isLoadingStudents: Boolean = false,
-    val purchaseRequests: List<LessonPurchaseRequest> = emptyList(),
+    val earnings: TeacherEarnings? = null,
+    val isLoadingEarnings: Boolean = false,
     val report: TeacherReport? = null,
     val isLoadingReport: Boolean = false,
-    val privateHourlyRateToman: Long? = null,
+    val privateHourlyRateCents: Long? = null,
     val busyLabel: String? = null,
     val message: String? = null
 )

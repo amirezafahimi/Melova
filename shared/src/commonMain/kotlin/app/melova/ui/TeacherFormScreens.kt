@@ -573,22 +573,17 @@ fun LessonFormScreen(
 }
 
 /**
- * The teacher's own card as students see it: photo, name and a short bio, and the bank card their
- * lessons are paid to. The photo is sent as soon as it is picked; the rest with «ذخیره».
+ * The teacher's own card as students see it: photo, name and a short bio. Students pay in the
+ * app, so there is no bank card here. The photo is sent as soon as it is picked; the rest with «ذخیره».
  */
 @Composable
 fun TeacherProfileScreen(state: TeacherUiState, viewModel: TeacherViewModel, onBack: () -> Unit) {
     val profile = state.profile
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
     var bio by rememberSaveable(profile?.id) { mutableStateOf(profile?.bio.orEmpty()) }
-    var cardNumber by rememberSaveable(profile?.id) { mutableStateOf(profile?.cardNumber.orEmpty()) }
-    var cardHolder by rememberSaveable(profile?.id) { mutableStateOf(profile?.cardHolder.orEmpty()) }
     var confirmingRemove by rememberSaveable { mutableStateOf(false) }
     val pickPhoto = rememberImagePicker { picked -> picked?.let(viewModel::setPhoto) }
-    val changed = profile != null && (
-        name.trim() != profile.name || bio.trim() != profile.bio ||
-            cardNumber.trim() != profile.cardNumber || cardHolder.trim() != profile.cardHolder
-        )
+    val changed = profile != null && (name.trim() != profile.name || bio.trim() != profile.bio)
 
     TeacherFormPage(
         title = "پروفایل استاد",
@@ -599,7 +594,7 @@ fun TeacherProfileScreen(state: TeacherUiState, viewModel: TeacherViewModel, onB
         actionLabel = "ذخیره",
         actionEnabled = changed && name.isNotBlank() && state.busyLabel == null,
         onAction = {
-            viewModel.updateProfile(name.trim(), bio.trim(), cardNumber.trim(), cardHolder.trim())
+            viewModel.updateProfile(name.trim(), bio.trim())
             onBack()
         }
     ) {
@@ -641,18 +636,6 @@ fun TeacherProfileScreen(state: TeacherUiState, viewModel: TeacherViewModel, onB
                 }
                 MelovaTextField(value = name, onValueChange = { name = it.take(MAX_NAME_LENGTH) }, label = "نام نمایشی")
                 MelovaTextField(value = bio, onValueChange = { bio = it }, label = "معرفی کوتاه", singleLine = false, minLines = 3)
-            }
-        }
-        item {
-            FormStep(title = "کارت بانکی", number = 2, hint = "هنرجوها قیمت درس را به این کارت واریز می‌کنند.") {
-                MelovaTextField(
-                    value = cardNumber,
-                    onValueChange = { cardNumber = it.take(24) },
-                    label = "شماره کارت",
-                    keyboardType = KeyboardType.Number,
-                    leftToRight = true
-                )
-                MelovaTextField(value = cardHolder, onValueChange = { cardHolder = it.take(120) }, label = "نام صاحب کارت")
             }
         }
     }

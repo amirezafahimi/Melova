@@ -14,6 +14,7 @@ data class ChatDto(
     @SerialName("id") val id: String?,
     @SerialName("side") val side: String? = null,
     @SerialName("peer_name") val peerName: String? = null,
+    @SerialName("teacher_id") val teacherId: String? = null,
     @SerialName("unread") val unread: Int? = null,
     @SerialName("peer_read_id") val peerReadId: Long? = null,
     @SerialName("last_message") val lastMessage: ChatMessageDto? = null,

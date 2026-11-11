@@ -5,6 +5,21 @@
       <set>
         <option value="$PROJECT_DIR$/backend" />
         <option value="$PROJECT_DIR$/dataset" />
+        <option value="$PROJECT_DIR$/app/build/generated/source/buildConfig/androidTest/debug" />
+        <option value="$PROJECT_DIR$/app/build/generated/source/buildConfig/debug" />
+        <option value="$PROJECT_DIR$/shared/src/webMain/resources" />
+        <option value="$PROJECT_DIR$/shared/src/webMain/kotlin" />
+        <option value="$PROJECT_DIR$/shared/build/generated/compose/resourceGenerator/kotlin/commonResClass" />
+        <option value="$PROJECT_DIR$/shared/build/generated/compose/resourceGenerator/kotlin/commonMainResourceAccessors" />
+        <option value="$PROJECT_DIR$/shared/build/generated/compose/resourceGenerator/kotlin/commonMainResourceCollectors" />
+        <option value="$PROJECT_DIR$/shared/src/commonMain/kotlin" />
+        <option value="$PROJECT_DIR$/shared/build/generated/compose/resourceGenerator/kotlin/wasmJsMainResourceCollectors" />
+        <option value="$PROJECT_DIR$/shared/build/kotlin-multiplatform-resources/aggregated-resources/wasmJs" />
+        <option value="$PROJECT_DIR$/shared/build/generated/compose/resourceGenerator/kotlin/jsMainResourceCollectors" />
+        <option value="$PROJECT_DIR$/shared/build/kotlin-multiplatform-resources/aggregated-resources/js" />
+        <option value="$PROJECT_DIR$/shared/src/commonTest/kotlin" />
+        <option value="$PROJECT_DIR$/shared/build/generated/compose/resourceGenerator/assembledResources/wasmJsTest" />
+        <option value="$PROJECT_DIR$/shared/build/generated/compose/resourceGenerator/kotlin/webMainResourceAccessors" />
       </set>
     </option>
   </component>

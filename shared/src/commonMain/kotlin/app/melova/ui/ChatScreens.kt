@@ -115,6 +115,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import app.melova.data.model.Chat
+import app.melova.data.model.Lesson
+import app.melova.data.model.MessageState
+import app.melova.platform.currentTimeMillis
 import app.melova.data.model.ChatMessage
 import app.melova.data.model.ChatMessageKind
 import app.melova.data.model.ChatSide
@@ -385,7 +388,10 @@ fun ChatScreen(
     state: ChatUiState,
     viewModel: ChatViewModel,
     onOpenPractice: (PracticeResultLink) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    /** The student's lessons of [teacherId]: each one's messages left show above the thread. */
+    lessonsOf: (teacherId: String) -> List<Lesson> = { emptyList() },
+    onOpenLesson: (lessonId: String) -> Unit = {}
 ) {
     DisposableEffect(chatId) {
         viewModel.openThread(chatId)
@@ -431,6 +437,9 @@ fun ChatScreen(
                         onBack = onBack
                     )
                 }
+                if (chat?.side == ChatSide.STUDENT && chat.teacherId.isNotBlank()) {
+                    MessagesLeftBanner(lessons = lessonsOf(chat.teacherId), onOpenLesson = onOpenLesson)
+                }
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     when {
                         thread?.messages?.isEmpty() == true && state.outgoing.isEmpty() -> EmptyThread()
@@ -468,6 +477,51 @@ fun ChatScreen(
                     onSendText = viewModel::sendText,
                     onSendVoice = viewModel::sendVoice
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Above the student's thread: how many takes they can still send this teacher, per lesson,
+ * and until when. A lesson whose messages ran out links to «درس با استاد» when it is on offer.
+ * Writing in the chat is free, so the banner only speaks of takes.
+ */
+@Composable
+private fun MessagesLeftBanner(lessons: List<Lesson>, onOpenLesson: (String) -> Unit) {
+    val nowMs = currentTimeMillis()
+    val lines = lessons.mapNotNull { lesson ->
+        val offer = lesson.offer ?: return@mapNotNull null
+        messagesLine(offer, nowMs)?.let { Triple(lesson, offer, it) }
+    }.take(3)
+    if (lines.isEmpty()) return
+    Column(
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp).fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        lines.forEach { (lesson, offer, line) ->
+            val runOut = offer.sendState(nowMs) !is MessageState.Left
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MelovaSmallShape)
+                    .background(MelovaCardElevated)
+                    .clickable(onClickLabel = "باز کردن درس") { onOpenLesson(lesson.id) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "«${lesson.title}»: $line",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (runOut) MelovaGold else MelovaTextMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (runOut && offer.canUpgrade) {
+                    Text("«درس با استاد»", style = MaterialTheme.typography.labelLarge, color = MelovaAccentSoft)
+                }
             }
         }
     }
@@ -1284,7 +1338,8 @@ private fun PracticeBubble(
                 when (practice.status) {
                     ReviewStatus.OPEN -> MelovaChip("در انتظار استاد", color = MelovaGold)
                     ReviewStatus.ANSWERED -> MelovaChip("پاسخ داده شد", color = MelovaSuccess)
-                    ReviewStatus.REFUNDED -> MelovaChip("بسته شد", color = MelovaTextMuted)
+                    ReviewStatus.REFUNDED -> MelovaChip("بسته شد، پیام برگشت", color = MelovaTextMuted)
+                    ReviewStatus.RETURNED -> MelovaChip("بی‌پاسخ ماند، پیام برگشت", color = MelovaTextMuted)
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 Row {

@@ -2,8 +2,8 @@ package app.melova.data.remote.mapper
 
 import app.melova.data.model.Catalog
 import app.melova.data.model.Lesson
-import app.melova.data.model.LessonPayment
-import app.melova.data.model.LessonPurchaseStatus
+import app.melova.data.model.LessonOffer
+import app.melova.data.model.LessonTier
 import app.melova.data.model.LessonSection
 import app.melova.data.model.Teacher
 import app.melova.data.model.TeacherOrnament
@@ -12,6 +12,7 @@ import app.melova.data.model.TeacherProfile
 import app.melova.data.model.UploadedTake
 import app.melova.data.remote.dto.CatalogResponseDto
 import app.melova.data.remote.dto.LessonDto
+import app.melova.data.remote.dto.LessonOfferDto
 import app.melova.data.remote.dto.TeacherOrnamentDto
 import app.melova.data.remote.dto.TeacherProfileDto
 import app.melova.data.remote.dto.UploadedTakeDto
@@ -29,8 +30,6 @@ fun TeacherProfileDto.toDomain(): TeacherProfile = TeacherProfile(
     id = id.orEmpty(),
     name = name.orEmpty(),
     bio = bio.orEmpty(),
-    cardNumber = cardNumber.orEmpty(),
-    cardHolder = cardHolder.orEmpty(),
     photoVersion = photoVersion,
     lessons = lessons.orEmpty().mapNotNull { it.toDomain() }
 )
@@ -59,13 +58,12 @@ private fun LessonDto.toDomain(): Lesson? {
         hasIntro = hasIntro == true,
         introVersion = introVersion.orEmpty(),
         isFree = isFree != false,
-        priceToman = priceToman ?: 0L,
-        bazaarSku = bazaarSku.orEmpty(),
+        priceCents = priceCents ?: 0L,
+        teacherPriceCents = teacherPriceCents ?: 0L,
+        setPriceCents = setPriceCents ?: 0L,
+        setTeacherPriceCents = setTeacherPriceCents ?: 0L,
         isOwned = isOwned,
-        purchaseStatus = LessonPurchaseStatus.fromRaw(purchaseStatus),
-        payment = payment?.cardNumber?.takeIf { it.isNotBlank() }?.let {
-            LessonPayment(cardNumber = it, cardHolder = payment.cardHolder.orEmpty())
-        },
+        offer = offer?.toDomain(),
         sections = sections.orEmpty().mapNotNull { dto ->
             val sectionId = dto.id?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             LessonSection(
@@ -77,5 +75,21 @@ private fun LessonDto.toDomain(): Lesson? {
                 audioVersion = dto.audioVersion.orEmpty()
             )
         }
+    )
+}
+
+fun LessonOfferDto.toDomain(): LessonOffer {
+    val defaults = LessonOffer()
+    return LessonOffer(
+        ownedTier = LessonTier.fromRaw(ownedTier),
+        messagesLeft = messagesLeft ?: 0,
+        messagesTotal = messagesTotal ?: 0,
+        messagesUntilMs = messagesUntil?.let { (it * 1000).toLong() },
+        lessonPriceNowCents = lessonPriceNowCents,
+        teacherPriceNowCents = teacherPriceNowCents,
+        lessonMessages = lessonMessages ?: defaults.lessonMessages,
+        teacherMessages = teacherMessages ?: defaults.teacherMessages,
+        messageDays = messageDays ?: defaults.messageDays,
+        answerDays = answerDays ?: defaults.answerDays
     )
 }

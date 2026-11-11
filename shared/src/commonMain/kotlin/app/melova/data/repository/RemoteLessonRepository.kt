@@ -1,5 +1,6 @@
 package app.melova.data.repository
 
+import app.melova.data.local.StudentSession
 import app.melova.data.local.TeacherReferenceCache
 import app.melova.data.local.TeacherSession
 import app.melova.data.model.Catalog
@@ -28,9 +29,11 @@ class RemoteLessonRepository(
 ) : LessonRepository {
     override suspend fun catalog(context: PlatformContext, forceRefresh: Boolean): Catalog =
         withContext(ioDispatcher) {
-            memoryCache?.takeIf { !forceRefresh }?.let { return@withContext it }
+            // The catalog says which lessons are the student's, so every copy belongs to one account.
+            val studentId = StudentSession(context).studentId.orEmpty()
+            memoryCache?.takeIf { !forceRefresh && it.first == studentId }?.let { return@withContext it.second }
 
-            val cacheFile = LocalFile(coursesDir(context), CATALOG_CACHE_NAME)
+            val cacheFile = LocalFile(coursesDir(context), catalogCacheName(studentId))
             val catalog = try {
                 val response = remoteDataSource.getCatalog(TeacherSession(context).token)
                 val rawCatalog = MelovaNetwork.json.encodeToString(CatalogResponseDto.serializer(), response)
@@ -45,7 +48,7 @@ class RemoteLessonRepository(
                 )
                 cached.toDomain()
             }
-            memoryCache = catalog
+            memoryCache = studentId to catalog
             catalog
         }
 
@@ -154,7 +157,8 @@ class RemoteLessonRepository(
     private fun safeName(raw: String): String = raw.replace(Regex("[^A-Za-z0-9_-]"), "_")
 
     private companion object {
-        const val CATALOG_CACHE_NAME = "catalog.json"
+        fun catalogCacheName(studentId: String) =
+            if (studentId.isEmpty()) "catalog.json" else "catalog_${studentId.replace(Regex("[^A-Za-z0-9_-]"), "_")}.json"
 
         /**
          * Raised with every change to the server's stretching settings, so a phone
@@ -164,7 +168,7 @@ class RemoteLessonRepository(
 
         /** Shared across screens so opening a lesson or section needs no extra request. */
         @Volatile
-        var memoryCache: Catalog? = null
+        var memoryCache: Pair<String, Catalog>? = null
 
         /** Teacher ornaments per section audio version; the server's first analysis is slow. */
         val ornamentCache = concurrentMapOf<String, List<TeacherOrnament>>()

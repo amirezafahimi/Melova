@@ -18,5 +18,5 @@ interface VocalScoringRepository {
     ): VocalScoreResult
 
     /** A take sent while it is sung; null where scoring doesn't support it. */
-    fun streamTake(scope: CoroutineScope, lessonId: String?): TakeStream? = null
+    fun streamTake(scope: CoroutineScope, lessonId: String?, sectionId: String? = null): TakeStream? = null
 }

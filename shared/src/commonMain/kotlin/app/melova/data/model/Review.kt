@@ -17,16 +17,20 @@ data class StudentAccount(
     val needsName: Boolean = false
 )
 
+enum class LoginChannel(val apiKind: String) { PHONE("phone"), EMAIL("email") }
+
 /** Which ways of signing in the server offers, narrowed to what this platform can do. */
 data class LoginMethods(
     val phone: Boolean,
     val email: Boolean,
     val googleClientId: String?,
-    /** The server takes any number or email with no code, until real sign-in is set up. */
-    val isMock: Boolean = false
+    /** These take any number or email with no code, until real sign-in is set up for them. */
+    val mockChannels: Set<LoginChannel> = emptySet()
 ) {
     val any: Boolean
         get() = phone || email || googleClientId != null
+
+    fun isMock(channel: LoginChannel): Boolean = channel in mockChannels
 }
 
 /** A sign-in code on its way. */
@@ -37,50 +41,36 @@ enum class ReviewStatus {
     OPEN,
     ANSWERED,
 
-    /** The teacher closed it without a review. */
-    REFUNDED;
+    /** The teacher closed it without a review; the message came back. */
+    REFUNDED,
+
+    /** The teacher didn't answer in time; the message came back. */
+    RETURNED;
 
     companion object {
         fun fromRaw(raw: String?): ReviewStatus = when (raw) {
             "answered" -> ANSWERED
             "refunded" -> REFUNDED
+            "returned" -> RETURNED
             else -> OPEN
         }
     }
 }
 
-/** A student as the teacher sees them, to find who paid. */
-data class StudentCard(
-    val id: String,
-    val name: String,
-    val createdAtMs: Long,
-    val ownedLessons: Set<String>
-)
-
-/** A student who says they paid for a lesson by card, waiting for the teacher to find it. */
-data class LessonPurchaseRequest(
-    val id: String,
-    val lessonId: String,
-    val priceToman: Long,
-    /** The name on the payment. */
-    val payer: String,
-    val studentName: String,
-    val createdAtMs: Long
-)
-
 /** Is the app worth the teacher's time? Net income per hour of their work. */
 data class TeacherReport(
     val days: Int,
-    val grossToman: Long,
-    val netToman: Long,
+    /** Euro cents, before and after Melova's cut. */
+    val grossCents: Long,
+    val netCents: Long,
     val payingStudents: Int,
     val teacherMinutes: Double,
     val minutesPerPayingStudent: Double?,
     val reviewsAnswered: Int,
     val averageReviewMinutes: Double,
     val reviewsWaiting: Int,
-    val netPerHourToman: Long?,
-    val privateHourlyRateToman: Long?,
+    val netPerHourCents: Long?,
+    val privateHourlyRateCents: Long?,
     /** Null until there is logged time and a private rate to compare with. */
     val worthIt: Boolean?
 )

@@ -22,31 +22,9 @@ data class TeacherProfile(
     val id: String,
     val name: String,
     val bio: String,
-    /** Where students pay for this teacher's lessons; empty until they set it. */
-    val cardNumber: String,
-    val cardHolder: String,
     val lessons: List<Lesson>,
     val photoVersion: Long? = null
 )
-
-/** A card payment the student reported for a lesson, until the teacher confirms it. */
-enum class LessonPurchaseStatus {
-    PENDING,
-
-    /** The teacher couldn't find the payment; the student can try again. */
-    REJECTED;
-
-    companion object {
-        fun fromRaw(raw: String?): LessonPurchaseStatus? = when (raw) {
-            "pending" -> PENDING
-            "rejected" -> REJECTED
-            else -> null
-        }
-    }
-}
-
-/** The teacher's card, where a lesson is paid for. */
-data class LessonPayment(val cardNumber: String, val cardHolder: String)
 
 data class Lesson(
     val id: String,
@@ -63,19 +41,29 @@ data class Lesson(
     val hasIntro: Boolean,
     val introVersion: String,
     val sections: List<LessonSection>,
-    /** A free lesson is open to everyone; a paid one to whoever bought it. */
+    /** A free lesson is open to everyone; a paid one to whoever bought it. The first section is always open. */
     val isFree: Boolean = true,
-    val priceToman: Long = 0L,
-    /** Cafe Bazaar product id; empty for a free lesson. */
-    val bazaarSku: String = "",
+    /** «درس», in euro cents; 0 for a free lesson. */
+    val priceCents: Long = 0L,
+    /** «درس با استاد», in euro cents; 0 when the teacher doesn't sell it. */
+    val teacherPriceCents: Long = 0L,
+    /** What the teacher entered, even while every lesson is made free for now. */
+    val setPriceCents: Long = 0L,
+    val setTeacherPriceCents: Long = 0L,
     /** Whether this student has it; null when the server didn't say (no student account yet). */
     val isOwned: Boolean? = null,
-    val purchaseStatus: LessonPurchaseStatus? = null,
-    /** Null while the teacher has no card, and for a lesson that needs no paying. */
-    val payment: LessonPayment? = null
+    /** This student's version, messages and prices now; null without an account. */
+    val offer: LessonOffer? = null
 ) {
     val isOpen: Boolean
         get() = isFree || isOwned == true
+
+    /** Sections past the first wait for the lesson to be bought. */
+    fun isSectionOpen(sectionId: String): Boolean = isOpen || sections.firstOrNull()?.id == sectionId
+
+    /** Sells «درس با استاد» too. */
+    val sellsWithTeacher: Boolean
+        get() = teacherPriceCents > 0
 
     fun section(sectionId: String): LessonSection? = sections.firstOrNull { it.id == sectionId }
 

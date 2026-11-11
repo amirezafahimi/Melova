@@ -6,7 +6,9 @@ import app.melova.data.model.LessonSection
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import app.melova.ui.theme.MelovaDimens
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
@@ -45,7 +46,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
@@ -53,9 +53,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import app.melova.data.model.Lesson
 import app.melova.platform.formatPersianInteger
 import app.melova.platform.persianDigits
@@ -63,13 +67,16 @@ import app.melova.presentation.CatalogUiState
 import app.melova.ui.components.BottomBarContentPadding
 import app.melova.ui.components.MelovaBackground
 import app.melova.ui.components.MelovaMark
-import app.melova.ui.components.MelovaProgressBar
 import app.melova.ui.components.MelovaSurfaceCard
 import app.melova.ui.components.MyLessonRow
 import app.melova.ui.components.SectionHeader
 import app.melova.ui.layout.RtlContent
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaAccentSoft
+import app.melova.ui.theme.MelovaCardElevated
+import app.melova.ui.theme.MelovaCard
+import app.melova.ui.theme.LocalMelovaPalette
+import app.melova.ui.theme.MelovaOutline
 import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.MelovaTextMuted
@@ -132,22 +139,21 @@ fun HomeScreen(
 
                     val myLessons = state.myLessons
                     if (state.totalSections > 0) {
-                        item(key = "continue") {
-                            val next = state.nextLesson
-                            val nextSection = next?.let { state.nextSection(it) }
-                            ContinueCard(
-                                lesson = next,
-                                section = nextSection,
-                                sectionNumber = next?.sections?.indexOf(nextSection)?.plus(1) ?: 0,
-                                practicedInLesson = next?.let { state.practicedSections(it) } ?: 0,
-                                practiced = state.totalPracticed,
-                                total = state.totalSections,
+                        val board = state.lastPracticedLesson
+                            ?: state.nextLesson
+                            ?: myLessons.firstOrNull { it.isOpen && it.availableSections > 0 }
+                        if (board != null) item(key = "continue") {
+                            val last = state.lastSectionId?.takeIf { state.lastLessonId == board.id }
+                                ?.let { board.section(it) }
+                            val next = state.nextSection(board)
+                            LastPracticeCard(
+                                lesson = board,
+                                lastSection = last,
+                                lastScore = state.lastScore.takeIf { last != null },
+                                nextSection = next,
                                 onClick = {
-                                    when {
-                                        next == null -> Unit
-                                        nextSection != null -> onSectionClick(next.id, nextSection.id)
-                                        else -> onLessonClick(next.id)
-                                    }
+                                    val target = next ?: last
+                                    if (target != null) onSectionClick(board.id, target.id) else onLessonClick(board.id)
                                 }
                             )
                         }
@@ -221,111 +227,156 @@ private fun HomeHeader(unreadChats: Int, onChatsClick: (() -> Unit)?) {
     }
 }
 
-/** One tap into the lesson to work on next, with overall progress across the student's lessons. */
+/**
+ * The board on top: the lesson the student last sang in, the section of that take and its score,
+ * and one row under a line that says what a tap sings next. Someone who has not sung yet is
+ * offered the lesson's first section instead. A faint tahrir curve behind is the only ornament.
+ */
 @Composable
-private fun ContinueCard(
-    lesson: Lesson?,
-    /** The section one tap sings; null when the lesson has none left, and the tap opens the lesson. */
-    section: LessonSection?,
-    sectionNumber: Int,
-    practicedInLesson: Int,
-    practiced: Int,
-    total: Int,
+private fun LastPracticeCard(
+    lesson: Lesson,
+    /** Sung most recently in [lesson]; null for someone who has not sung in it yet. */
+    lastSection: LessonSection?,
+    lastScore: Int?,
+    /** What a tap sings; null when every section has been sung, and the last one is sung again. */
+    nextSection: LessonSection?,
     onClick: () -> Unit
 ) {
-    val shape = MelovaCardShape
+    val sections = lesson.sections.filter { it.isAvailable }
+    // «بخش ۳: عنوان», but a section titled «بخش ۳» already says its number.
+    fun label(section: LessonSection): String {
+        val number = sections.indexOfFirst { it.id == section.id } + 1
+        return if (section.title.trim().startsWith("بخش") || number == 0) section.title
+        else persianDigits("بخش $number") + ": " + section.title
+    }
+    // On the dark theme the raised card and an outline-coloured curve are enough. On the light
+    // theme they fade into the lavender page, so the card takes a very light violet wash, a little
+    // deeper at the curve's corner, and the curve takes the accent.
+    val dark = LocalMelovaPalette.current.isDark
+    val accent = MelovaAccent
+    val curve = if (dark) MelovaOutline else accent.copy(alpha = 0.45f)
     Surface(
         onClick = onClick,
-        enabled = lesson != null,
-        shape = shape,
-        color = Color.Transparent,
+        shape = MelovaCardShape,
+        color = if (dark) MelovaCardElevated else MelovaCard,
+        border = BorderStroke(1.dp, MelovaOutline),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
-                .clip(shape)
-                // One violet deepening to night, with a soft light in the top corner: the app's own
-                // colour, not a second hue beside it.
-                .background(Brush.linearGradient(listOf(MelovaAccent, lerp(MelovaAccent, Color.Black, 0.25f))))
                 .drawBehind {
-                    drawRect(
-                        Brush.radialGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.18f), Color.Transparent),
-                            center = Offset(if (layoutDirection == LayoutDirection.Rtl) size.width else 0f, 0f),
-                            radius = size.width * 0.7f
+                    if (!dark) {
+                        val rtl = layoutDirection == LayoutDirection.Rtl
+                        drawRect(
+                            Brush.linearGradient(
+                                colors = listOf(accent.copy(alpha = 0.10f), accent.copy(alpha = 0.04f)),
+                                start = Offset(if (rtl) 0f else size.width, 0f),
+                                end = Offset(if (rtl) size.width else 0f, size.height)
+                            )
                         )
-                    )
+                    }
+                    drawTahrirCurve(curve)
                 }
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = when {
-                            lesson == null -> "همه را تمرین کرده‌اید"
-                            practicedInLesson > 0 -> "ادامه‌ی تمرین"
-                            else -> "درس بعدی"
-                        },
+                        text = if (lastSection != null) "آخرین تمرین شما" else "اولین درس شما",
                         style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.7f)
+                        color = MelovaTextMuted
                     )
                     Text(
-                        text = lesson?.title ?: "برای نمره‌ی بهتر دوباره بخوانید!",
-                        style = MaterialTheme.typography.titleLarge,
+                        text = lesson.title,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MelovaText,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (lesson != null) {
-                        val left = lesson.availableSections - practicedInLesson
-                        Text(
-                            text = if (section != null) {
-                                // What one tap opens: the section itself, not the lesson page.
-                                persianDigits("بخش $sectionNumber") + " • " + section.title
-                            } else {
-                                "${lesson.teacher}، ${formatPersianInteger(left.toLong())} بخش مانده"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (lesson != null) Icons.Default.PlayArrow else Icons.Outlined.EmojiEvents,
-                        contentDescription = null,
-                        tint = MelovaAccent,
-                        modifier = Modifier.size(28.dp)
+                    Text(
+                        text = lastSection?.let(::label)
+                            ?: "با ${lesson.teacher}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MelovaTextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+                if (lastSection != null && lastScore != null) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = persianDigits("$lastScore"),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MelovaGold
+                        )
+                        Text(text = "نمره", style = MaterialTheme.typography.labelSmall, color = MelovaTextMuted)
+                    }
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MelovaProgressBar(
-                    progress = practiced.toFloat() / total,
-                    modifier = Modifier.weight(1f),
-                    color = Color.White,
-                    trackColor = Color.White.copy(alpha = 0.22f),
-                    followLayoutDirection = true,
-                    thickness = 4.dp
-                )
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MelovaOutline)
+            )
+            // The row says what a tap does; the whole card does the same.
+            val target = nextSection ?: lastSection
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = persianDigits("$practiced از $total بخش"),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.75f)
+                    text = when {
+                        target == null -> "دیدن درس"
+                        lastSection == null -> "شروع: " + label(target)
+                        nextSection == null -> "دوباره: " + label(target)
+                        else -> "بعدی: " + label(target)
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MelovaAccentSoft,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
+                ForwardArrow(tint = MelovaAccentSoft)
             }
         }
     }
+}
+
+/**
+ * A melisma drawn as one thin line across the top of the card's far end: a few quick turns, then
+ * a long rise, the shape a tahrir takes on the teacher's pitch line. It sits away from where the
+ * text starts so the words stay clear.
+ */
+private fun DrawScope.drawTahrirCurve(color: Color) {
+    val w = minOf(size.width * 0.55f, 200.dp.toPx())
+    val h = size.height * 0.6f
+    val rtl = layoutDirection == LayoutDirection.Rtl
+    // Drawn for right-to-left (curve on the left); mirrored when the far end is on the right.
+    fun x(f: Float) = if (rtl) f * w else size.width - f * w
+    fun y(f: Float) = f * h
+    // Points of the curve in a 160 by 90 box.
+    val segments = listOf(
+        floatArrayOf(20f, 70f, 24f, 30f, 40f, 40f),
+        floatArrayOf(56f, 50f, 56f, 70f, 68f, 50f),
+        floatArrayOf(80f, 30f, 80f, 20f, 92f, 34f),
+        floatArrayOf(104f, 48f, 104f, 56f, 116f, 40f),
+        floatArrayOf(128f, 24f, 132f, 14f, 160f, 18f)
+    )
+    val path = Path().apply {
+        moveTo(x(0f), y(70f / 90f))
+        segments.forEach { s ->
+            cubicTo(
+                x(s[0] / 160f), y(s[1] / 90f),
+                x(s[2] / 160f), y(s[3] / 90f),
+                x(s[4] / 160f), y(s[5] / 90f)
+            )
+        }
+    }
+    drawPath(path, color = color, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
 }
 
 @Composable

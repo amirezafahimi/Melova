@@ -111,7 +111,7 @@ class RemoteVocalScoringRepository(
         }
     }
 
-    override fun streamTake(scope: CoroutineScope, lessonId: String?): TakeStream {
+    override fun streamTake(scope: CoroutineScope, lessonId: String?, sectionId: String?): TakeStream {
         val id = TakeStream.newId()
         return TakeStream(
             id,
@@ -123,7 +123,13 @@ class RemoteVocalScoringRepository(
                     val flac = withContext(Dispatchers.Default) { FlacEncoder.encode(samples, sampleRate) }
                     listOf(FilePart("piece", "piece.flac", "audio/flac", flac))
                 }
-                val fields = mapOf("offset" to offset.toString(), "ended" to ended.toString(), "lesson_id" to lessonId)
+                // The section lets the free first section of a lesson through for a student who hasn't bought it.
+                val fields = mapOf(
+                    "offset" to offset.toString(),
+                    "ended" to ended.toString(),
+                    "lesson_id" to lessonId,
+                    "section_id" to sectionId.takeIf { lessonId != null }
+                )
                 remoteDataSource.streamTakePiece(id, multipartBody(fields, piece)).accepted
             },
             drop = { remoteDataSource.dropTakeStream(id) }

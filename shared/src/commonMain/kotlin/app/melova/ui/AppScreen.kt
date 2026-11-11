@@ -29,6 +29,10 @@ object AppScreen {
     const val PRACTICE_RESULT =
         "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}" +
             "/result/{${VocalTrainingViewModel.ARG_REVIEW_ID}}"
+    /** One of the student's earlier takes of a section, from the practice page: read-only too. */
+    const val PRACTICE_PAST_TAKE =
+        "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}" +
+            "/take/{${VocalTrainingViewModel.ARG_TAKE_ID}}"
     /** The teacher's performance in detail: waveform with tahrir/vibrato spans. */
     const val TEACHER_PERFORMANCE =
         "practice/{${VocalTrainingViewModel.ARG_LESSON_ID}}/{${VocalTrainingViewModel.ARG_SECTION_ID}}/teacher"
@@ -45,7 +49,7 @@ object AppScreen {
     const val NEW_SECTION = "teacher/lesson/{$ARG_LESSON_ID}/new-section"
     const val ARG_SECTION_ID = "sectionId"
     const val EDIT_SECTION = "teacher/lesson/{$ARG_LESSON_ID}/section/{$ARG_SECTION_ID}"
-    const val TEACHER_STUDENTS = "teacher/students"
+    const val TEACHER_EARNINGS = "teacher/earnings"
     const val TEACHER_REPORT = "teacher/report"
 
     const val ARG_CHAT_ID = "chatId"
@@ -74,6 +78,9 @@ object AppScreen {
 
     fun practiceResult(lessonId: String, sectionId: String, reviewId: String) =
         "practice/${lessonId.encodeURLPathPart()}/${sectionId.encodeURLPathPart()}/result/${reviewId.encodeURLPathPart()}"
+
+    fun practicePastTake(lessonId: String, sectionId: String, takeId: String) =
+        "practice/${lessonId.encodeURLPathPart()}/${sectionId.encodeURLPathPart()}/take/${takeId.encodeURLPathPart()}"
 
     fun teacherPerformance(lessonId: String, sectionId: String) =
         "practice/${lessonId.encodeURLPathPart()}/${sectionId.encodeURLPathPart()}/teacher"

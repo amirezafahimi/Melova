@@ -58,9 +58,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.melova.data.model.LoginChannel
 import app.melova.data.model.LoginMethods
 import app.melova.data.model.StudentAccount
-import app.melova.data.repository.LoginChannel
 import app.melova.platform.PlatformBackHandler
 import app.melova.platform.formatPersianInteger
 import app.melova.platform.rememberGoogleSignIn
@@ -184,7 +184,7 @@ fun LoginScreen(
                             onGoogle = signInWithGoogle,
                             onChannelChange = viewModel::setChannel,
                             onAddressChange = viewModel::setAddress,
-                            onSubmit = if (methods.isMock) viewModel::signInWithoutCode else viewModel::requestCode
+                            onSubmit = if (methods.isMock(state.channel)) viewModel::signInWithoutCode else viewModel::requestCode
                         )
                         Text(
                             text = "حساب ندارید؟ مشکلی نیست؛ با همین کار برایتان ساخته می‌شود.",
@@ -262,7 +262,7 @@ private fun AddressStep(
             if (state.isBusy) {
                 CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
             } else {
-                Text(if (methods.isMock) "ورود" else "دریافت کد")
+                Text(if (methods.isMock(state.channel)) "ورود" else "دریافت کد")
             }
         }
     }

@@ -2,8 +2,8 @@ package app.melova.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.melova.data.model.LoginChannel
 import app.melova.data.model.StudentAccount
-import app.melova.data.repository.LoginChannel
 import app.melova.data.repository.StudentRepository
 import app.melova.platform.GoogleSignInResult
 import app.melova.platform.appContext

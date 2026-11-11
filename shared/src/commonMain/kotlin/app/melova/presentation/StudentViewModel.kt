@@ -3,6 +3,7 @@ package app.melova.presentation
 import androidx.lifecycle.ViewModel
 import app.melova.platform.appContext
 import androidx.lifecycle.viewModelScope
+import app.melova.data.model.LessonTier
 import app.melova.data.model.LoginMethods
 import app.melova.data.model.StudentAccount
 import app.melova.data.repository.StudentRepository
@@ -85,11 +86,22 @@ class StudentViewModel : ViewModel() {
         repository.claimFreeLesson(lessonId)
     }
 
-    /** The student paid for a lesson by card, under the name [payer]. */
-    fun buyLesson(lessonId: String, payer: String) =
-        changeLessons("پرداخت ثبت شد. بعد از تأیید استاد، درس باز می‌شود.") {
-            repository.requestLesson(lessonId, payer)
+    /**
+     * Pays for [tier] of a lesson. With a provider that finishes on its own page, the page's
+     * address lands in [StudentUiState.paymentUrl] and the lesson opens once it says paid.
+     */
+    fun buyLesson(lessonId: String, tier: LessonTier) {
+        val done = if (tier == LessonTier.WITH_TEACHER) "«درس با استاد» مال شماست." else "این درس مال شماست."
+        changeLessons(done) {
+            val checkout = repository.checkout(lessonId, tier)
+            if (!checkout.paid) _uiState.update { it.copy(paymentUrl = checkout.redirectUrl) }
+            checkout.account
         }
+    }
+
+    fun consumePaymentUrl() {
+        _uiState.update { it.copy(paymentUrl = null) }
+    }
 
     private fun changeLessons(done: String, change: suspend () -> StudentAccount) {
         if (_uiState.value.isChangingLessons) return
@@ -103,12 +115,12 @@ class StudentViewModel : ViewModel() {
                     it.copy(
                         account = account,
                         isChangingLessons = false,
-                        message = done,
+                        message = if (it.paymentUrl != null) null else done,
                         accountRevision = it.accountRevision + 1
                     )
                 }
             }.onFailure { error ->
-                _uiState.update { it.copy(isChangingLessons = false, message = error.message ?: "انجام نشد.") }
+                _uiState.update { it.copy(isChangingLessons = false, message = error.message ?: "پرداخت انجام نشد. دوباره امتحان کنید.") }
             }
         }
     }
@@ -165,6 +177,8 @@ data class StudentUiState(
     val isChangingLessons: Boolean = false,
     val loadError: String? = null,
     val message: String? = null,
+    /** The payment provider's page, to open; null once opened or when payment needs none. */
+    val paymentUrl: String? = null,
     val accountRevision: Int = 0
 ) {
     /** Buying and sending to a teacher take a real account, once the server offers a way in. */

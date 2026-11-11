@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -150,6 +151,17 @@ private fun SideTab(
 @Composable
 private fun PracticeButton(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val scale by animateFloatAsState(if (selected) 1f else 0.9f, label = "practiceScale")
+    // Off the practice tab the circle goes quiet, like a disabled control: a flat grey-violet fill (the
+    // muted text colour laid thinly over the bar, so it shows on both themes), a muted clef and no
+    // glow. On it, the accent gradient with a white clef.
+    val quiet = MelovaTextMuted.copy(alpha = 0.28f).compositeOver(MelovaCard)
+    val fromColor by animateColorAsState(if (selected) MelovaAccent else quiet, label = "practiceFrom")
+    val toColor by animateColorAsState(if (selected) MelovaSecondary else quiet, label = "practiceTo")
+    val clefTint by animateColorAsState(
+        if (selected) Color.White else MelovaTextMuted.copy(alpha = 0.7f),
+        label = "practiceClef"
+    )
+    val glow by animateColorAsState(if (selected) MelovaAccent else Color.Transparent, label = "practiceGlow")
     Column(
         modifier = modifier.selectable(
             selected = selected,
@@ -165,13 +177,13 @@ private fun PracticeButton(selected: Boolean, onClick: () -> Unit, modifier: Mod
             modifier = Modifier
                 .scale(scale)
                 .size(58.dp)
-                .shadow(10.dp, CircleShape, ambientColor = MelovaAccent, spotColor = MelovaAccent)
+                .shadow(if (selected) 10.dp else 0.dp, CircleShape, ambientColor = glow, spotColor = glow)
                 .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(MelovaAccent, MelovaSecondary)))
+                .background(Brush.linearGradient(listOf(fromColor, toColor)))
                 .border(4.dp, MelovaCard, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(TrebleClefIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(36.dp))
+            Icon(TrebleClefIcon, contentDescription = null, tint = clefTint, modifier = Modifier.size(36.dp))
         }
         Text(
             text = "تمرین",

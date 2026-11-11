@@ -20,7 +20,10 @@ data class ScoringResponseDto(
     @SerialName("tahrir_comparisons") val tahrirComparisons: List<TahrirComparisonDto> = emptyList(),
     @SerialName("ornament_corrections") val ornamentCorrections: List<OrnamentCorrectionDto> = emptyList(),
     @SerialName("pitch_lines") val pitchLines: PitchLinesDto? = null,
-    @SerialName("teacher_review") val teacherReview: TeacherReviewSuggestionDto? = null
+    @SerialName("teacher_review") val teacherReview: TeacherReviewSuggestionDto? = null,
+    /** Set once the take is kept for the student: the section's best score and whether this take set it. */
+    @SerialName("best_score") val bestScore: Int? = null,
+    @SerialName("is_new_best") val isNewBest: Boolean = false
 )
 
 /** Both voices' pitch as the score read it, so the detail sheet draws those same notes. */

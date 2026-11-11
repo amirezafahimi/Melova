@@ -14,7 +14,6 @@ import app.melova.platform.LocalFile
 import app.melova.platform.PlatformContext
 import app.melova.platform.cacheDir
 import kotlinx.io.IOException
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -41,11 +40,8 @@ class TeacherRepository(
 
     suspend fun profile() = call { api.me(token()) }
 
-    suspend fun updateProfile(name: String, bio: String, cardNumber: String, cardHolder: String) = call {
-        api.updateMe(
-            token(),
-            mapOf("name" to name, "bio" to bio, "card_number" to cardNumber, "card_holder" to cardHolder)
-        )
+    suspend fun updateProfile(name: String, bio: String) = call {
+        api.updateMe(token(), mapOf("name" to name, "bio" to bio))
     }
 
     /** The server crops it to a square; read now, as the picked file is only temporary. */
@@ -63,15 +59,18 @@ class TeacherRepository(
     suspend fun setLessonPublished(lessonId: String, published: Boolean) =
         call { api.updateLesson(token(), lessonId, buildJsonObject { put("published", published) }) }
 
-    /** With no [bazaarSku] and no [priceToman], the lesson is free. */
-    suspend fun setLessonSale(lessonId: String, bazaarSku: String, priceToman: Long) =
+    /**
+     * Both versions' prices in euro cents. A [priceCents] of 0 makes the lesson free; a
+     * [teacherPriceCents] of 0 doesn't sell «درس با استاد».
+     */
+    suspend fun setLessonSale(lessonId: String, priceCents: Long, teacherPriceCents: Long) =
         call {
             api.updateLesson(
                 token(),
                 lessonId,
                 buildJsonObject {
-                    put("bazaar_sku", JsonPrimitive(bazaarSku.trim()))
-                    put("price_toman", priceToman)
+                    put("price_cents", priceCents)
+                    put("teacher_price_cents", teacherPriceCents)
                 }
             )
         }

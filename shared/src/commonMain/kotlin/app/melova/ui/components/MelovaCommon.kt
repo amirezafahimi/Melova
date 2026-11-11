@@ -126,7 +126,9 @@ fun MelovaSurfaceCard(
 fun MelovaTopBar(
     title: String,
     subtitle: String? = null,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    /** A round icon button at the far end, such as the practice page's history. */
+    action: TopBarAction? = null
 ) {
     // Back from the system or the browser does exactly what this page's button does.
     PlatformBackHandler(onBack = onBack)
@@ -171,11 +173,32 @@ fun MelovaTopBar(
                     )
                 }
             }
+            action?.let {
+                Surface(
+                    onClick = it.onClick,
+                    shape = CircleShape,
+                    color = Color.Transparent,
+                    border = BorderStroke(1.dp, MelovaOutline),
+                    modifier = Modifier.size(MelovaDimens.CompactButtonHeight)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = it.icon,
+                            contentDescription = it.description,
+                            tint = MelovaText,
+                            modifier = Modifier.size(MelovaDimens.Icon)
+                        )
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(8.dp))
         HorizontalDivider(thickness = 1.dp, color = MelovaOutline)
     }
 }
+
+/** An icon button for [MelovaTopBar]'s far end. */
+class TopBarAction(val icon: ImageVector, val description: String, val onClick: () -> Unit)
 
 /**
  * The small action that sits beside something else — «درس جدید» next to a heading, «دنبال کردن»

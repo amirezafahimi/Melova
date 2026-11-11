@@ -84,9 +84,15 @@ import androidx.compose.material.icons.outlined.Public
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.border
 import app.melova.data.model.Lesson
+import app.melova.data.model.TeacherEarnings
+import app.melova.data.model.SUGGESTED_LESSON_PRICE_CENTS
+import app.melova.data.model.SUGGESTED_TEACHER_PRICE_CENTS
+import app.melova.data.model.euroInput
+import app.melova.data.model.formatEuro
+import app.melova.data.model.parseEuroCents
+import app.melova.data.model.salePriceProblem
 import app.melova.data.model.LessonSection
 import app.melova.data.repository.LessonFields
-import app.melova.platform.digitsOnly
 import app.melova.platform.persianDigits
 import app.melova.presentation.TeacherUiState
 import app.melova.presentation.TeacherViewModel
@@ -125,8 +131,8 @@ import app.melova.ui.theme.MelovaTextMuted
 fun TeacherPanelScreen(
     state: TeacherUiState,
     viewModel: TeacherViewModel,
-    /** Students waiting for the teacher to confirm a card payment. */
-    pendingPurchases: Int,
+    /** What this teacher's lessons sold; null until loaded. */
+    earnings: TeacherEarnings?,
     onOpenLesson: (String) -> Unit,
     onNewLesson: () -> Unit,
     onEditProfile: () -> Unit,
@@ -135,7 +141,7 @@ fun TeacherPanelScreen(
     onSignOut: (() -> Unit)? = null,
     unreadChats: Int = 0,
     onOpenChats: () -> Unit = {},
-    onOpenStudents: () -> Unit = {},
+    onOpenEarnings: () -> Unit = {},
     onOpenReport: () -> Unit = {}
 ) {
     var confirmingSignOut by rememberSaveable { mutableStateOf(false) }
@@ -170,10 +176,10 @@ fun TeacherPanelScreen(
         }
         item {
             TeacherDeskEntryCard(
-                pendingPurchases = pendingPurchases,
+                earnings = earnings,
                 unreadChats = unreadChats,
                 onOpenChats = onOpenChats,
-                onOpenStudents = onOpenStudents,
+                onOpenEarnings = onOpenEarnings,
                 onOpenReport = onOpenReport
             )
         }
@@ -239,7 +245,7 @@ private fun TeacherLessonRow(number: Int, lesson: Lesson, onClick: () -> Unit) {
                         text = buildString {
                             append(if (lesson.hasIntro) "آموزش ✓" else "بدون آموزش")
                             append(persianDigits("، $ready بخش"))
-                            if (!lesson.isFree) append("، ${formatToman(lesson.priceToman)}")
+                            if (!lesson.isFree) append("، ${formatEuro(lesson.priceCents)}")
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MelovaTextMuted
@@ -314,7 +320,6 @@ fun LessonEditorScreen(
         item {
             // Who sees the lesson and what it costs, together: both decide who gets it.
             val canPublish = lesson.published || lesson.availableSections > 0
-            val hasCard = state.profile?.cardNumber?.isNotBlank() == true
             MelovaNavGroup(
                 {
                     MelovaGroupRow(
@@ -341,10 +346,10 @@ fun LessonEditorScreen(
                 {
                     MelovaGroupRow(
                         icon = Icons.Outlined.Sell,
-                        title = if (lesson.priceToman > 0) "قیمت: ${formatToman(lesson.priceToman)}" else "درس رایگان",
-                        subtitle = saleNote(lesson, hasCard),
+                        title = salePrices(lesson),
+                        subtitle = saleNote(lesson),
                         onClick = { editingSale = true },
-                        iconTint = if (!lesson.isFree && !hasCard) MelovaError else MelovaGold
+                        iconTint = MelovaGold
                     )
                 }
             )
@@ -412,9 +417,9 @@ fun LessonEditorScreen(
     if (editingSale && lesson != null) {
         SaleDialog(
             lesson = lesson,
-            onConfirm = { sku, price ->
+            onConfirm = { price, teacherPrice ->
                 editingSale = false
-                viewModel.setLessonSale(lesson.id, sku, price)
+                viewModel.setLessonSale(lesson.id, price, teacherPrice)
             },
             onDismiss = { editingSale = false }
         )
@@ -543,34 +548,63 @@ internal fun TeacherListenRow(
 
 // ------------------------------------------------------------------ dialogs
 
-/** What the price row says under the price. */
-private fun saleNote(lesson: Lesson, hasCard: Boolean): String = when {
-    lesson.isFree && lesson.priceToman > 0 -> "فعلاً همه‌ی درس‌ها رایگان است و این قیمت برای بعد می‌ماند."
-    lesson.isFree -> "همه می‌توانند تمرینش کنند. برای فروش، قیمت بگذارید."
-    !hasCard -> "برای شروع فروش، شماره کارتتان را در پروفایل استاد بگذارید."
-    else -> "هنرجو کارت‌به‌کارت می‌خرد و شما تأیید می‌کنید."
+/** The price row's title: both versions, or that the lesson is free. */
+private fun salePrices(lesson: Lesson): String {
+    val price = lesson.setPriceCents
+    val teacherPrice = lesson.setTeacherPriceCents
+    return when {
+        price > 0 && teacherPrice > 0 -> "«درس» ${formatEuro(price)}، «با استاد» ${formatEuro(teacherPrice)}"
+        price > 0 -> "«درس» ${formatEuro(price)}"
+        teacherPrice > 0 -> "رایگان، «با استاد» ${formatEuro(teacherPrice)}"
+        else -> "درس رایگان"
+    }
 }
 
-/** Price 0 makes the lesson free again. */
+/** What the price row says under the prices. */
+private fun saleNote(lesson: Lesson): String = when {
+    lesson.isFree && lesson.setPriceCents > 0 -> "فعلاً همه‌ی درس‌ها رایگان است و این قیمت‌ها برای بعد می‌مانند."
+    lesson.isFree -> "همه می‌توانند تمرینش کنند. برای فروش، قیمت بگذارید."
+    else -> "هنرجو در اپ می‌خرد و درس فوراً برایش باز می‌شود. بخش اول برای همه رایگان است."
+}
+
+/**
+ * Both versions' prices, in euros. A lesson with no prices yet starts from the suggested ones.
+ * A blank «درس» price keeps the lesson free; a blank «درس با استاد» price doesn't sell that version.
+ */
 @Composable
-private fun SaleDialog(lesson: Lesson, onConfirm: (sku: String, priceToman: Long) -> Unit, onDismiss: () -> Unit) {
-    var priceText by rememberSaveable { mutableStateOf(lesson.priceToman.takeIf { it > 0 }?.let { persianDigits(it.toString()) }.orEmpty()) }
-    var sku by rememberSaveable { mutableStateOf(lesson.bazaarSku) }
-    val price = digitsOnly(priceText).toLongOrNull() ?: 0L
+private fun SaleDialog(lesson: Lesson, onConfirm: (priceCents: Long, teacherPriceCents: Long) -> Unit, onDismiss: () -> Unit) {
+    val fresh = lesson.setPriceCents == 0L && lesson.setTeacherPriceCents == 0L
+    var priceText by rememberSaveable {
+        mutableStateOf(euroInput(if (fresh) SUGGESTED_LESSON_PRICE_CENTS else lesson.setPriceCents).takeUnless { it == "0" }.orEmpty())
+    }
+    var teacherText by rememberSaveable {
+        mutableStateOf(euroInput(if (fresh) SUGGESTED_TEACHER_PRICE_CENTS else lesson.setTeacherPriceCents).takeUnless { it == "0" }.orEmpty())
+    }
+    val price = parseEuroCents(priceText)
+    val teacherPrice = parseEuroCents(teacherText)
+    val problem = salePriceProblem(price, teacherPrice)
     FormDialog(
-        title = "قیمت درس",
+        title = "قیمت درس (یورو)",
         confirmLabel = "ذخیره",
-        onConfirm = { onConfirm(if (price > 0) sku else "", price) },
+        confirmEnabled = problem == null,
+        onConfirm = { if (price != null && teacherPrice != null) onConfirm(price, teacherPrice) },
         onDismiss = onDismiss
     ) {
-        Text(
-            text = "قیمت را خالی بگذارید تا درس رایگان بماند. هنرجو مبلغ را به کارت شما واریز می‌کند و شما در «هنرجوها و پرداخت‌ها» تأیید می‌کنید تا درس برایش باز شود.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MelovaTextMuted
+        MelovaTextField(
+            value = priceText,
+            onValueChange = { priceText = it.take(8) },
+            label = "قیمت «درس»"
         )
-        MelovaTextField(value = priceText, onValueChange = { priceText = it.take(12) }, label = "قیمت (تومان)")
-        if (price > 0) Text(formatToman(price), style = MaterialTheme.typography.bodySmall, color = MelovaAccentSoft)
-        MelovaTextField(value = sku, onValueChange = { sku = it.trim().take(80) }, label = "شناسه محصول کافه‌بازار (بعداً)")
+        MelovaTextField(
+            value = teacherText,
+            onValueChange = { teacherText = it.take(8) },
+            label = "قیمت «درس با استاد»"
+        )
+        Text(
+            text = problem ?: "«درس با استاد» همان درس است با پیام‌های بیشتر به شما. «درس» خالی یعنی درس رایگان؛ «با استاد» خالی یعنی فروخته نمی‌شود.",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (problem != null) MelovaError else MelovaTextMuted
+        )
     }
 }
 

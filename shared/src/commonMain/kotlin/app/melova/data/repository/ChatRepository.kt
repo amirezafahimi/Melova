@@ -166,6 +166,7 @@ private fun ChatDto.toDomain(): Chat? {
         id = chatId,
         side = ChatSide.fromRaw(side),
         peerName = peerName.orEmpty(),
+        teacherId = teacherId.orEmpty(),
         unread = unread ?: 0,
         peerReadId = peerReadId ?: 0L,
         lastMessage = lastMessage?.toDomain(),

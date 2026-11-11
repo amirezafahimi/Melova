@@ -77,6 +77,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.melova.data.model.Lesson
 import app.melova.data.model.LessonSection
+import app.melova.data.model.LessonTier
 import app.melova.platform.persianDigits
 import app.melova.presentation.CatalogUiState
 import app.melova.presentation.IntroStatus
@@ -99,6 +100,7 @@ import app.melova.ui.theme.MelovaAccentSoft
 import app.melova.ui.theme.MelovaCardElevated
 import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaSecondary
+import app.melova.ui.theme.MelovaSuccess
 import app.melova.ui.theme.MelovaTextMuted
 import app.melova.ui.theme.MelovaText
 import app.melova.ui.theme.LocalMelovaPalette
@@ -119,7 +121,7 @@ fun LessonScreen(
     isChangingLessons: Boolean = false,
     onLogin: () -> Unit = {},
     onLoginToAdd: () -> Unit = {},
-    onBuy: (payer: String) -> Unit = {},
+    onBuy: (LessonTier) -> Unit = {},
     onAddFree: () -> Unit = {},
     onTeacherClick: (String) -> Unit = {},
     introViewModel: LessonIntroViewModel = viewModel { LessonIntroViewModel(createSavedStateHandle()) }
@@ -127,6 +129,7 @@ fun LessonScreen(
     val introState by introViewModel.uiState.collectAsStateWithLifecycle()
     val lesson = catalogState.lesson(lessonId)
     val addFree = rememberLoginGated(loginGate, onLoginToAdd, onAddFree)
+    var offerOpen by rememberSaveable(lessonId) { mutableStateOf(false) }
 
     // Refresh best scores when the student comes back from a practice section.
     LaunchedEffect(Unit) { onResume() }
@@ -164,7 +167,7 @@ fun LessonScreen(
                 item { LessonHero(lesson, onTeacherClick = { onTeacherClick(lesson.teacherId) }) }
                 val locked = !lesson.isOpen && !isOwnTeacher
                 if (locked) {
-                    item { LessonPurchaseCard(lesson, loginGate, isChangingLessons, onLogin, onBuy) }
+                    item { LessonOfferCard(lesson, isChangingLessons, onOpen = { offerOpen = true }) }
                 } else if (lesson.isFree && lesson.isOwned != true && !isOwnTeacher) {
                     item {
                         FreeLessonCard(isBusy = isChangingLessons, onAdd = addFree)
@@ -179,9 +182,11 @@ fun LessonScreen(
                         onSkip = introViewModel::skipBy
                     )
                 }
-                // Hidden while the page asks to add or buy the lesson, so it keeps one main action.
-                val offersAdd = locked || (lesson.isFree && lesson.isOwned != true && !isOwnTeacher)
-                val next = catalogState.nextSection(lesson).takeUnless { locked }
+                // Hidden while the page asks to add a free lesson, so it keeps one main action.
+                // A locked lesson still starts here: its first section is free.
+                val offersAdd = !locked && lesson.isFree && lesson.isOwned != true && !isOwnTeacher
+                // Before buying, only the free first section can be next.
+                val next = catalogState.nextSection(lesson)?.takeIf { !locked || lesson.isSectionOpen(it.id) }
                 if (next != null && !offersAdd) {
                     item {
                         StartPracticeButton(
@@ -202,13 +207,29 @@ fun LessonScreen(
                         number = index + 1,
                         section = section,
                         bestScore = catalogState.bestScore(lesson.id, section.id),
-                        locked = locked,
+                        locked = !isOwnTeacher && !lesson.isSectionOpen(section.id),
+                        freeSample = locked && index == 0,
                         isNext = section.id == next?.id,
-                        onClick = { onSectionClick(section.id) }
+                        onClick = { onSectionClick(section.id) },
+                        onLockedClick = { offerOpen = true }
                     )
+                }
+                // Someone who has the lesson, or a free one, may still want more time with the teacher.
+                if (!locked && !isOwnTeacher && lesson.isOwned == true && lesson.offer?.canUpgrade == true) {
+                    item { LessonOfferCard(lesson, isChangingLessons, onOpen = { offerOpen = true }) }
                 }
                 item { PracticeTipCard() }
                 item { Spacer(Modifier.height(12.dp)) }
+            }
+            if (lesson != null && !isOwnTeacher) {
+                LessonOfferSheet(
+                    lesson = lesson,
+                    loginGate = loginGate,
+                    open = offerOpen,
+                    onOpenChange = { offerOpen = it },
+                    onLogin = onLogin,
+                    onBuy = onBuy
+                )
             }
         }
     }
@@ -392,12 +413,16 @@ private fun SectionCard(
     bestScore: Int?,
     locked: Boolean,
     isNext: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    /** The first section of a lesson not bought yet, which anyone can sing. */
+    freeSample: Boolean = false,
+    /** Tapping a locked section shows what buying the lesson gives. */
+    onLockedClick: () -> Unit = {}
 ) {
     val enabled = section.isAvailable && !locked
     MelovaSurfaceCard(
-        onClick = onClick,
-        enabled = enabled,
+        onClick = if (locked) onLockedClick else onClick,
+        enabled = section.isAvailable,
         highlighted = isNext,
         modifier = Modifier.alpha(if (enabled) 1f else 0.55f),
         contentPadding = 12.dp
@@ -416,7 +441,7 @@ private fun SectionCard(
                         .background(MelovaCardElevated),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (section.isAvailable) {
+                    if (section.isAvailable && !locked) {
                         Text(
                             text = persianDigits(number.toString()),
                             style = MaterialTheme.typography.titleMedium,
@@ -453,6 +478,7 @@ private fun SectionCard(
                 }
                 val line = when {
                     !section.isAvailable -> "به‌زودی"
+                    locked -> "بعد از خرید درس باز می‌شود"
                     section.description.isNotBlank() -> section.description
                     bestScore != null -> "بهترین نمره‌ی شما"
                     else -> "هنوز تمرین نشده"
@@ -465,9 +491,11 @@ private fun SectionCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            if (isNext) {
+            if (freeSample && section.isAvailable) {
+                MelovaChip(text = "رایگان", color = MelovaSuccess)
+            } else if (isNext) {
                 MelovaChip(text = "بعدی", color = MelovaAccentSoft)
-            } else if (section.isAvailable) {
+            } else if (section.isAvailable && !locked) {
                 if (bestScore != null) {
                     Icon(Icons.Default.Check, contentDescription = null, tint = MelovaTextMuted)
                 } else {

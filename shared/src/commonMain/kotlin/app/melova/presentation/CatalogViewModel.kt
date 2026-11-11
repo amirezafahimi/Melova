@@ -4,9 +4,10 @@ import androidx.lifecycle.ViewModel
 import app.melova.platform.appContext
 import androidx.lifecycle.viewModelScope
 import app.melova.data.local.FollowStore
-import app.melova.data.local.PracticeProgressStore
+import app.melova.data.local.StudentSession
 import app.melova.data.model.Catalog
 import app.melova.data.model.Lesson
+import app.melova.data.model.PracticeProgress
 import app.melova.data.model.LessonSection
 import app.melova.data.model.Teacher
 import app.melova.data.repository.LessonRepository
@@ -22,13 +23,13 @@ import kotlinx.coroutines.launch
 class CatalogViewModel : ViewModel() {
     private val repository: LessonRepository = RemoteLessonRepository()
     private val studentRepository = StudentRepository(appContext)
-    private val progressStore = PracticeProgressStore(appContext)
     private val followStore = FollowStore(appContext)
+    private val studentSession = StudentSession(appContext)
 
     private val _uiState = MutableStateFlow(
         CatalogUiState(
-            followedIds = followStore.followedIds(),
-            lastLessonId = progressStore.lastLessonId()
+            catalogOwnerId = studentSession.studentId,
+            followedIds = followStore.followedIds()
         )
     )
     val uiState: StateFlow<CatalogUiState> = _uiState.asStateFlow()
@@ -43,16 +44,18 @@ class CatalogViewModel : ViewModel() {
         if (!silent) _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
             moveDeviceFollows()
+            val studentId = studentSession.studentId
+            val progress = runCatching { studentRepository.practiceProgress() }.getOrNull()
             runCatching { repository.catalog(appContext, forceRefresh = true) }
                 .onSuccess { catalog ->
                     _uiState.update {
                         it.copy(
+                            catalogOwnerId = studentId,
                             isLoading = false,
                             errorMessage = null,
                             catalog = catalog,
                             followedIds = catalog.followedTeacherIds ?: it.followedIds,
-                            bestScores = progressStore.allBestScores(),
-                            lastLessonId = progressStore.lastLessonId()
+                            progress = progress ?: it.progress
                         )
                     }
                 }
@@ -71,9 +74,33 @@ class CatalogViewModel : ViewModel() {
         }
     }
 
-    fun refreshProgress() {
+    /**
+     * Lessons and practice belong to a signed-in account: without one there are none, and the
+     * practice read back is the new account's own. The refresh a new account triggers brings
+     * its lessons.
+     */
+    fun onAccountChanged(signedIn: Boolean) {
+        val studentId = studentSession.studentId
         _uiState.update {
-            it.copy(bestScores = progressStore.allBestScores(), lastLessonId = progressStore.lastLessonId())
+            // A catalog fetched for another account still carries that account's lessons and follows.
+            val stale = it.catalogOwnerId != studentId
+            it.copy(
+                signedIn = signedIn,
+                catalogOwnerId = if (stale) studentId else it.catalogOwnerId,
+                followedIds = if (stale) emptySet() else it.followedIds,
+                catalog = if (!stale) it.catalog else it.catalog.copy(
+                    lessons = it.catalog.lessons.map { lesson -> lesson.copy(isOwned = null, offer = null) }
+                ),
+                // Another account's practice isn't this one's; the refresh that follows brings its own.
+                progress = if (stale) PracticeProgress() else it.progress
+            )
+        }
+    }
+
+    fun refreshProgress() {
+        viewModelScope.launch {
+            runCatching { studentRepository.practiceProgress() }
+                .onSuccess { progress -> _uiState.update { it.copy(progress = progress) } }
         }
     }
 
@@ -110,12 +137,21 @@ data class CatalogUiState(
     /** For a snackbar, unlike [errorMessage] which stands in for the catalog. */
     val message: String? = null,
     val catalog: Catalog = Catalog(),
+    /** Whether a signed-in account is using the app; without one there are no lessons of one's own. */
+    val signedIn: Boolean = false,
+    /** The account the catalog was fetched for. */
+    val catalogOwnerId: String? = null,
     /** Followed teacher ids. */
     val followedIds: Set<String> = emptySet(),
-    /** Keyed by [PracticeProgressStore.key]. */
-    val bestScores: Map<String, Int> = emptyMap(),
-    val lastLessonId: String? = null
+    /** Counted on the server. */
+    val progress: PracticeProgress = PracticeProgress()
 ) {
+    val lastLessonId: String? get() = progress.lastLessonId
+    val lastSectionId: String? get() = progress.lastSectionId
+
+    /** What the most recent take scored. */
+    val lastScore: Int? get() = progress.lastScore
+
     val teachers: List<Teacher>
         get() = catalog.teachers
 
@@ -125,10 +161,10 @@ data class CatalogUiState(
     val followedTeachers: List<Teacher>
         get() = teachers.filter { it.id in followedIds }
 
-    /** What Home shows: lessons the student has, paid for and waiting on, or has sung in. */
+    /** What Home shows: lessons the student has, or has sung in (a paid lesson's free first section counts). */
     val myLessons: List<Lesson>
-        get() = catalog.lessons.filter {
-            it.isOwned == true || it.purchaseStatus != null || (it.isOpen && practicedSections(it) > 0)
+        get() = if (!signedIn) emptyList() else catalog.lessons.filter {
+            it.isOwned == true || practicedSections(it) > 0
         }
 
     /** Every lesson on offer, the followed teachers' first. */
@@ -144,7 +180,7 @@ data class CatalogUiState(
     fun lesson(lessonId: String): Lesson? = catalog.lessons.firstOrNull { it.id == lessonId }
 
     fun bestScore(lessonId: String, sectionId: String): Int? =
-        bestScores[PracticeProgressStore.key(lessonId, sectionId)]
+        progress.bestScores[PracticeProgress.key(lessonId, sectionId)]
 
     fun practicedSections(lesson: Lesson): Int =
         lesson.sections.count { it.isAvailable && bestScore(lesson.id, it.id) != null }
@@ -176,6 +212,10 @@ data class CatalogUiState(
             playable.firstOrNull { it.id == lastLessonId && !isDone(it) }?.let { return it }
             return playable.firstOrNull { !isDone(it) }
         }
+
+    /** The lesson of the most recent take, when the student still has it open. */
+    val lastPracticedLesson: Lesson?
+        get() = lastLessonId?.let(::lesson)?.takeIf { it.isOpen && it.availableSections > 0 }
 
     /** The section to sing next in [lesson]: the first ready one not yet practiced; null once all are. */
     fun nextSection(lesson: Lesson): LessonSection? =

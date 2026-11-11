@@ -29,13 +29,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.graphics.StrokeCap
 import app.melova.ui.theme.MelovaDimens
 import app.melova.data.model.Lesson
-import app.melova.data.model.LessonPurchaseStatus
 import app.melova.platform.persianDigits
-import app.melova.ui.formatToman
+import app.melova.ui.saleChip
 import app.melova.ui.theme.MelovaAccent
 import app.melova.ui.theme.MelovaSmallShape
 import app.melova.ui.theme.MelovaAccentSoft
-import app.melova.ui.theme.MelovaError
 import app.melova.ui.theme.MelovaGold
 import app.melova.ui.theme.MelovaSecondary
 import app.melova.ui.theme.MelovaSuccess
@@ -122,11 +120,11 @@ fun MyLessonRow(lesson: Lesson, practiced: Int, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            when {
-                lesson.isOpen -> LessonProgressRing(practiced, lesson.availableSections)
-                lesson.purchaseStatus == LessonPurchaseStatus.REJECTED ->
-                    MelovaChip(text = "پرداخت پیدا نشد", color = MelovaError)
-                else -> MelovaChip(text = "در انتظار تأیید", color = MelovaGold)
+            if (lesson.isOpen) {
+                LessonProgressRing(practiced, lesson.availableSections)
+            } else {
+                // Sung only in the free first section: the rest waits for buying.
+                MelovaChip(text = saleChip(lesson), color = MelovaGold)
             }
         }
     }
@@ -163,20 +161,11 @@ fun LessonSearchRow(lesson: Lesson, onClick: () -> Unit) {
                 )
             }
             MelovaChip(
-                text = lesson.saleLabel(),
+                text = saleChip(lesson),
                 color = if (lesson.isOwned == true || lesson.isFree) MelovaSuccess else MelovaGold
             )
         }
     }
-}
-
-/** Where a lesson stands for this student: theirs, on its way, free, or its price. */
-private fun Lesson.saleLabel(): String = when {
-    isOwned == true -> "درس شما"
-    !isOpen && purchaseStatus == LessonPurchaseStatus.PENDING -> "در انتظار تأیید"
-    isFree -> "رایگان"
-    priceToman > 0 -> formatToman(priceToman)
-    else -> "پولی"
 }
 
 private val CoverColors = listOf(
@@ -236,7 +225,7 @@ fun LessonRowCard(
             }
             when {
                 !lesson.published -> MelovaChip(text = "پیش‌نویس", color = MelovaGold)
-                !lesson.isOpen -> MelovaChip(text = lesson.saleLabel(), color = MelovaGold)
+                !lesson.isOpen -> MelovaChip(text = saleChip(lesson), color = MelovaGold)
                 else -> LessonProgressRing(practiced, available)
             }
         }
