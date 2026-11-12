@@ -56,6 +56,8 @@ private const val WORK_NAME = "chat_alerts"
 private const val CHANNEL = "chat_messages"
 private const val LISTENING_CHANNEL = "chat_listening"
 private const val LISTENING_NOTIFICATION = 1
+private const val REMINDER_CHANNEL = "practice_reminder"
+private const val REMINDER_NOTIFICATION = 2
 private const val LOGO_COLOR = 0xFF9B7BFF.toInt()
 private const val CHECK_EVERY_MINUTES = 15L
 private const val MIN_RETRY_MS = 2_000L
@@ -228,6 +230,31 @@ private class ChatAlertTeller(private val context: Context) {
                 seen.putLong(chat.id, chat.lastMessageAtMs)
             }
         }
+        // The weekly practice reminder, which a browser gets pushed; the server gives it once.
+        runCatching { StudentRepository(context).claimPracticeReminder() }.getOrNull()?.let(::showReminder)
+    }
+
+    private fun showReminder(text: String) {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(NotificationChannel(REMINDER_CHANNEL, "یادآوری تمرین", NotificationManager.IMPORTANCE_DEFAULT))
+        }
+        val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val tap = open?.let {
+            PendingIntent.getActivity(context, REMINDER_NOTIFICATION, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        }
+        val notification = NotificationCompat.Builder(context, REMINDER_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(LOGO_COLOR)
+            .setContentTitle("ملووا")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentIntent(tap)
+            .setAutoCancel(true)
+            .build()
+        manager.notify(REMINDER_NOTIFICATION, notification)
     }
 
     private fun isOnScreen(): Boolean {

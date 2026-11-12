@@ -20,6 +20,7 @@ object AppScreen {
     const val FOLLOWED_TEACHERS = "profile/teachers"
     const val SETTINGS = "profile/settings"
     const val FAQ = "profile/faq"
+    const val PRACTICE_JOURNAL = "home/journal"
 
     const val SOLFEGE = "solfege"
     const val LESSON = "lesson/{${LessonIntroViewModel.ARG_LESSON_ID}}"

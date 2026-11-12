@@ -21,7 +21,9 @@ data class PracticeProgress(
     val lastLessonId: String? = null,
     val lastSectionId: String? = null,
     /** What the latest take scored (not the section's best). */
-    val lastScore: Int? = null
+    val lastScore: Int? = null,
+    /** Keyed by [key]: sections where the teacher said «آفرین» to a take. */
+    val stamped: Set<String> = emptySet()
 ) {
     companion object {
         fun key(lessonId: String, sectionId: String) = "$lessonId/$sectionId"

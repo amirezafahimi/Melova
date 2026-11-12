@@ -9,7 +9,10 @@ import app.melova.data.model.LessonTier
 import app.melova.data.model.LoginCodeSent
 import app.melova.data.model.LoginChannel
 import app.melova.data.model.LoginMethods
+import app.melova.data.model.JournalSection
+import app.melova.data.model.JournalTake
 import app.melova.data.model.PracticeProgress
+import app.melova.data.model.PracticeWeek
 import app.melova.data.model.PracticeTake
 import app.melova.data.model.PracticeTakeDetail
 import app.melova.data.model.StudentAccount
@@ -18,7 +21,10 @@ import app.melova.data.remote.FilePart
 import app.melova.data.remote.MelovaNetwork
 import app.melova.data.remote.api.StudentApi
 import app.melova.data.remote.apiCall
+import app.melova.data.remote.dto.JournalSectionDto
+import app.melova.data.remote.dto.JournalTakeDto
 import app.melova.data.remote.dto.LoginMethodsDto
+import app.melova.data.remote.dto.PracticeWeekDto
 import app.melova.data.remote.dto.PracticeTakeDto
 import app.melova.data.remote.mapper.toDomain
 import app.melova.data.remote.dto.StudentMeDto
@@ -26,6 +32,8 @@ import app.melova.data.remote.writeAtomically
 import app.melova.platform.LocalFile
 import app.melova.platform.PlatformContext
 import app.melova.platform.cacheDir
+import app.melova.platform.currentTimeMillis
+import app.melova.platform.utcOffsetMinutes
 import app.melova.platform.filesDir
 import app.melova.platform.supportsGoogleSignIn
 import kotlinx.coroutines.sync.Mutex
@@ -213,9 +221,26 @@ class StudentRepository(
             }.toMap(),
             lastLessonId = progress.last?.lessonId,
             lastSectionId = progress.last?.sectionId,
-            lastScore = progress.last?.score
+            lastScore = progress.last?.score,
+            stamped = progress.stamped.orEmpty().mapNotNullTo(mutableSetOf()) { section ->
+                PracticeProgress.key(section.lessonId ?: return@mapNotNullTo null, section.sectionId ?: return@mapNotNullTo null)
+            }
         )
     }
+
+    /** This week's practice days in the device's own time, so a day ends at the student's midnight. */
+    suspend fun practiceWeek(): PracticeWeek =
+        apiCall { api.practiceWeek(utcOffsetMinutes(currentTimeMillis())) }.toDomain()
+
+    suspend fun setPracticeWeek(goal: Int, reminders: Boolean): PracticeWeek =
+        apiCall { api.setPracticeWeek(goal, reminders, utcOffsetMinutes(currentTimeMillis())) }.toDomain()
+
+    /** The weekly reminder's text when it is due, for an app with no push address; null otherwise. */
+    suspend fun claimPracticeReminder(): String? =
+        apiCall { api.claimPracticeReminder() }.body?.takeIf { it.isNotBlank() }
+
+    suspend fun practiceJournal(): List<JournalSection> =
+        apiCall { api.practiceJournal() }.sections.orEmpty().mapNotNull { it.toDomain() }
 
     /** This section's earlier takes the practice page lists, newest first. */
     suspend fun practiceTakes(lessonId: String, sectionId: String): List<PracticeTake> =
@@ -282,3 +307,30 @@ private fun PracticeTakeDto.toDomain(): PracticeTake? {
         isRecent = "recent" in why
     )
 }
+
+internal fun PracticeWeekDto.toDomain(): PracticeWeek {
+    val week = days.orEmpty()
+    return PracticeWeek(
+        goal = (goal ?: PracticeWeek.DEFAULT_GOAL).coerceIn(PracticeWeek.MIN_GOAL, PracticeWeek.MAX_GOAL),
+        days = List(7) { week.getOrNull(it) == true },
+        today = (today ?: 0).coerceIn(0, 6),
+        practised = practised ?: 0,
+        fullWeeks = fullWeeks ?: 0,
+        reminders = reminders == true
+    )
+}
+
+private fun JournalTakeDto.toDomain(): JournalTake? =
+    JournalTake(id = id, score = score ?: return null, createdAtMs = ((createdAt ?: 0.0) * 1000).toLong())
+
+internal fun JournalSectionDto.toDomain(): JournalSection? = JournalSection(
+    lessonId = lessonId ?: return null,
+    sectionId = sectionId ?: return null,
+    lessonTitle = lessonTitle.orEmpty(),
+    sectionTitle = sectionTitle.orEmpty(),
+    first = first?.toDomain() ?: return null,
+    best = best?.toDomain() ?: return null,
+    takes = takes ?: 0,
+    lastAtMs = ((lastAt ?: 0.0) * 1000).toLong(),
+    stamped = stamped == true
+)

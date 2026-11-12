@@ -99,6 +99,7 @@ import app.melova.presentation.PlaybackTarget
 import app.melova.presentation.VocalTrainingMode
 import app.melova.presentation.VocalTrainingUiState
 import app.melova.presentation.VocalTrainingViewModel
+import app.melova.data.model.PracticeLevels
 import app.melova.ui.components.ErrorDetailSheet
 import app.melova.ui.components.ForwardArrow
 import app.melova.ui.components.MelovaBackground
@@ -1096,7 +1097,11 @@ private fun ScoreHero(result: VocalScoreResult, isNewBest: Boolean, onDismiss: (
                     color = MelovaText,
                     textAlign = TextAlign.Start
                 )
-                if (isNewBest) MelovaChip(text = "رکورد جدید در این بخش!", color = MelovaGold)
+                // Only a clear gain is called a record: the scorer moves a few points on changes nobody hears.
+                val previous = result.previousBest
+                if (isNewBest && previous != null && PracticeLevels.isRealNewBest(result.overall, previous)) {
+                    MelovaChip(text = persianDigits("رکورد تازه در این بخش، قبلی $previous"), color = MelovaGold)
+                }
             }
             if (onDismiss != null) {
                 MelovaMediaIconButton(

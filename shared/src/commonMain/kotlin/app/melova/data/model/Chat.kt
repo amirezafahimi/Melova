@@ -36,7 +36,9 @@ data class PracticeResultLink(
     val sectionTitle: String,
     /** Null when the scorer turned the take down. */
     val score: Int?,
-    val status: ReviewStatus
+    val status: ReviewStatus,
+    /** The teacher said «آفرین» to this take. */
+    val stamped: Boolean = false
 )
 
 data class ChatMessage(

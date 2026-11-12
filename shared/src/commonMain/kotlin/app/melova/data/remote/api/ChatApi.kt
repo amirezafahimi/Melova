@@ -124,6 +124,12 @@ class ChatApi(private val client: HttpClient, private val socketClient: HttpClie
             jsonBody(JsonObject(mapOf("text" to JsonPrimitive(text))))
         }.decode()
 
+    suspend fun stamp(teacherToken: String?, chatId: String, messageId: Long, stamped: Boolean): ChatThreadDto =
+        client.call(HttpMethod.Post, "api/v1/chats/${segment(chatId)}/messages/$messageId/stamp") {
+            header(TEACHER_TOKEN, teacherToken)
+            jsonBody(JsonObject(mapOf("stamped" to JsonPrimitive(stamped))))
+        }.decode()
+
     suspend fun delete(teacherToken: String?, chatId: String, messageId: Long): ChatThreadDto =
         client.call(HttpMethod.Delete, "api/v1/chats/${segment(chatId)}/messages/$messageId") {
             header(TEACHER_TOKEN, teacherToken)

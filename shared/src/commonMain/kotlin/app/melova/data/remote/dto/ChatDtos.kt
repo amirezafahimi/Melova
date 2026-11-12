@@ -68,7 +68,8 @@ data class PracticeResultLinkDto(
     @SerialName("lesson_title") val lessonTitle: String? = null,
     @SerialName("section_title") val sectionTitle: String? = null,
     @SerialName("score") val score: Int? = null,
-    @SerialName("status") val status: String? = null
+    @SerialName("status") val status: String? = null,
+    @SerialName("stamped") val stamped: Boolean? = null
 )
 
 @Serializable

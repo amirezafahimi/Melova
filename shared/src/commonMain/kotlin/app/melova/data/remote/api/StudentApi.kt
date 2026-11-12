@@ -10,12 +10,16 @@ import app.melova.data.remote.dto.FollowsDto
 import app.melova.data.remote.dto.LessonOfferDto
 import app.melova.data.remote.dto.LoginCodeSentDto
 import app.melova.data.remote.dto.LoginMethodsDto
+import app.melova.data.remote.dto.PracticeJournalDto
 import app.melova.data.remote.dto.PracticeProgressDto
+import app.melova.data.remote.dto.PracticeReminderDto
+import app.melova.data.remote.dto.PracticeWeekDto
 import app.melova.data.remote.dto.PracticeTakeDetailDto
 import app.melova.data.remote.dto.PracticeTakesDto
 import app.melova.data.remote.dto.StudentMeDto
 import app.melova.data.remote.multipartBody
 import io.ktor.client.HttpClient
+import io.ktor.client.request.parameter
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.HttpMethod
@@ -104,6 +108,28 @@ class StudentApi(private val client: HttpClient) {
     }.decode()
 
     suspend fun practice(): PracticeProgressDto = client.call(HttpMethod.Get, "api/v1/me/practice").decode()
+
+    suspend fun practiceWeek(utcOffsetMinutes: Int): PracticeWeekDto =
+        client.call(HttpMethod.Get, "api/v1/me/practice/week") { parameter("utc_offset_minutes", utcOffsetMinutes) }.decode()
+
+    suspend fun setPracticeWeek(goal: Int, reminders: Boolean, utcOffsetMinutes: Int): PracticeWeekDto =
+        client.call(HttpMethod.Put, "api/v1/me/practice/week") {
+            jsonBody(
+                JsonObject(
+                    mapOf(
+                        "goal" to JsonPrimitive(goal),
+                        "reminders" to JsonPrimitive(reminders),
+                        "utc_offset_minutes" to JsonPrimitive(utcOffsetMinutes)
+                    )
+                )
+            )
+        }.decode()
+
+    suspend fun claimPracticeReminder(): PracticeReminderDto =
+        client.call(HttpMethod.Post, "api/v1/me/practice/reminder").decode()
+
+    suspend fun practiceJournal(): PracticeJournalDto =
+        client.call(HttpMethod.Get, "api/v1/me/practice/journal").decode()
 
     suspend fun practiceTakes(lessonId: String, sectionId: String): PracticeTakesDto =
         client.call(HttpMethod.Get, "api/v1/me/lessons/${segment(lessonId)}/sections/${segment(sectionId)}/takes").decode()

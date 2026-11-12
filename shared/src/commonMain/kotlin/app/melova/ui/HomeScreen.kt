@@ -43,6 +43,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import app.melova.ui.components.MelovaNavRow
+import app.melova.ui.components.PracticeWeekCard
+import app.melova.ui.components.WeekGoalDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -105,12 +113,18 @@ fun HomeScreen(
     onSectionClick: (lessonId: String, sectionId: String) -> Unit,
     onSolfegeClick: () -> Unit,
     onExploreClick: () -> Unit,
+    onJournalClick: () -> Unit = {},
+    onSaveWeekGoal: (goal: Int, reminders: Boolean) -> Unit = { _, _ -> },
+    /** Whether this device can get the weekly reminder at all. */
+    canRemind: Boolean = false,
+    reminderNote: String? = null,
     unreadChats: Int = 0,
     /** Null until the person has someone to talk to, that is before they sign in. */
     onChatsClick: (() -> Unit)? = null
 ) {
     // Catch up with changes made in the teacher panel or by another device.
     LaunchedEffect(Unit) { onAppear() }
+    var editingGoal by remember { mutableStateOf(false) }
 
     val freePractice = listOf(
         FreePractice(Icons.Default.MusicNote, "گام و سلفژ", "ماژور و مینور، با دقت هر نت", onSolfegeClick)
@@ -159,6 +173,20 @@ fun HomeScreen(
                         }
                     }
 
+                    // Only once there is something to sing: an empty week is no use to a newcomer.
+                    val week = state.week
+                    if (week != null && state.totalSections > 0) {
+                        item(key = "week") { PracticeWeekCard(week = week, onEditGoal = { editingGoal = true }) }
+                        if (state.progress.bestScores.isNotEmpty()) item(key = "journal") {
+                            MelovaNavRow(
+                                icon = Icons.Outlined.AutoStories,
+                                title = "دفتر تمرین",
+                                subtitle = "اولین و بهترین اجرای هر بخش",
+                                onClick = onJournalClick
+                            )
+                        }
+                    }
+
                     // A newcomer's first step is finding a lesson, so that card comes before free practice.
                     val noLessons = state.hasContent && myLessons.isEmpty()
                     if (noLessons) item(key = "no-lessons") { NoLessonsCard(onExploreClick) }
@@ -198,6 +226,20 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    val week = state.week
+    if (editingGoal && week != null) {
+        WeekGoalDialog(
+            week = week,
+            canRemind = canRemind,
+            reminderNote = reminderNote,
+            onSave = { goal, reminders ->
+                editingGoal = false
+                onSaveWeekGoal(goal, reminders)
+            },
+            onDismiss = { editingGoal = false }
+        )
     }
 }
 

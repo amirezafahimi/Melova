@@ -293,6 +293,13 @@ class ChatViewModel : ViewModel() {
         changeMessage(messageId) { repository.deleteMessage(chatId, messageId) }
     }
 
+    /** The teacher's «آفرین» on a take the student sent, or taking it back. */
+    fun stampTake(messageId: Long, stamped: Boolean) {
+        val chatId = _uiState.value.openChatId ?: return
+        if (messageId in _uiState.value.busyMessageIds) return
+        changeMessage(messageId) { repository.stamp(chatId, messageId, stamped) }
+    }
+
     private fun changeMessage(messageId: Long, action: suspend () -> ChatUpdate) {
         _uiState.update { it.copy(busyMessageIds = it.busyMessageIds + messageId) }
         viewModelScope.launch {

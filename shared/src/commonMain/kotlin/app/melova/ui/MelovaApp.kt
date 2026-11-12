@@ -39,6 +39,7 @@ import androidx.navigation.navArgument
 import androidx.savedstate.read
 import app.melova.platform.BrowserBackButton
 import app.melova.platform.ChatLinks
+import app.melova.platform.NotificationState
 import app.melova.platform.rememberNotificationPermission
 import app.melova.presentation.CatalogViewModel
 import app.melova.presentation.ChatViewModel
@@ -201,6 +202,8 @@ fun MelovaApp(
                     onAppear = {
                         catalogViewModel.refresh(silent = true)
                         catalogViewModel.refreshProgress()
+                        // The weekly goal's reminder switch depends on this device's notifications.
+                        chatViewModel.refreshNotifications()
                     },
                     onLessonClick = { navController.navigate(AppScreen.lesson(it)) },
                     onSectionClick = { lessonId, sectionId ->
@@ -210,6 +213,21 @@ fun MelovaApp(
                     },
                     onSolfegeClick = { navController.navigate(AppScreen.SOLFEGE) },
                     onExploreClick = { selectTab(MainTab.EXPLORE) },
+                    onJournalClick = { navController.navigate(AppScreen.PRACTICE_JOURNAL) },
+                    onSaveWeekGoal = { goal, reminders ->
+                        catalogViewModel.setWeekGoal(goal, reminders)
+                        // A reminder needs this device's notifications; turning one on asks for them.
+                        if (reminders && chatState.notifications == NotificationState.OFF) askNotifications()
+                    },
+                    canRemind = chatState.notifications == NotificationState.ON ||
+                        chatState.notifications == NotificationState.OFF,
+                    reminderNote = when (chatState.notifications) {
+                        NotificationState.BLOCKED ->
+                            "یادآوری با اعلان می‌آید و اعلان ملووا مسدود است. از تنظیمات گوشی یا مرورگر آن را باز کنید."
+                        NotificationState.NEEDS_INSTALL ->
+                            "برای یادآوری روی آیفون، اول ملووا را به صفحه‌ی اصلی گوشی اضافه کنید."
+                        else -> null
+                    },
                     unreadChats = chatState.unread,
                     onChatsClick = if (canChat) {
                         { navController.navigate(AppScreen.CHATS) }
@@ -272,6 +290,17 @@ fun MelovaApp(
                         chatViewModel.forgetThisDevice()
                         studentViewModel.signOut()
                         navController.popBackStack()
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(AppScreen.PRACTICE_JOURNAL) {
+                PracticeJournalScreen(
+                    state = catalogState,
+                    onLoad = catalogViewModel::loadJournal,
+                    onOpenTake = { lessonId, sectionId, takeId ->
+                        navController.navigate(AppScreen.practicePastTake(lessonId, sectionId, takeId))
                     },
                     onBack = { navController.popBackStack() }
                 )

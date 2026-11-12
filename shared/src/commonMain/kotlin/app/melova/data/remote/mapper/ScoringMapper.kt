@@ -47,6 +47,7 @@ fun ScoringResponseDto.toDomain(): VocalScoreResult {
         },
         pitchLines = pitchLines?.toDomain(),
         bestScore = bestScore,
+        previousBest = previousBest,
         isNewBest = isNewBest
     )
 }

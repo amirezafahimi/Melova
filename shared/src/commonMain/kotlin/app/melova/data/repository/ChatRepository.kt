@@ -94,6 +94,10 @@ class ChatRepository(
     suspend fun deleteMessage(chatId: String, messageId: Long): ChatUpdate =
         apiCall { api.delete(session.token, chatId, messageId) }.run { toUpdate(chat, messages, removed) }
 
+    /** The teacher's «آفرین» on a take sent to them, or taking it back. */
+    suspend fun stamp(chatId: String, messageId: Long, stamped: Boolean): ChatUpdate =
+        apiCall { api.stamp(session.token, chatId, messageId, stamped) }.run { toUpdate(chat, messages, removed) }
+
     /** Whether this voice is already here, so it plays without waiting for the network. */
     fun hasVoice(message: ChatMessage): Boolean = voiceFile(message).let { it.exists() && it.length() > 0L }
 
@@ -199,6 +203,7 @@ private fun PracticeResultLinkDto.toDomain(): PracticeResultLink? {
         lessonTitle = lessonTitle.orEmpty(),
         sectionTitle = sectionTitle.orEmpty(),
         score = score,
-        status = ReviewStatus.fromRaw(status)
+        status = ReviewStatus.fromRaw(status),
+        stamped = stamped == true
     )
 }

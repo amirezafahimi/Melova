@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -67,6 +68,7 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -135,6 +137,8 @@ import app.melova.platform.rememberMicPermission
 import app.melova.presentation.ChatUiState
 import app.melova.presentation.ChatViewModel
 import app.melova.presentation.OutgoingMessage
+import app.melova.ui.components.MelovaSoftAction
+import app.melova.ui.components.AfarinStamp
 import app.melova.ui.components.ConfirmDialog
 import app.melova.ui.components.ForwardArrow
 import app.melova.ui.components.LiveLevelBars
@@ -538,7 +542,8 @@ private class MessageActions(
     val delete: (ChatMessage) -> Unit,
     val retry: (Long) -> Unit,
     val discard: (Long) -> Unit,
-    val openPractice: (PracticeResultLink) -> Unit
+    val openPractice: (PracticeResultLink) -> Unit,
+    val stamp: (ChatMessage, Boolean) -> Unit
 )
 
 @Composable
@@ -557,7 +562,8 @@ private fun rememberMessageActions(
         delete = { message -> onDelete(message.id) },
         retry = viewModel::retrySend,
         discard = viewModel::discardSend,
-        openPractice = onOpenPractice
+        openPractice = onOpenPractice,
+        stamp = { message, stamped -> viewModel.stampTake(message.id, stamped) }
     )
 }
 
@@ -753,7 +759,10 @@ private fun MessageBubble(
                         practice = practice,
                         note = message.text,
                         onClick = { actions.openPractice(practice) },
-                        onLongClick = openMenu
+                        onLongClick = openMenu,
+                        // A take is always the student's, so the side it isn't "mine" on is the teacher's.
+                        onStamp = if (!isMine) ({ stamped -> actions.stamp(message, stamped) }) else null,
+                        isBusy = isBusy
                     )
                 }
             }
@@ -1282,9 +1291,15 @@ private fun PracticeBubble(
     practice: PracticeResultLink,
     note: String,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    /** The teacher's way to say «آفرین» to this take, or take it back; null for the student. */
+    onStamp: ((Boolean) -> Unit)? = null,
+    isBusy: Boolean = false
 ) {
     val shape = RoundedCornerShape(20.dp)
+    // Played only when the stamp arrives while the chat is open, not for one already there.
+    val wasStamped = remember(practice.reviewId) { practice.stamped }
+    Box(modifier = Modifier.widthIn(max = 310.dp)) {
     Surface(
         shape = shape,
         color = MelovaCard,
@@ -1336,7 +1351,10 @@ private fun PracticeBubble(
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when (practice.status) {
-                    ReviewStatus.OPEN -> MelovaChip("در انتظار استاد", color = MelovaGold)
+                    // The stamp is the teacher's answer to the student; it stays open only on the teacher's side.
+                    ReviewStatus.OPEN -> if (!practice.stamped || onStamp != null) {
+                        MelovaChip("در انتظار استاد", color = MelovaGold)
+                    }
                     ReviewStatus.ANSWERED -> MelovaChip("پاسخ داده شد", color = MelovaSuccess)
                     ReviewStatus.REFUNDED -> MelovaChip("بسته شد، پیام برگشت", color = MelovaTextMuted)
                     ReviewStatus.RETURNED -> MelovaChip("بی‌پاسخ ماند، پیام برگشت", color = MelovaTextMuted)
@@ -1352,7 +1370,25 @@ private fun PracticeBubble(
                     ForwardArrow(tint = MelovaAccentSoft, modifier = iconOnBaseline(ARROW_LINE_UNIT))
                 }
             }
+            if (onStamp != null) {
+                MelovaSoftAction(
+                    text = if (practice.stamped) "برداشتن آفرین" else "آفرین",
+                    icon = if (practice.stamped) null else Icons.Outlined.Verified,
+                    onClick = { onStamp(!practice.stamped) },
+                    enabled = !isBusy,
+                    done = practice.stamped
+                )
+            }
         }
+    }
+    if (practice.stamped) {
+        AfarinStamp(
+            pressed = !wasStamped,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = (-8).dp, y = (-10).dp)
+        )
+    }
     }
 }
 

@@ -126,7 +126,48 @@ data class LastTakeDto(
 @Serializable
 data class PracticeProgressDto(
     @SerialName("best_scores") val bestScores: List<SectionBestDto>? = null,
-    @SerialName("last") val last: LastTakeDto? = null
+    @SerialName("last") val last: LastTakeDto? = null,
+    /** Sections where the teacher said «آفرین» to a take; the score field is unused. */
+    @SerialName("stamped") val stamped: List<SectionBestDto>? = null
+)
+
+/** This week's practice days, Saturday first, against the weekly goal. */
+@Serializable
+data class PracticeWeekDto(
+    @SerialName("goal") val goal: Int? = null,
+    @SerialName("days") val days: List<Boolean>? = null,
+    @SerialName("today") val today: Int? = null,
+    @SerialName("practised") val practised: Int? = null,
+    @SerialName("full_weeks") val fullWeeks: Int? = null,
+    @SerialName("reminders") val reminders: Boolean? = null
+)
+
+@Serializable
+data class PracticeReminderDto(@SerialName("body") val body: String? = null)
+
+@Serializable
+data class JournalTakeDto(
+    @SerialName("id") val id: String? = null,
+    @SerialName("score") val score: Int? = null,
+    @SerialName("created_at") val createdAt: Double? = null
+)
+
+@Serializable
+data class JournalSectionDto(
+    @SerialName("lesson_id") val lessonId: String?,
+    @SerialName("section_id") val sectionId: String?,
+    @SerialName("lesson_title") val lessonTitle: String? = null,
+    @SerialName("section_title") val sectionTitle: String? = null,
+    @SerialName("first") val first: JournalTakeDto? = null,
+    @SerialName("best") val best: JournalTakeDto? = null,
+    @SerialName("takes") val takes: Int? = null,
+    @SerialName("last_at") val lastAt: Double? = null,
+    @SerialName("stamped") val stamped: Boolean? = null
+)
+
+@Serializable
+data class PracticeJournalDto(
+    @SerialName("sections") val sections: List<JournalSectionDto>? = null
 )
 
 /** An earlier take of a section the practice page lists; [roles] says why it is kept. */

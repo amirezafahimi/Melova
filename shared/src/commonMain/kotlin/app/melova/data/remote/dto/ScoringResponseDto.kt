@@ -23,6 +23,7 @@ data class ScoringResponseDto(
     @SerialName("teacher_review") val teacherReview: TeacherReviewSuggestionDto? = null,
     /** Set once the take is kept for the student: the section's best score and whether this take set it. */
     @SerialName("best_score") val bestScore: Int? = null,
+    @SerialName("previous_best") val previousBest: Int? = null,
     @SerialName("is_new_best") val isNewBest: Boolean = false
 )
 

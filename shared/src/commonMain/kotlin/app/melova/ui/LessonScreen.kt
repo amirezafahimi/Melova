@@ -1,5 +1,7 @@
 package app.melova.ui
 
+import app.melova.data.model.SectionLevel
+import app.melova.ui.components.SectionLevelChip
 import app.melova.ui.components.ForwardArrow
 import app.melova.ui.theme.MelovaAccentTint
 import androidx.compose.ui.graphics.StrokeCap
@@ -207,6 +209,7 @@ fun LessonScreen(
                         number = index + 1,
                         section = section,
                         bestScore = catalogState.bestScore(lesson.id, section.id),
+                        level = catalogState.level(lesson.id, section.id),
                         locked = !isOwnTeacher && !lesson.isSectionOpen(section.id),
                         freeSample = locked && index == 0,
                         isNext = section.id == next?.id,
@@ -411,6 +414,7 @@ private fun SectionCard(
     number: Int,
     section: LessonSection,
     bestScore: Int?,
+    level: SectionLevel,
     locked: Boolean,
     isNext: Boolean,
     onClick: () -> Unit,
@@ -496,8 +500,8 @@ private fun SectionCard(
             } else if (isNext) {
                 MelovaChip(text = "بعدی", color = MelovaAccentSoft)
             } else if (section.isAvailable && !locked) {
-                if (bestScore != null) {
-                    Icon(Icons.Default.Check, contentDescription = null, tint = MelovaTextMuted)
+                if (level != SectionLevel.NOT_SUNG) {
+                    SectionLevelChip(level)
                 } else {
                     ForwardArrow(tint = MelovaTextMuted)
                 }

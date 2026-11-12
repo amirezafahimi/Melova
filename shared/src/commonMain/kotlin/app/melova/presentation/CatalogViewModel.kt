@@ -7,7 +7,11 @@ import app.melova.data.local.FollowStore
 import app.melova.data.local.StudentSession
 import app.melova.data.model.Catalog
 import app.melova.data.model.Lesson
+import app.melova.data.model.JournalSection
+import app.melova.data.model.PracticeLevels
 import app.melova.data.model.PracticeProgress
+import app.melova.data.model.PracticeWeek
+import app.melova.data.model.SectionLevel
 import app.melova.data.model.LessonSection
 import app.melova.data.model.Teacher
 import app.melova.data.repository.LessonRepository
@@ -42,6 +46,7 @@ class CatalogViewModel : ViewModel() {
     /** [silent] refreshes in the background without the pull-to-refresh spinner. */
     fun refresh(silent: Boolean = false) {
         if (!silent) _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        refreshWeek()
         viewModelScope.launch {
             moveDeviceFollows()
             val studentId = studentSession.studentId
@@ -92,15 +97,49 @@ class CatalogViewModel : ViewModel() {
                     lessons = it.catalog.lessons.map { lesson -> lesson.copy(isOwned = null, offer = null) }
                 ),
                 // Another account's practice isn't this one's; the refresh that follows brings its own.
-                progress = if (stale) PracticeProgress() else it.progress
+                progress = if (stale) PracticeProgress() else it.progress,
+                week = if (stale || !signedIn) null else it.week,
+                journal = if (stale || !signedIn) null else it.journal
             )
         }
+        refreshWeek()
     }
 
     fun refreshProgress() {
         viewModelScope.launch {
             runCatching { studentRepository.practiceProgress() }
                 .onSuccess { progress -> _uiState.update { it.copy(progress = progress) } }
+        }
+        refreshWeek()
+    }
+
+    private fun refreshWeek() {
+        if (!_uiState.value.signedIn) return
+        viewModelScope.launch {
+            runCatching { studentRepository.practiceWeek() }
+                .onSuccess { week -> _uiState.update { it.copy(week = week) } }
+        }
+    }
+
+    /** The card answers at once, and goes back if the server didn't take it. */
+    fun setWeekGoal(goal: Int, reminders: Boolean) {
+        val before = _uiState.value.week ?: return
+        _uiState.update { it.copy(week = before.copy(goal = goal, reminders = reminders)) }
+        viewModelScope.launch {
+            runCatching { studentRepository.setPracticeWeek(goal, reminders) }
+                .onSuccess { week -> _uiState.update { it.copy(week = week) } }
+                .onFailure { error ->
+                    _uiState.update { it.copy(week = before, message = error.message ?: "هدف هفته ذخیره نشد.") }
+                }
+        }
+    }
+
+    fun loadJournal() {
+        _uiState.update { it.copy(journalFailed = false) }
+        viewModelScope.launch {
+            runCatching { studentRepository.practiceJournal() }
+                .onSuccess { journal -> _uiState.update { it.copy(journal = journal) } }
+                .onFailure { _uiState.update { it.copy(journalFailed = true) } }
         }
     }
 
@@ -144,7 +183,12 @@ data class CatalogUiState(
     /** Followed teacher ids. */
     val followedIds: Set<String> = emptySet(),
     /** Counted on the server. */
-    val progress: PracticeProgress = PracticeProgress()
+    val progress: PracticeProgress = PracticeProgress(),
+    /** This week's practice days; null until known, and for someone not signed in. */
+    val week: PracticeWeek? = null,
+    /** Each section sung, first take against best; null until loaded. */
+    val journal: List<JournalSection>? = null,
+    val journalFailed: Boolean = false
 ) {
     val lastLessonId: String? get() = progress.lastLessonId
     val lastSectionId: String? get() = progress.lastSectionId
@@ -181,6 +225,11 @@ data class CatalogUiState(
 
     fun bestScore(lessonId: String, sectionId: String): Int? =
         progress.bestScores[PracticeProgress.key(lessonId, sectionId)]
+
+    fun level(lessonId: String, sectionId: String): SectionLevel = PracticeLevels.level(
+        best = bestScore(lessonId, sectionId),
+        stamped = PracticeProgress.key(lessonId, sectionId) in progress.stamped
+    )
 
     fun practicedSections(lesson: Lesson): Int =
         lesson.sections.count { it.isAvailable && bestScore(lesson.id, it.id) != null }
